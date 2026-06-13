@@ -11,7 +11,7 @@ import {
 import {
   setCurrentUnit, isMetric, inToMm, mmToIn, metricRoundIn,
   roundTo8th, roundTo4th, roundTo32nd, smartRound,
-  fmtInch, fmtInch32, fmtCm, setLengthViaUnit,
+  fmtInch, fmtInch32, fmtCm,
 } from "./utils/formatting.js";
 import { PI, GA_MEASUREMENT_ID, DEFAULT_SA, CORDS } from "./utils/constants.js";
 import {
@@ -19,6 +19,10 @@ import {
   cpTilePlan, cpTileLabel, cpRowLabel, cpTestSquareSVG, cpRegistrationMarks,
 } from "./utils/print-utils.js";
 import "./moonshot.css";
+import ComingSoon from "./components/ComingSoon.jsx";
+import PrintButton from "./components/PrintButton.jsx";
+import TrustBadge from "./components/TrustBadge.jsx";
+import FracInput from "./components/FracInput.jsx";
 
 // ── Google Analytics (GA4) ──────────────────────────────────────────────────
 // Basic anonymous page tracking only. Do not send user-entered calculator values.
@@ -87,88 +91,6 @@ function pipingStripWidth(dia, sa) { return smartRound(4*dia + 2*sa); }
 // Cord length offset: cord curves inside sewline
 // offset = 2π × (cord_radius + vinyl_thickness)
 function cordOffset(dia, vinylThick) { return 2*PI*(dia/2 + vinylThick); }
-
-// ── Fraction picker ───────────────────────────────────────────────────────────
-const FOPTS = [0,0.125,0.25,0.375,0.5,0.625,0.75,0.875];
-const FLBLS = ["0","1/8","1/4","3/8","1/2","5/8","3/4","7/8"];
-
-function FracInput({ label, sub, whole, frac, onWhole, onFrac, th, append }) {
-  const [focused, setFocused] = useState(false);
-  const valueInches = Math.max(0, (parseFloat(whole)||0) + (parseFloat(frac)||0));
-  const metricValue = Math.round(inToMm(valueInches) / 10 * 10) / 10; // cm to 1 decimal
-  const metricDisplay = focused && metricValue === 0 ? "" : (metricValue % 1 === 0 ? String(metricValue) : metricValue.toFixed(1));
-  const currentFrac = parseFloat(frac) || 0;
-  const standardFrac = FOPTS.some(f => Math.abs(f - currentFrac) < 0.0001);
-
-  if (isMetric()) {
-    return (
-      <div style={{ marginBottom:16 }}>
-        {label !== "" && (
-          <div style={{ fontSize:14, fontWeight:800, color:th.label, marginBottom:sub?2:6, fontFamily:"Nunito,sans-serif" }}>
-            {label}
-          </div>
-        )}
-        {sub && (
-          <div style={{ fontSize:13, fontWeight:600, color:th.sub, marginBottom:6, fontFamily:"Nunito,sans-serif", lineHeight:1.4 }}>
-            {sub}
-          </div>
-        )}
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <input type="number" min="0" step="0.1"
-            value={metricDisplay}
-            onFocus={e=>{setFocused(true);e.target.select();}}
-            onBlur={e=>{setFocused(false);if(e.target.value==="")setLengthViaUnit(0,onWhole,onFrac);}}
-            onChange={e=>setLengthViaUnit(e.target.value,onWhole,onFrac)}
-            style={{ width:118, padding:"9px 8px", fontSize:22, fontFamily:"DM Mono,monospace", fontWeight:500,
-              background:th.inputBg, border:`2px solid ${th.border}`, borderRadius:8,
-              color:th.inputTxt, outline:"none", textAlign:"center" }}
-          />
-          <div style={{ fontSize:20, fontFamily:"DM Mono,monospace", fontWeight:500, color:th.accent, minWidth:38 }}>
-            cm
-          </div>
-          {append && append}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ marginBottom:16 }}>
-      {label !== "" && (
-        <div style={{ fontSize:14, fontWeight:800, color:th.label, marginBottom:sub?2:6, fontFamily:"Nunito,sans-serif" }}>
-          {label}
-        </div>
-      )}
-      {sub && (
-        <div style={{ fontSize:13, fontWeight:600, color:th.sub, marginBottom:6, fontFamily:"Nunito,sans-serif", lineHeight:1.4 }}>
-          {sub}
-        </div>
-      )}
-      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-        <input type="number" min="0" step="1"
-          value={focused ? (whole===0?"":whole) : whole}
-          onFocus={e=>{setFocused(true);e.target.select();}}
-          onBlur={e=>{setFocused(false);if(e.target.value==="")onWhole(0);}}
-          onChange={e=>onWhole(Math.max(0,parseInt(e.target.value)||0))}
-          style={{ width:64, padding:"9px 8px", fontSize:22, fontFamily:"DM Mono,monospace", fontWeight:500,
-            background:th.inputBg, border:`2px solid ${th.border}`, borderRadius:8,
-            color:th.inputTxt, outline:"none", textAlign:"center" }}
-        />
-        <select value={standardFrac ? currentFrac : "custom"} onChange={e=>onFrac(e.target.value==="custom" ? currentFrac : parseFloat(e.target.value))}
-          style={{ padding:"9px 8px", fontSize:17, fontFamily:"DM Mono,monospace", fontWeight:500,
-            background:th.inputBg, border:`2px solid ${th.border}`, borderRadius:8,
-            color:th.inputTxt, outline:"none", cursor:"pointer" }}>
-          {!standardFrac && <option value="custom">custom</option>}
-          {FOPTS.map((f,i)=><option key={f} value={f}>{FLBLS[i]}</option>)}
-        </select>
-        <div style={{ fontSize:20, fontFamily:"DM Mono,monospace", fontWeight:500, color:th.accent, minWidth:56 }}>
-          {fmtInch(whole+frac)}
-        </div>
-        {append && append}
-      </div>
-    </div>
-  );
-}
 
 // ── Themes ────────────────────────────────────────────────────────────────────
 const T = {
@@ -3208,61 +3130,6 @@ function cpStat(k, v, d){
 }
 
 /* ── Small React helpers for this page ──────────────────────────────── */
-const CP_EIGHTHS = [
-  ["0",0],["1/8",0.125],["1/4",0.25],["3/8",0.375],
-  ["1/2",0.5],["5/8",0.625],["3/4",0.75],["7/8",0.875]
-];
-
-/* Compact fraction input — prototype `fi` widget, React-ified.
-   Imperial fraction: whole box + 16ths dropdown. Decimal toggle: single
-   inches box. Metric mode: single cm box (decimal). Same whole+frac state
-   contract as the app FracInput. */
-function CpFracInput({ label, whole, frac, onWhole, onFrac, ghost, decMode }){
-  const inches = Math.max(0, (parseFloat(whole)||0) + (parseFloat(frac)||0));
-  const currentFrac = parseFloat(frac) || 0;
-  const matchIdx = CP_EIGHTHS.findIndex(([,v]) => Math.abs(v - currentFrac) < 0.0001);
-  const metricValue = Math.round(inToMm(inches) / 10 * 10) / 10;
-
-  function setFromInches(val){
-    const v = Math.max(0, parseFloat(val) || 0);
-    const w = Math.floor(v);
-    onWhole(w); onFrac(Math.max(0, v - w));
-  }
-
-  return (
-    <div className={"cp-field" + (ghost ? " ghost" : "")}>
-      <label>{label}</label>
-      {isMetric() ? (
-        <div className="cp-fi">
-          <input type="number" className="dec" min="0" step="0.1" value={metricValue}
-            onChange={e=>setFromInches(mmToIn((parseFloat(e.target.value)||0) * 10))}
-            onFocus={e=>e.target.select()}/>
-          <span className="inch">cm</span>
-        </div>
-      ) : decMode ? (
-        <div className="cp-fi">
-          <input type="number" className="dec" min="0" step="0.125" value={inches}
-            onChange={e=>setFromInches(e.target.value)}
-            onFocus={e=>e.target.select()}/>
-          <span className="inch">{"\u2033"}</span>
-        </div>
-      ) : (
-        <div className="cp-fi">
-          <input type="number" min="0" step="1" value={whole}
-            onChange={e=>onWhole(Math.max(0, parseInt(e.target.value)||0))}
-            onFocus={e=>e.target.select()}/>
-          <select value={matchIdx >= 0 ? matchIdx : "custom"}
-            onChange={e=>{ if(e.target.value !== "custom") onFrac(CP_EIGHTHS[parseInt(e.target.value)][1]); }}>
-            {matchIdx < 0 && <option value="custom">custom</option>}
-            {CP_EIGHTHS.map(([lbl], i)=><option key={i} value={i}>{lbl}</option>)}
-          </select>
-          <span className="inch">{"\u2033"}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CpSeg({ options, value, set }){
   return (
     <div className="cp-seg">
@@ -3270,21 +3137,6 @@ function CpSeg({ options, value, set }){
         <button key={o.id} className={value===o.id ? "on" : ""} onClick={()=>set(o.id)}>{o.label}</button>
       ))}
     </div>
-  );
-}
-
-function CpPrintBtn({ label, onClick, small, disabled, meta }){
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      marginTop:small?10:12,background:disabled?"#d8c8ce":CP.maroon,color:disabled?"#7f6870":"#fff",
-      border:"none",cursor:disabled?"not-allowed":"pointer",width:"100%",
-      fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:small?14:15,
-      padding:small?"9px 12px":"10px 16px",borderRadius:small?8:10,
-      boxShadow:disabled?"none":"0 2px 5px rgba(111,21,46,.3)"
-    }}>
-      <span>{label}</span>
-      {meta&&<span style={{display:"block",fontSize:12,fontWeight:700,opacity:.82,marginTop:2}}>{meta}</span>}
-    </button>
   );
 }
 
@@ -3527,10 +3379,10 @@ function CurvedPanelPage() {
               <div className="cp-controlSection">
                 <h2>Starting Frame</h2>
                 <div className="cp-row">
-                  <CpFracInput label="Top width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
-                  <CpFracInput label="Bottom width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
-                  <CpFracInput label="Panel height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
-                  <CpFracInput label="Seam allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
+                  <FracInput variant="cp" label="Top width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
+                  <FracInput variant="cp" label="Bottom width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
+                  <FracInput variant="cp" label="Panel height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
+                  <FracInput variant="cp" label="Seam allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
                 </div>
                 <p className="cp-hint">These are design-intent dimensions. Actual cut and sewline sizes appear below the diagram.</p>
               </div>
@@ -3538,10 +3390,10 @@ function CurvedPanelPage() {
               <div className="cp-controlSection">
                 <h2>Edge Shape</h2>
                 <div className="cp-edgeFields">
-                  <CpFracInput label={matchingSides?"Left & right fullness":"Left fullness"} decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
-                  <CpFracInput label="Right fullness" decMode={decMode} ghost={matchingSides} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
-                  <CpFracInput label="Top crown" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
-                  <CpFracInput label="Bottom crown" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
+                  <FracInput variant="cp" label={matchingSides?"Left & right fullness":"Left fullness"} decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
+                  <FracInput variant="cp" label="Right fullness" decMode={decMode} ghost={matchingSides} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
+                  <FracInput variant="cp" label="Top crown" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
+                  <FracInput variant="cp" label="Bottom crown" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
                 </div>
                 <label className="cp-check"><input type="checkbox" checked={matchingSides} onChange={e=>setMatchingSides(e.target.checked)}/>Matching Sides</label>
                 <div style={{fontSize:12.5,fontWeight:800,margin:"5px 0 3px"}}>Curve feel</div>
@@ -3553,8 +3405,8 @@ function CurvedPanelPage() {
                 <div className="cp-controlSection">
                   <h2>Corners</h2>
                   <div className="cp-row">
-                    <CpFracInput label="Top softness" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
-                    <CpFracInput label="Bottom softness" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
+                    <FracInput variant="cp" label="Top softness" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
+                    <FracInput variant="cp" label="Bottom softness" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
                   </div>
                   <p className="cp-hint">0 keeps the join crisp. Higher values soften only the corner transition.</p>
                 </div>
@@ -3574,11 +3426,9 @@ function CurvedPanelPage() {
 
           {ready&&<>
             {model.notes.length>0&&<div className="cp-warn">Automatic geometry adjustments:<ul>{model.notes.map((n,i)=><li key={i}>{n}</li>)}</ul></div>}
-            <div className={"cp-status "+(model.valid?"ok":"bad")}>
-              {model.valid
-                ?"✓ Geometry verified: cut path and active sewline are non-crossing, correctly oriented, and contained."
-                :<><strong>Pattern output locked:</strong><ul style={{margin:"4px 0 0",paddingLeft:18}}>{model.errors.map((e,i)=><li key={i}>{e}</li>)}</ul></>}
-            </div>
+            <TrustBadge tone="cp" valid={model.valid}
+              okMessage="✓ Geometry verified: cut path and active sewline are non-crossing, correctly oriented, and contained."
+              lockLabel="Pattern output locked" errors={model.errors}/>
 
             <div className="cp-card cp-diagramCard" ref={diagramRef}>
               <svg viewBox="0 0 760 490" style={{width:"100%",height:"auto",display:"block"}} role="img" aria-label="Live curved panel diagram"
@@ -3632,13 +3482,13 @@ function CurvedPanelPage() {
               <h2>Matching Pieces</h2>
               <div style={{marginBottom:7}}><CpSeg value={sgView} set={setSgView} options={[{id:"sides",label:"Side Panels"},{id:"gusset",label:"Gusset"}]}/></div>
               {sgView==="sides"?<>
-                <div className="cp-row"><CpFracInput label="Finished side depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/></div>
+                <div className="cp-row"><FracInput variant="cp" label="Finished side depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/></div>
                 <p className="cp-hint">Assumes a constant finished depth and two matching main panels.</p>
                 {hasDepth&&model.valid?<>
                   <div dangerouslySetInnerHTML={{__html:sides.minis}}/><div dangerouslySetInnerHTML={{__html:sides.tables}}/>
                 </>:<p className="cp-hint">{model.valid?"Enter a finished side depth to generate the pieces.":"Correct the geometry above before side pieces are generated."}</p>}
               </>:<>
-                <div className="cp-row"><CpFracInput label="Finished gusset width" decMode={decMode} whole={gwW} frac={gwF} onWhole={setGwW} onFrac={setGwF}/></div>
+                <div className="cp-row"><FracInput variant="cp" label="Finished gusset width" decMode={decMode} whole={gwW} frac={gwF} onWhole={setGwW} onFrac={setGwF}/></div>
                 {hasGusset&&model.valid?<>
                   <div dangerouslySetInnerHTML={{__html:gusset.minis}}/><div dangerouslySetInnerHTML={{__html:gusset.tables}}/>
                 </>:<p className="cp-hint">{model.valid?"Enter a finished gusset width to generate the strip.":"Correct the geometry above before the gusset is generated."}</p>}
@@ -3650,15 +3500,15 @@ function CurvedPanelPage() {
               <div className="cp-printGrid">
                 <div className="cp-printCard">
                   <div className="pt">Main Panel</div><div className="pm">Actual cut path, active sewline, match marks, dimensions, and test squares.</div>
-                  <CpPrintBtn small label="Print Main Panel" meta={cpTileLabel(panelPlan)} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
+                  <PrintButton tone="cp" small label="Print Main Panel" meta={cpTileLabel(panelPlan)} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
                 </div>
                 <div className="cp-printCard">
                   <div className="pt">Side Panels</div><div className="pm">Exact matching strips with raw-top orientation and suggested clip/notch marks.</div>
-                  <CpPrintBtn small label="Print Side Panels" meta={sidePlan?cpTileLabel(sidePlan):"Add finished side depth"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
+                  <PrintButton tone="cp" small label="Print Side Panels" meta={sidePlan?cpTileLabel(sidePlan):"Add finished side depth"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
                 </div>
                 <div className="cp-printCard">
                   <div className="pt">Gusset</div><div className="pm">One continuous strip with side zones, end allowances, match marks, and tiling.</div>
-                  <CpPrintBtn small label="Print Gusset" meta={gusPlan?cpTileLabel(gusPlan):"Add finished gusset width"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
+                  <PrintButton tone="cp" small label="Print Gusset" meta={gusPlan?cpTileLabel(gusPlan):"Add finished gusset width"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
                 </div>
               </div>
             </div>
@@ -3695,16 +3545,7 @@ const BC_THEME={
 function bcFmt(v){ return isMetric()?fmtCm(v):bcFmtIn(v); }
 function bcFmtD(v){ return isMetric()?fmtCm(v):bcFmtDec(v); }
 
-const BC_EIGHTHS=[["0",0],["1/8",.125],["1/4",.25],["3/8",.375],["1/2",.5],["5/8",.625],["3/4",.75],["7/8",.875]];
-function BcFracInput({label,whole,frac,onWhole,onFrac,decMode,ghost}){
-  const inches=Math.max(0,(+whole||0)+(+frac||0));
-  const idx=BC_EIGHTHS.findIndex(x=>Math.abs(x[1]-(+frac||0))<1e-5);
-  const setIn=v=>{const n=Math.max(0,+v||0),w=Math.floor(n);onWhole(w);onFrac(n-w);};
-  const metric=Math.round(inToMm(inches))/10;
-  return <div className={"bc-field"+(ghost?" ghost":"")}><label>{label}</label>{isMetric()?<div className="bc-fi"><input className="dec" type="number" min="0" step="0.1" value={metric} onFocus={e=>e.target.select()} onChange={e=>setIn(mmToIn((+e.target.value||0)*10))}/><span className="unit">cm</span></div>:decMode?<div className="bc-fi"><input className="dec" type="number" min="0" step="0.125" value={inches} onFocus={e=>e.target.select()} onChange={e=>setIn(e.target.value)}/><span className="unit">″</span></div>:<div className="bc-fi"><input type="number" min="0" step="1" value={whole} onFocus={e=>e.target.select()} onChange={e=>onWhole(Math.max(0,parseInt(e.target.value)||0))}/><select value={idx<0?"custom":idx} onChange={e=>{if(e.target.value!=="custom")onFrac(BC_EIGHTHS[+e.target.value][1]);}}>{idx<0&&<option value="custom">custom</option>}{BC_EIGHTHS.map((x,i)=><option key={i} value={i}>{x[0]}</option>)}</select><span className="unit">″</span></div>}</div>;
-}
 function BcSeg({options,value,set}){return <div className="bc-seg">{options.map(o=><button key={o.id} className={value===o.id?"on":""} onClick={()=>set(o.id)}>{o.label}</button>)}</div>;}
-function BcPrintBtn({label,meta,onClick,disabled}){return <button onClick={onClick} disabled={disabled} style={{marginTop:10,background:disabled?"#dcc9ba":BC.pumpkin,color:disabled?"#806b5d":"#fff",border:"none",cursor:disabled?"not-allowed":"pointer",width:"100%",fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:14,padding:"10px 12px",borderRadius:8,boxShadow:disabled?"none":"0 2px 5px rgba(118,52,7,.28)"}}><span>{label}</span>{meta&&<span style={{display:"block",fontSize:12,fontWeight:700,opacity:.82,marginTop:2}}>{meta}</span>}</button>;}
 
 function bcRightAngleSVG(marker,X,Y,scale){
   const q=7,at={x:X(marker.at.x),y:Y(marker.at.y)};
@@ -3790,14 +3631,19 @@ function BoxedCornerPage(){
   useEffect(()=>{if(!dragging)return;const move=e=>{const d=dragRef.current;if(!d)return;d.lastX=e.clientX;setFloatPos(clampPos({x:e.clientX-d.dx,y:e.clientY-d.dy}))};const stop=()=>{const d=dragRef.current;if(d?.lastX<=34)dock("left");else if(d?.lastX>=window.innerWidth-34)dock("right");dragRef.current=null;setDragging(false)};window.addEventListener("pointermove",move);window.addEventListener("pointerup",stop,{once:true});return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",stop)}},[dragging,floatSize]);
   useEffect(()=>{if(!resizing)return;const move=e=>{const r=resizeRef.current;if(!r)return;const dx=r.side==="right"?r.x-e.clientX:e.clientX-r.x,next=clampSize({w:r.w+dx,h:r.h+e.clientY-r.y});setFloatSize(next);if(!r.side)setFloatPos(x=>clampPos(x,next))};const stop=()=>{resizeRef.current=null;setResizing(false)};window.addEventListener("pointermove",move);window.addEventListener("pointerup",stop,{once:true});return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",stop)}},[resizing,dockSide]);
   return <div className="bc-wrap" style={{minHeight:"100vh",padding:"16px 16px 48px"}}><div style={{background:th.sec,borderRadius:14,boxShadow:"0 4px 18px rgba(118,52,7,.11)"}}><SecHeader th={th} title="Boxed Corner" sub="Work backward from finished width, height, and depth. Rectangle and tapered panels use the same trusted corner model; folded pieces are mirrored exactly across the bottom fold."/><div style={{padding:"12px 12px 18px"}}><div className="bc-topbar"><div className="bc-hint" style={{margin:0}}>The diagram, dimension checks, and full-size print pattern all use the same geometry model.</div>{!isMetric()&&<label className="bc-decToggle"><input type="checkbox" checked={decMode} onChange={e=>setDecMode(e.target.checked)}/>Decimal input</label>}</div>
-    <div className="bc-card"><div className="bc-controlSection"><h2>Finished Dimensions</h2><div className="bc-row"><BcFracInput label="Top width" ghost={shape==="rect"} decMode={decMode} whole={shape==="rect"?bwW:twW} frac={shape==="rect"?bwF:twF} onWhole={setTwW} onFrac={setTwF}/><BcFracInput label="Bottom width" decMode={decMode} whole={bwW} frac={bwF} onWhole={setBwW} onFrac={setBwF}/><BcFracInput label="Height" decMode={decMode} whole={hW} frac={hF} onWhole={setHW} onFrac={setHF}/><BcFracInput label="Depth" decMode={decMode} whole={dW} frac={dF} onWhole={setDW} onFrac={setDF}/><BcFracInput label="Seam allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/></div><p className="bc-hint">For a rectangle, top width follows bottom width. A trapezoid may use different top and bottom widths.</p></div><div className="bc-lowerControls"><div className="bc-controlSection"><h2>Panel Layout</h2><BcSeg value={layout} set={setLayout} options={[{id:"two",label:"2 Separate Panels"},{id:"fold",label:"1 Mirrored Fold"}]}/><p className="bc-hint">The folded piece has no bottom seam allowance. Its side-edge corner leg still includes seam allowance so both boxed edges match after the side seam is sewn.</p></div><div className="bc-controlSection"><h2>Shape & Top</h2><BcSeg value={shape} set={setShape} options={[{id:"rect",label:"Rectangle"},{id:"trap",label:"Trapezoid"}]}/><div style={{height:6}}/><BcSeg value={topMode} set={setTopMode} options={[{id:"open",label:"Open Top"},{id:"enclosed",label:"Top Boxed"}]}/><p className="bc-hint">Every trapezoid box-cut leg leaves its own source edge at 90°; the two legs meet at the finished face corner.</p></div></div></div>
-    <div className="bc-card"><div className="bc-controlSection"><h2>Stabilizer</h2><BcSeg value={stabEnabled?"add":"none"} set={v=>setStabEnabled(v==="add")} options={[{id:"none",label:"No Stabilizer"},{id:"add",label:"Add Stabilizer"}]}/>{stabEnabled&&<><div className="bc-stabGrid"><BcFracInput label="Offset from fabric cut edge" decMode={decMode} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/><button className="bc-matchSa" onClick={()=>setStabilizerValue(sa)}>Match Seam Allowance</button><div className="bc-stabPrint"><label>Print stabilizer</label><BcSeg value={stabPrintMode} set={setStabPrintMode} options={[{id:"overlay",label:"On Main Pattern"},{id:"separate",label:"Separately"}]}/></div></div><p className="bc-hint">The stabilizer is one continuous inset of the fabric outline. Matching the seam allowance keeps it out of the stitched seams; on sewn edges, the green stabilizer line will intentionally coincide with the grey stitch line. Choose a larger offset when you want more clearance.</p></>}</div></div>
-    {m.notes.length>0&&<div className="bc-warn">Geometry note:<ul>{m.notes.map((x,i)=><li key={i}>{x}</li>)}</ul></div>}<div className={"bc-status "+(m.valid?"ok":"bad")}>{m.valid?"✓ Finished dimensions verified: top, bottom, height, and depth reconstruct exactly from the cut geometry.":<><strong>Pattern output locked:</strong><ul style={{margin:"4px 0 0",paddingLeft:18}}>{m.errors.map((x,i)=><li key={i}>{x}</li>)}</ul></>}</div>
-    {stabEnabled&&<div className={"bc-status "+(m.stabilizer.valid?"ok":"bad")}>{m.stabilizer.valid?`✓ Stabilizer outline verified ${bcFmt(m.stabilizer.offset)} inside every fabric cut edge.`:<><strong>Stabilizer output locked:</strong><ul style={{margin:"4px 0 0",paddingLeft:18}}>{m.stabilizer.errors.map((x,i)=><li key={i}>{x}</li>)}</ul></>}</div>}
+    <div className="bc-card"><div className="bc-controlSection"><h2>Finished Dimensions</h2><div className="bc-row"><FracInput variant="bc" label="Top width" ghost={shape==="rect"} decMode={decMode} whole={shape==="rect"?bwW:twW} frac={shape==="rect"?bwF:twF} onWhole={setTwW} onFrac={setTwF}/><FracInput variant="bc" label="Bottom width" decMode={decMode} whole={bwW} frac={bwF} onWhole={setBwW} onFrac={setBwF}/><FracInput variant="bc" label="Height" decMode={decMode} whole={hW} frac={hF} onWhole={setHW} onFrac={setHF}/><FracInput variant="bc" label="Depth" decMode={decMode} whole={dW} frac={dF} onWhole={setDW} onFrac={setDF}/><FracInput variant="bc" label="Seam allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/></div><p className="bc-hint">For a rectangle, top width follows bottom width. A trapezoid may use different top and bottom widths.</p></div><div className="bc-lowerControls"><div className="bc-controlSection"><h2>Panel Layout</h2><BcSeg value={layout} set={setLayout} options={[{id:"two",label:"2 Separate Panels"},{id:"fold",label:"1 Mirrored Fold"}]}/><p className="bc-hint">The folded piece has no bottom seam allowance. Its side-edge corner leg still includes seam allowance so both boxed edges match after the side seam is sewn.</p></div><div className="bc-controlSection"><h2>Shape & Top</h2><BcSeg value={shape} set={setShape} options={[{id:"rect",label:"Rectangle"},{id:"trap",label:"Trapezoid"}]}/><div style={{height:6}}/><BcSeg value={topMode} set={setTopMode} options={[{id:"open",label:"Open Top"},{id:"enclosed",label:"Top Boxed"}]}/><p className="bc-hint">Every trapezoid box-cut leg leaves its own source edge at 90°; the two legs meet at the finished face corner.</p></div></div></div>
+    <div className="bc-card"><div className="bc-controlSection"><h2>Stabilizer</h2><BcSeg value={stabEnabled?"add":"none"} set={v=>setStabEnabled(v==="add")} options={[{id:"none",label:"No Stabilizer"},{id:"add",label:"Add Stabilizer"}]}/>{stabEnabled&&<><div className="bc-stabGrid"><FracInput variant="bc" label="Offset from fabric cut edge" decMode={decMode} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/><button className="bc-matchSa" onClick={()=>setStabilizerValue(sa)}>Match Seam Allowance</button><div className="bc-stabPrint"><label>Print stabilizer</label><BcSeg value={stabPrintMode} set={setStabPrintMode} options={[{id:"overlay",label:"On Main Pattern"},{id:"separate",label:"Separately"}]}/></div></div><p className="bc-hint">The stabilizer is one continuous inset of the fabric outline. Matching the seam allowance keeps it out of the stitched seams; on sewn edges, the green stabilizer line will intentionally coincide with the grey stitch line. Choose a larger offset when you want more clearance.</p></>}</div></div>
+    {m.notes.length>0&&<div className="bc-warn">Geometry note:<ul>{m.notes.map((x,i)=><li key={i}>{x}</li>)}</ul></div>}
+    <TrustBadge tone="bc" valid={m.valid}
+      okMessage="✓ Finished dimensions verified: top, bottom, height, and depth reconstruct exactly from the cut geometry."
+      lockLabel="Pattern output locked" errors={m.errors}/>
+    {stabEnabled&&<TrustBadge tone="bc" valid={m.stabilizer.valid}
+      okMessage={`✓ Stabilizer outline verified ${bcFmt(m.stabilizer.offset)} inside every fabric cut edge.`}
+      lockLabel="Stabilizer output locked" errors={m.stabilizer.errors}/>}
     <div className="bc-card bc-diagramCard"><svg viewBox="0 0 760 520" style={{width:"100%",height:"auto",display:"block"}} role="img" aria-label="Live boxed corner panel diagram" dangerouslySetInnerHTML={{__html:bcPanelDiagramSVG(m)}}/><p className="bc-diagramLegend">Solid pumpkin = fabric cut &nbsp; Grey dashed = assembly stitch lines &nbsp; Purple dash-dot = center / place on fold &nbsp; Cyan dashed = bottom fold {stabEnabled&&m.stabilizer.valid&&<>&nbsp; Green dash-dot = stabilizer cut</>}</p></div>{m.valid&&<BcResultBand m={m}/>} 
     {canFloat&&floatOpen&&dockSide&&collapsed&&<button className={"bc-dockTab "+dockSide} style={{top:Math.max(86,Math.min(floatPos.y,typeof window!=="undefined"?window.innerHeight-210:120))}} onClick={undock}><span className="bc-liveDot" style={{background:m.valid?"#2f9a62":"#c23b47"}}/>Live Pattern Feed</button>}
     {canFloat&&floatOpen&&!(dockSide&&collapsed)&&<div ref={floatRef} className={"bc-floatDock"+(dragging?" dragging":"")+(resizing?" resizing":"")+(dockSide?" docked-"+dockSide:"")} style={dockSide?{[dockSide]:0,top:Math.max(72,Math.min(floatPos.y,typeof window!=="undefined"?window.innerHeight-Math.min(floatSize.h,window.innerHeight-82)-10:86)),width:floatSize.w,height:typeof window!=="undefined"?Math.min(floatSize.h,window.innerHeight-82):floatSize.h}:{left:floatPos.x,top:floatPos.y,width:floatSize.w,height:floatSize.h}}><div className="bc-floatHead" onPointerDown={startDrag}><div className="bc-missionBrand"><span className="bc-liveDot" style={{background:m.valid?"#2f9a62":"#c23b47"}}/><div><div className="bc-missionTitle">MoonShot Mission Control</div><div className="bc-missionFeed">Live Boxed-Corner Feed</div></div></div><button className="bc-floatClose" onPointerDown={e=>e.stopPropagation()} onClick={()=>{setDockSide(dockSide||"right");setCollapsed(true)}}>×</button></div><div className="bc-floatNav"><button onClick={()=>dock("left")}>← Dock Left</button><button onClick={reset}>ReCenter</button><button onClick={()=>dock("right")}>Dock Right →</button></div><div className="bc-floatBody"><svg viewBox="0 0 760 520" style={{width:"100%",height:"auto",display:"block"}} dangerouslySetInnerHTML={{__html:bcPanelDiagramSVG(m)}}/><div className="bc-floatMeta">{bcFmt(m.cutBB.w)} W × {bcFmt(m.cutBB.h)} H cut · {bcFmt(params.depth)} finished depth · {m.labels.layout}</div></div><div className={"bc-resizeHandle "+(dockSide==="right"?"left":"right")} onPointerDown={startResize}/></div>}
-    <div className="bc-card" style={{marginTop:8}}><h2>Print Pattern</h2><div className="bc-printGrid"><div className="bc-printCard"><div className="pt">Main Panel</div><div className="pm">Actual-size fabric cut outline, assembly stitch lines only, center place-on-fold line, bottom fold where used, perpendicular-corner marks, registration crosses, and test squares.{overlayStabilizer?" The stabilizer cut line is overlaid in green.":""}</div><BcPrintBtn label="Print Main Panel" meta={cpTileLabel(plan)} disabled={!m.valid||(overlayRequested&&!m.stabilizer.valid)} onClick={()=>bcPrintPanel(m,overlayStabilizer)}/></div>{stabEnabled&&stabPrintMode==="separate"&&<div className="bc-printCard"><div className="pt">Stabilizer</div><div className="pm">A separate actual-size pattern inset {bcFmt(stabilizerOffset)} from the fabric cut edge, with its own center place-on-fold line and bottom fold when applicable.</div><BcPrintBtn label="Print Stabilizer" meta={stabPlan?cpTileLabel(stabPlan):"Adjust stabilizer offset"} disabled={!m.valid||!m.stabilizer.valid||!stabPlan} onClick={()=>bcPrintStabilizer(m)}/></div>}</div></div>
+    <div className="bc-card" style={{marginTop:8}}><h2>Print Pattern</h2><div className="bc-printGrid"><div className="bc-printCard"><div className="pt">Main Panel</div><div className="pm">Actual-size fabric cut outline, assembly stitch lines only, center place-on-fold line, bottom fold where used, perpendicular-corner marks, registration crosses, and test squares.{overlayStabilizer?" The stabilizer cut line is overlaid in green.":""}</div><PrintButton tone="bc" label="Print Main Panel" meta={cpTileLabel(plan)} disabled={!m.valid||(overlayRequested&&!m.stabilizer.valid)} onClick={()=>bcPrintPanel(m,overlayStabilizer)}/></div>{stabEnabled&&stabPrintMode==="separate"&&<div className="bc-printCard"><div className="pt">Stabilizer</div><div className="pm">A separate actual-size pattern inset {bcFmt(stabilizerOffset)} from the fabric cut edge, with its own center place-on-fold line and bottom fold when applicable.</div><PrintButton tone="bc" label="Print Stabilizer" meta={stabPlan?cpTileLabel(stabPlan):"Adjust stabilizer offset"} disabled={!m.valid||!m.stabilizer.valid||!stabPlan} onClick={()=>bcPrintStabilizer(m)}/></div>}</div></div>
   </div></div></div>;
 }
 
@@ -3854,80 +3700,6 @@ function NavRocketIcon() {
       <circle className="spark" cx="2.1" cy="8" r=".8" fill="rgba(255,255,255,.9)" style={{animationDelay:"-.7s"}}/>
       <circle className="spark" cx="15.9" cy="5.5" r=".6" fill="rgba(255,221,143,.95)" style={{animationDelay:"-1.5s"}}/>
     </svg>
-  );
-}
-
-function MoonshotRocket({ label }) {
-  const id = `moonshot-${String(label).toLowerCase().replace(/[^a-z0-9]+/g,"-")}`;
-  const stars = [
-    [24,64,2.2,-.2],[45,28,1.4,-1.1],[84,18,1.8,-2.2],[136,20,1.2,-.7],[181,46,2.1,-1.7],
-    [199,92,1.5,-2.5],[192,146,2.4,-.4],[171,190,1.3,-1.4],[138,220,1.9,-2.8],[78,222,1.2,-.9],
-    [39,194,2.1,-2],[18,150,1.3,-1.2],[17,104,1.8,-2.4],[61,77,1.1,-.5],[163,93,1.1,-1.9]
-  ];
-  return (
-    <svg width="190" height="230" viewBox="0 0 220 260" fill="none" aria-hidden="true" style={{overflow:"visible"}}>
-      <defs>
-        <radialGradient id={`${id}-halo`} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(110 117) rotate(90) scale(112)">
-          <stop stopColor="rgba(77,224,212,.13)"/>
-          <stop offset=".72" stopColor="rgba(77,224,212,.035)"/>
-          <stop offset="1" stopColor="rgba(77,224,212,0)"/>
-        </radialGradient>
-        <linearGradient id={`${id}-body`} x1="110" y1="26" x2="110" y2="166" gradientUnits="userSpaceOnUse">
-          <stop stopColor="rgba(115,241,229,.24)"/>
-          <stop offset="1" stopColor="rgba(63,196,187,.08)"/>
-        </linearGradient>
-      </defs>
-      <circle cx="110" cy="116" r="108" fill={`url(#${id}-halo)`}/>
-      <circle cx="110" cy="116" r="91" stroke="rgba(124,235,224,.08)" strokeDasharray="2 8"/>
-      {stars.map(([cx,cy,r,delay],i)=><circle key={i} className="moon-star" cx={cx} cy={cy} r={r}
-        fill={i%3===0?"rgba(255,220,142,.9)":"rgba(255,255,255,.82)"} style={{animationDelay:`${delay}s`}}/>)}
-      <g opacity=".72">
-        <path className="moon-star" d="M33 111 l2.2 4.5 4.5 2.2-4.5 2.2-2.2 4.5-2.2-4.5-4.5-2.2 4.5-2.2Z" fill="rgba(255,255,255,.72)" style={{animationDelay:"-1.8s"}}/>
-        <path className="moon-star" d="M184 123 l1.8 3.6 3.6 1.8-3.6 1.8-1.8 3.6-1.8-3.6-3.6-1.8 3.6-1.8Z" fill="rgba(255,214,128,.8)" style={{animationDelay:"-.9s"}}/>
-        <path className="moon-star" d="M151 56 l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3-3-1.5 3-1.5Z" fill="rgba(255,255,255,.72)" style={{animationDelay:"-2.6s"}}/>
-      </g>
-      <ellipse cx="110" cy="239" rx="31" ry="7" fill="rgba(255,255,255,.055)"/>
-      <g>
-        <path className="moon-flame" d="M91 157 C79 181 87 218 110 246 C133 218 141 181 129 157 C122 172 118 181 110 193 C102 181 98 172 91 157Z" fill="rgba(255,157,47,.28)" stroke="rgba(255,188,79,.45)"/>
-        <path className="moon-flame mid" d="M98 159 C91 181 98 211 110 232 C122 211 129 181 122 159 C118 174 115 184 110 194 C105 184 102 174 98 159Z" fill="rgba(255,198,74,.5)"/>
-        <path className="moon-flame core" d="M104 160 C101 179 105 201 110 216 C115 201 119 179 116 160 C114 172 112 181 110 187 C108 181 106 172 104 160Z" fill="rgba(255,240,174,.82)"/>
-        <circle className="moon-spark" cx="91" cy="185" r="2.2" fill="rgba(255,211,104,.8)" style={{animationDelay:"-.3s"}}/>
-        <circle className="moon-spark" cx="132" cy="193" r="1.7" fill="rgba(255,239,175,.85)" style={{animationDelay:"-1.1s"}}/>
-        <circle className="moon-spark" cx="101" cy="214" r="1.4" fill="rgba(255,191,71,.8)" style={{animationDelay:"-1.55s"}}/>
-      </g>
-      <path d="M110 25 C110 25 70 63 71 123 L110 162 L149 123 C150 63 110 25 110 25Z"
-        fill={`url(#${id}-body)`} stroke="rgba(105,235,222,.75)" strokeWidth="2.2"/>
-      <path d="M75 115 L55 158 L91 145" fill="rgba(255,190,72,.12)" stroke="rgba(255,198,78,.52)" strokeWidth="1.8"/>
-      <path d="M145 115 L165 158 L129 145" fill="rgba(255,190,72,.12)" stroke="rgba(255,198,78,.52)" strokeWidth="1.8"/>
-      <circle cx="110" cy="92" r="15" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.62)" strokeWidth="2"/>
-      <circle cx="110" cy="92" r="8.5" fill="rgba(74,220,211,.1)"/>
-      <path d="M84 129 H136" stroke="rgba(255,255,255,.16)" strokeWidth="1.4" strokeDasharray="5 5"/>
-    </svg>
-  );
-}
-
-function ComingSoon({ label }) {
-  return (
-    <div style={{ minHeight:"calc(100vh - 170px)", padding:"18px 16px 48px" }}>
-      <div style={{
-        minHeight:480, display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", padding:"44px 20px 58px", gap:8,
-        background:"radial-gradient(circle at 50% 22%, #302066 0%, #211247 48%, #170c34 100%)",
-        border:"1px solid rgba(112,221,210,0.18)", borderRadius:16,
-        boxShadow:"0 10px 28px rgba(24,10,54,0.22)",
-        color:"rgba(255,255,255,0.4)", textAlign:"center", overflow:"hidden"
-      }}>
-        <MoonshotRocket label={label}/>
-        <div style={{ fontFamily:"Nunito,sans-serif", fontWeight:900, fontSize:"1.18rem",
-                      color:"rgba(255,255,255,0.72)", letterSpacing:"0.025em", marginTop:-5 }}>
-          {label}
-        </div>
-        <div style={{ fontFamily:"Nunito,sans-serif", fontSize:".92rem",
-                      color:"rgba(255,255,255,0.38)", maxWidth:290, lineHeight:1.55 }}>
-          This calculator is in the queue.<br/>Check back soon.
-        </div>
-      </div>
-    </div>
   );
 }
 

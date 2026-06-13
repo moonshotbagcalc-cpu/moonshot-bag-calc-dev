@@ -1,0 +1,687 @@
+/* =====================================================================
+   MoonShot Bag Calculator — style-capture add-on
+   Reference only: paste near the end of moonshot.css later, after the
+   current :root block. It does not change the app until JSX inline styles
+   are converted to classNames / CSS variables.
+
+   Captures:
+   - legacy active-tab palettes from App.jsx T object
+   - shared legacy component styles: SecHeader, Card, CardTitle, RRow,
+     InfoBox, NoteBox, SubTabs, Nudge, Divider, SABar, FracInput
+   - app shell/header/footer tokens
+   - Lid/Bottom diagram tokens
+   - a shared "Mission Control" floating dock token layer
+   ===================================================================== */
+
+:root {
+  /* Existing app fonts already declared in moonshot.css; repeated here for reference. */
+  --ms-font-sans: var(--font-sans, Nunito, sans-serif);
+  --ms-font-mono: var(--font-mono, "DM Mono", monospace);
+
+  /* App shell / header / intro / footer tokens pulled from App.jsx inline styles. */
+  --ms-shell-bg: #1e1040;
+  --ms-shell-bg-deep: #140d30;
+  --ms-wordmark-accent: #9880d8;
+  --ms-mobile-peek-accent: #b8a8e8;
+  --ms-unit-active-bg: #c8b8f0;
+  --ms-unit-active-ink: #1e1040;
+  --ms-unit-off-ink: rgba(255,255,255,0.68);
+  --ms-unit-border: rgba(152,128,216,0.5);
+  --ms-thread-guide-bg: #ccc8d8;
+  --ms-thread-guide-border: #b8b0cc;
+  --ms-thread-guide-ink: #3a1060;
+  --ms-intro-grad-a: #2a1860;
+  --ms-intro-grad-b: #1a0e40;
+  --ms-intro-kicker: #c8b8f0;
+  --ms-intro-copy: rgba(255,255,255,0.72);
+  --ms-footer-bg: #140d30;
+  --ms-footer-muted: rgba(255,255,255,0.35);
+  --ms-footer-copy: rgba(255,255,255,0.45);
+  --ms-footer-fine: rgba(255,255,255,0.2);
+  --ms-footer-link: #b8a8e8;
+  --ms-footer-button-bg: rgba(152,128,216,0.15);
+  --ms-footer-button-border: rgba(152,128,216,0.3);
+
+  /* Shared status / warning colors used by the legacy helper components. */
+  --ms-ok-bg: #e0f5ea;
+  --ms-ok-border: #5aaa80;
+  --ms-ok-ink: #1a5c38;
+  --ms-warn-bg: #fdf4e0;
+  --ms-warn-border: #d4a820;
+  --ms-warn-ink: #6b4400;
+  --ms-custom-bg: #fef3c7;
+  --ms-custom-border: #c08800;
+
+  /* Active nav/page accent colors. Under-construction tabs intentionally omitted. */
+  --ms-nav-basic: #7658b3;
+  --ms-nav-advanced: #9a3e52;
+  --ms-nav-pockets: #356b9b;
+  --ms-page-lid: #5a2da0;
+  --ms-page-gusset: #1a6e3a;
+  --ms-page-piping: #8e1a9e;
+  --ms-page-accordion: #1a4a7a;
+  --ms-page-curved: #7a1a2e;
+  --ms-page-boxed: #a84f14;
+
+  /* Page background colors/pattern accents for active, non-blank tabs. */
+  --ms-bg-lid: #f0ecfc;
+  --ms-bg-lid-stroke: #5a2da0;
+  --ms-bg-gusset: #ecf8f0;
+  --ms-bg-gusset-stroke: #1a6e3a;
+  --ms-bg-piping: #f8eefb;
+  --ms-bg-piping-stroke: #8e1a9e;
+  --ms-bg-accordion: #eaf2fc;
+  --ms-bg-accordion-stroke: #1a4a7a;
+  --ms-bg-curved: #f2e8ea;
+  --ms-bg-curved-stroke: #7a1a2e;
+  --ms-bg-boxed: #faf0e8;
+  --ms-bg-boxed-stroke: #a84f14;
+
+
+  /* Lid & Bottom / purple palette from App.jsx T.purple. */
+  --ms-lid-sec: #ede8f7;
+  --ms-lid-hdr: #5a2da0;
+  --ms-lid-hdr-txt: #fff;
+  --ms-lid-card: #faf8ff;
+  --ms-lid-border: #b09ee0;
+  --ms-lid-label: #4a1f96;
+  --ms-lid-sub: #8a70c0;
+  --ms-lid-accent: #5a2da0;
+  --ms-lid-input-bg: #f3f0fc;
+  --ms-lid-input-txt: #2e1060;
+  --ms-lid-res-bg: #e2daf5;
+  --ms-lid-res-accent: #4a1f96;
+  --ms-lid-res-txt: #2e1060;
+  --ms-lid-btn-on: #5a2da0;
+  --ms-lid-btn-on-txt: #fff;
+  --ms-lid-btn-off: #e2daf5;
+  --ms-lid-btn-off-txt: #4a1f96;
+  --ms-lid-info: #ede8f7;
+  --ms-lid-info-bdr: #9880d0;
+  --ms-lid-info-txt: #3a1880;
+  --ms-lid-ok: #e0f5ea;
+  --ms-lid-ok-bdr: #5aaa80;
+  --ms-lid-ok-txt: #1a5c38;
+  --ms-lid-warn: #fdf4e0;
+  --ms-lid-warn-bdr: #d4a820;
+  --ms-lid-warn-txt: #6b4400;
+  --ms-lid-nudge-bg: #e2daf5;
+  --ms-lid-nudge-txt: #4a1f96;
+  --ms-lid-page-bg: #f0ecfc;
+
+  /* Gusset / green palette from App.jsx T.green. */
+  --ms-gusset-sec: #e2f5e8;
+  --ms-gusset-hdr: #1a6e3a;
+  --ms-gusset-hdr-txt: #fff;
+  --ms-gusset-card: #f4fbf6;
+  --ms-gusset-border: #72c490;
+  --ms-gusset-label: #165c30;
+  --ms-gusset-sub: #3a9e60;
+  --ms-gusset-accent: #1a6e3a;
+  --ms-gusset-input-bg: #eaf7ee;
+  --ms-gusset-input-txt: #0e3d20;
+  --ms-gusset-res-bg: #ceeedd;
+  --ms-gusset-res-accent: #165c30;
+  --ms-gusset-res-txt: #0e3d20;
+  --ms-gusset-btn-on: #1a6e3a;
+  --ms-gusset-btn-on-txt: #fff;
+  --ms-gusset-btn-off: #ceeedd;
+  --ms-gusset-btn-off-txt: #165c30;
+  --ms-gusset-info: #e2f5e8;
+  --ms-gusset-info-bdr: #72c490;
+  --ms-gusset-info-txt: #0e3d20;
+  --ms-gusset-warn: #fdf4e0;
+  --ms-gusset-warn-bdr: #d4a820;
+  --ms-gusset-warn-txt: #6b4400;
+  --ms-gusset-nudge-bg: #ceeedd;
+  --ms-gusset-nudge-txt: #165c30;
+  --ms-gusset-page-bg: #ecf8f0;
+
+  /* Piping / magenta palette from App.jsx T.magenta. */
+  --ms-piping-sec: #f5e2f8;
+  --ms-piping-hdr: #8e1a9e;
+  --ms-piping-hdr-txt: #fff;
+  --ms-piping-card: #fdf5ff;
+  --ms-piping-border: #d090e0;
+  --ms-piping-label: #741880;
+  --ms-piping-sub: #c060d8;
+  --ms-piping-accent: #8e1a9e;
+  --ms-piping-input-bg: #f8eefb;
+  --ms-piping-input-txt: #4a0a58;
+  --ms-piping-res-bg: #eecef5;
+  --ms-piping-res-accent: #741880;
+  --ms-piping-res-txt: #4a0a58;
+  --ms-piping-btn-on: #8e1a9e;
+  --ms-piping-btn-on-txt: #fff;
+  --ms-piping-btn-off: #eecef5;
+  --ms-piping-btn-off-txt: #741880;
+  --ms-piping-info: #f5e2f8;
+  --ms-piping-info-bdr: #c070d8;
+  --ms-piping-info-txt: #4a0a58;
+  --ms-piping-warn: #fdf4e0;
+  --ms-piping-warn-bdr: #d4a820;
+  --ms-piping-warn-txt: #6b4400;
+  --ms-piping-nudge-bg: #eecef5;
+  --ms-piping-nudge-txt: #741880;
+  --ms-piping-page-bg: #f8eefb;
+
+  /* Accordion Pocket / blue palette from App.jsx T.blue. */
+  --ms-accordion-sec: #e0eaf7;
+  --ms-accordion-hdr: #1a4a7a;
+  --ms-accordion-hdr-txt: #fff;
+  --ms-accordion-card: #f4f8ff;
+  --ms-accordion-border: #7aaad8;
+  --ms-accordion-label: #0e3060;
+  --ms-accordion-sub: #3a70a8;
+  --ms-accordion-accent: #1a4a7a;
+  --ms-accordion-input-bg: #eaf2fc;
+  --ms-accordion-input-txt: #0a1e40;
+  --ms-accordion-res-bg: #ccdff5;
+  --ms-accordion-res-accent: #0e3060;
+  --ms-accordion-res-txt: #0a1e40;
+  --ms-accordion-btn-on: #1a4a7a;
+  --ms-accordion-btn-on-txt: #fff;
+  --ms-accordion-btn-off: #ccdff5;
+  --ms-accordion-btn-off-txt: #0e3060;
+  --ms-accordion-info: #e0eaf7;
+  --ms-accordion-info-bdr: #5a90c8;
+  --ms-accordion-info-txt: #0a1e40;
+  --ms-accordion-ok: #e0f5ea;
+  --ms-accordion-ok-bdr: #5aaa80;
+  --ms-accordion-ok-txt: #1a5c38;
+  --ms-accordion-warn: #fdf4e0;
+  --ms-accordion-warn-bdr: #d4a820;
+  --ms-accordion-warn-txt: #6b4400;
+  --ms-accordion-nudge-bg: #ccdff5;
+  --ms-accordion-nudge-txt: #0e3060;
+  --ms-accordion-page-bg: #eaf2fc;
+
+  /* Legacy Advanced wrapper / maroon palette from App.jsx T.advanced. */
+  --ms-legacy-curved-sec: #f5eaec;
+  --ms-legacy-curved-hdr: #7a1a2e;
+  --ms-legacy-curved-hdr-txt: #fff;
+  --ms-legacy-curved-card: #fdf5f6;
+  --ms-legacy-curved-border: #c48090;
+  --ms-legacy-curved-label: #5c1020;
+  --ms-legacy-curved-sub: #a04060;
+  --ms-legacy-curved-accent: #7a1a2e;
+  --ms-legacy-curved-input-bg: #f8eef0;
+  --ms-legacy-curved-input-txt: #3a0818;
+  --ms-legacy-curved-res-bg: #eeccd4;
+  --ms-legacy-curved-res-accent: #5c1020;
+  --ms-legacy-curved-res-txt: #3a0818;
+  --ms-legacy-curved-btn-on: #7a1a2e;
+  --ms-legacy-curved-btn-on-txt: #fff;
+  --ms-legacy-curved-btn-off: #eeccd4;
+  --ms-legacy-curved-btn-off-txt: #5c1020;
+  --ms-legacy-curved-info: #f5eaec;
+  --ms-legacy-curved-info-bdr: #b06070;
+  --ms-legacy-curved-info-txt: #3a0818;
+  --ms-legacy-curved-ok: #e0f5ea;
+  --ms-legacy-curved-ok-bdr: #5aaa80;
+  --ms-legacy-curved-ok-txt: #1a5c38;
+  --ms-legacy-curved-warn: #fdf4e0;
+  --ms-legacy-curved-warn-bdr: #d4a820;
+  --ms-legacy-curved-warn-txt: #6b4400;
+  --ms-legacy-curved-nudge-bg: #eeccd4;
+  --ms-legacy-curved-nudge-txt: #5c1020;
+  --ms-legacy-curved-page-bg: #f2e8ea;
+
+  /* Lid/Bottom diagram tokens from DT object. */
+  --ms-diagram-lid-fill: #ede8f7;
+  --ms-diagram-lid-stroke: #5a2da0;
+  --ms-diagram-side-fill: #e2daf5;
+  --ms-diagram-side-stroke: #4a1f96;
+  --ms-diagram-sew-stroke: #8a70c0;
+  --ms-diagram-panel-name: #4a1f96;
+  --ms-diagram-panel-sub: #8a70c0;
+  --ms-diagram-radius-dot: #5a2da0;
+  --ms-diagram-radius-text: #4a1f96;
+  --ms-diagram-dim-line: #5a2da0;
+  --ms-diagram-svg-bg: #ffffff;
+
+  /* Shared floating dock reference layer for Curved Panel + Boxed Corner.
+     Current moonshot.css already has .cp-floatDock and .bc-floatDock rules;
+     these are neutral tokens for a future shared .ms-floatDock refactor. */
+  --ms-float-min-w: 280px;
+  --ms-float-min-h: 250px;
+  --ms-float-max-w: calc(100vw - 20px);
+  --ms-float-max-h: calc(100vh - 20px);
+  --ms-float-radius: 13px;
+  --ms-float-z: 35;
+  --ms-float-shadow-cp: 0 14px 34px rgba(86,24,49,.25);
+  --ms-float-shadow-cp-active: 0 18px 42px rgba(86,24,49,.34);
+  --ms-float-shadow-bc: 0 14px 34px rgba(96,49,18,.22);
+  --ms-float-shadow-bc-active: 0 18px 42px rgba(96,49,18,.32);
+}
+
+/* =====================================================================
+   Future wrapper scopes
+   ---------------------------------------------------------------------
+   Later JSX idea:
+     <div className="ms-theme-lid"><SecHeader ... /></div>
+   Then the generic .ms-* component classes below read from --theme-*.
+   ===================================================================== */
+
+.ms-theme-lid {
+  --theme-sec: var(--ms-lid-sec);
+  --theme-hdr: var(--ms-lid-hdr);
+  --theme-hdr-txt: var(--ms-lid-hdr-txt);
+  --theme-card: var(--ms-lid-card);
+  --theme-border: var(--ms-lid-border);
+  --theme-label: var(--ms-lid-label);
+  --theme-sub: var(--ms-lid-sub);
+  --theme-accent: var(--ms-lid-accent);
+  --theme-input-bg: var(--ms-lid-input-bg);
+  --theme-input-txt: var(--ms-lid-input-txt);
+  --theme-res-bg: var(--ms-lid-res-bg);
+  --theme-res-accent: var(--ms-lid-res-accent);
+  --theme-res-txt: var(--ms-lid-res-txt);
+  --theme-btn-on: var(--ms-lid-btn-on);
+  --theme-btn-on-txt: var(--ms-lid-btn-on-txt);
+  --theme-btn-off: var(--ms-lid-btn-off);
+  --theme-btn-off-txt: var(--ms-lid-btn-off-txt);
+  --theme-info: var(--ms-lid-info);
+  --theme-info-bdr: var(--ms-lid-info-bdr);
+  --theme-info-txt: var(--ms-lid-info-txt);
+  --theme-nudge-bg: var(--ms-lid-nudge-bg);
+  --theme-nudge-txt: var(--ms-lid-nudge-txt);
+}
+
+.ms-theme-gusset {
+  --theme-sec: var(--ms-gusset-sec);
+  --theme-hdr: var(--ms-gusset-hdr);
+  --theme-hdr-txt: var(--ms-gusset-hdr-txt);
+  --theme-card: var(--ms-gusset-card);
+  --theme-border: var(--ms-gusset-border);
+  --theme-label: var(--ms-gusset-label);
+  --theme-sub: var(--ms-gusset-sub);
+  --theme-accent: var(--ms-gusset-accent);
+  --theme-input-bg: var(--ms-gusset-input-bg);
+  --theme-input-txt: var(--ms-gusset-input-txt);
+  --theme-res-bg: var(--ms-gusset-res-bg);
+  --theme-res-accent: var(--ms-gusset-res-accent);
+  --theme-res-txt: var(--ms-gusset-res-txt);
+  --theme-btn-on: var(--ms-gusset-btn-on);
+  --theme-btn-on-txt: var(--ms-gusset-btn-on-txt);
+  --theme-btn-off: var(--ms-gusset-btn-off);
+  --theme-btn-off-txt: var(--ms-gusset-btn-off-txt);
+  --theme-info: var(--ms-gusset-info);
+  --theme-info-bdr: var(--ms-gusset-info-bdr);
+  --theme-info-txt: var(--ms-gusset-info-txt);
+  --theme-nudge-bg: var(--ms-gusset-nudge-bg);
+  --theme-nudge-txt: var(--ms-gusset-nudge-txt);
+}
+
+.ms-theme-piping {
+  --theme-sec: var(--ms-piping-sec);
+  --theme-hdr: var(--ms-piping-hdr);
+  --theme-hdr-txt: var(--ms-piping-hdr-txt);
+  --theme-card: var(--ms-piping-card);
+  --theme-border: var(--ms-piping-border);
+  --theme-label: var(--ms-piping-label);
+  --theme-sub: var(--ms-piping-sub);
+  --theme-accent: var(--ms-piping-accent);
+  --theme-input-bg: var(--ms-piping-input-bg);
+  --theme-input-txt: var(--ms-piping-input-txt);
+  --theme-res-bg: var(--ms-piping-res-bg);
+  --theme-res-accent: var(--ms-piping-res-accent);
+  --theme-res-txt: var(--ms-piping-res-txt);
+  --theme-btn-on: var(--ms-piping-btn-on);
+  --theme-btn-on-txt: var(--ms-piping-btn-on-txt);
+  --theme-btn-off: var(--ms-piping-btn-off);
+  --theme-btn-off-txt: var(--ms-piping-btn-off-txt);
+  --theme-info: var(--ms-piping-info);
+  --theme-info-bdr: var(--ms-piping-info-bdr);
+  --theme-info-txt: var(--ms-piping-info-txt);
+  --theme-nudge-bg: var(--ms-piping-nudge-bg);
+  --theme-nudge-txt: var(--ms-piping-nudge-txt);
+}
+
+.ms-theme-accordion {
+  --theme-sec: var(--ms-accordion-sec);
+  --theme-hdr: var(--ms-accordion-hdr);
+  --theme-hdr-txt: var(--ms-accordion-hdr-txt);
+  --theme-card: var(--ms-accordion-card);
+  --theme-border: var(--ms-accordion-border);
+  --theme-label: var(--ms-accordion-label);
+  --theme-sub: var(--ms-accordion-sub);
+  --theme-accent: var(--ms-accordion-accent);
+  --theme-input-bg: var(--ms-accordion-input-bg);
+  --theme-input-txt: var(--ms-accordion-input-txt);
+  --theme-res-bg: var(--ms-accordion-res-bg);
+  --theme-res-accent: var(--ms-accordion-res-accent);
+  --theme-res-txt: var(--ms-accordion-res-txt);
+  --theme-btn-on: var(--ms-accordion-btn-on);
+  --theme-btn-on-txt: var(--ms-accordion-btn-on-txt);
+  --theme-btn-off: var(--ms-accordion-btn-off);
+  --theme-btn-off-txt: var(--ms-accordion-btn-off-txt);
+  --theme-info: var(--ms-accordion-info);
+  --theme-info-bdr: var(--ms-accordion-info-bdr);
+  --theme-info-txt: var(--ms-accordion-info-txt);
+  --theme-nudge-bg: var(--ms-accordion-nudge-bg);
+  --theme-nudge-txt: var(--ms-accordion-nudge-txt);
+}
+
+/* Optional old Advanced wrapper palette, retained only because CurvedPanelPage
+   still declares const th = T.advanced in App.jsx. The newer .cp-* CSS should
+   stay the primary Curved Panel styling direction. */
+.ms-theme-legacy-curved {
+  --theme-sec: var(--ms-legacy-curved-sec);
+  --theme-hdr: var(--ms-legacy-curved-hdr);
+  --theme-hdr-txt: var(--ms-legacy-curved-hdr-txt);
+  --theme-card: var(--ms-legacy-curved-card);
+  --theme-border: var(--ms-legacy-curved-border);
+  --theme-label: var(--ms-legacy-curved-label);
+  --theme-sub: var(--ms-legacy-curved-sub);
+  --theme-accent: var(--ms-legacy-curved-accent);
+  --theme-input-bg: var(--ms-legacy-curved-input-bg);
+  --theme-input-txt: var(--ms-legacy-curved-input-txt);
+  --theme-res-bg: var(--ms-legacy-curved-res-bg);
+  --theme-res-accent: var(--ms-legacy-curved-res-accent);
+  --theme-res-txt: var(--ms-legacy-curved-res-txt);
+  --theme-btn-on: var(--ms-legacy-curved-btn-on);
+  --theme-btn-on-txt: var(--ms-legacy-curved-btn-on-txt);
+  --theme-btn-off: var(--ms-legacy-curved-btn-off);
+  --theme-btn-off-txt: var(--ms-legacy-curved-btn-off-txt);
+  --theme-info: var(--ms-legacy-curved-info);
+  --theme-info-bdr: var(--ms-legacy-curved-info-bdr);
+  --theme-info-txt: var(--ms-legacy-curved-info-txt);
+  --theme-nudge-bg: var(--ms-legacy-curved-nudge-bg);
+  --theme-nudge-txt: var(--ms-legacy-curved-nudge-txt);
+}
+
+/* =====================================================================
+   Legacy shared component class targets
+   ---------------------------------------------------------------------
+   These mirror the inline style components in App.jsx. They are not wired
+   yet; use as targets when replacing inline styles.
+   ===================================================================== */
+
+.ms-section {
+  background: var(--theme-sec);
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(26,74,122,0.12);
+}
+
+.ms-sec-header {
+  background: var(--theme-hdr);
+  border-radius: 14px 14px 0 0;
+  padding: 18px 22px 14px;
+}
+
+.ms-sec-title {
+  font-family: var(--ms-font-sans);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--theme-hdr-txt);
+}
+
+.ms-sec-subtitle {
+  font-family: var(--ms-font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.85);
+  margin-top: 5px;
+}
+
+.ms-card {
+  background: var(--theme-card);
+  border: 1.5px solid var(--theme-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.ms-card-title {
+  font-family: var(--ms-font-sans);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--theme-label);
+  border-bottom: 2px solid var(--theme-border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.ms-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.ms-result-label {
+  font-family: var(--ms-font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--theme-label);
+}
+
+.ms-result-value {
+  font-family: var(--ms-font-mono);
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--theme-res-txt);
+}
+
+.ms-result-value.is-big { font-size: 24px; }
+.ms-result-value.is-accent { color: var(--theme-res-accent); }
+
+.ms-info-box {
+  background: var(--theme-info);
+  border: 1.5px solid var(--theme-info-bdr);
+  border-radius: 8px;
+  padding: 11px 14px;
+  margin-top: 10px;
+  font-family: var(--ms-font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--theme-info-txt);
+}
+
+.ms-note-box {
+  background: var(--ms-warn-bg);
+  border: 1.5px solid var(--ms-warn-border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  margin-top: 10px;
+  font-family: var(--ms-font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ms-warn-ink);
+}
+
+.ms-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.ms-subtab {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 6px;
+  border: none;
+  border-radius: 8px;
+  background: var(--theme-btn-off);
+  color: var(--theme-btn-off-txt);
+  cursor: pointer;
+  font-family: var(--ms-font-sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+
+.ms-subtab.is-active {
+  background: var(--theme-btn-on);
+  color: var(--theme-btn-on-txt);
+}
+
+.ms-nudge {
+  width: 100%;
+  flex: 1;
+  padding: 4px 2px;
+  border: 1.5px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-nudge-bg);
+  color: var(--theme-nudge-txt);
+  cursor: pointer;
+  font-family: var(--ms-font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.ms-divider {
+  border-top: 2px dashed var(--theme-border);
+  margin: 14px 0;
+  opacity: 0.5;
+}
+
+.ms-sa-bar {
+  background: var(--theme-card);
+  border: 1.5px solid var(--theme-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.ms-sa-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ms-sa-button {
+  padding: 10px 14px;
+  border: 2px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-btn-off);
+  color: var(--theme-btn-off-txt);
+  cursor: pointer;
+  font-family: var(--ms-font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.ms-sa-button.is-active {
+  background: var(--theme-btn-on);
+  border-color: var(--theme-btn-on);
+  color: var(--theme-btn-on-txt);
+}
+
+.ms-custom-sa-input,
+.ms-frac-input,
+.ms-frac-select {
+  border: 2px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-input-bg);
+  color: var(--theme-input-txt);
+  outline: none;
+  text-align: center;
+  font-family: var(--ms-font-mono);
+  font-weight: 500;
+}
+
+.ms-custom-sa-input {
+  width: 88px;
+  padding: 10px 8px;
+  font-size: 14px;
+}
+
+.ms-custom-sa-input.is-custom {
+  background: var(--ms-custom-bg);
+  border-color: var(--ms-custom-border);
+}
+
+.ms-frac-field { margin-bottom: 16px; }
+
+.ms-frac-label {
+  font-family: var(--ms-font-sans);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--theme-label);
+  margin-bottom: 6px;
+}
+
+.ms-frac-sub {
+  font-family: var(--ms-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--theme-sub);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.ms-frac-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ms-frac-input {
+  width: 64px;
+  padding: 9px 8px;
+  font-size: 22px;
+}
+
+.ms-frac-input.is-metric { width: 118px; }
+
+.ms-frac-select {
+  padding: 9px 8px;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.ms-frac-unit {
+  min-width: 56px;
+  font-family: var(--ms-font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--theme-accent);
+}
+
+.ms-frac-unit.is-metric { min-width: 38px; }
+
+/* Optional shared floating dock future class. Keep current .cp-floatDock and
+   .bc-floatDock rules until the JSX is deliberately refactored. */
+.ms-floatDock {
+  position: fixed;
+  z-index: var(--ms-float-z);
+  min-width: var(--ms-float-min-w);
+  min-height: var(--ms-float-min-h);
+  max-width: var(--ms-float-max-w);
+  max-height: var(--ms-float-max-h);
+  border-radius: var(--ms-float-radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ms-floatDock.docked-left {
+  border-left: none;
+  border-radius: 0 var(--ms-float-radius) var(--ms-float-radius) 0;
+}
+
+.ms-floatDock.docked-right {
+  border-right: none;
+  border-radius: var(--ms-float-radius) 0 0 var(--ms-float-radius);
+}
+
+@media (max-width: 700px) {
+  .ms-floatDock { display: none; }
+}

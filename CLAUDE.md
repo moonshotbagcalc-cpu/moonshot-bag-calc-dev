@@ -102,6 +102,11 @@ src/
     print-utils.js     ← page counting, rotation logic, tiling math
     constants.js       ← default SA values, unit labels, breakpoints
 
+> Note: TileSystem.jsx is deferred. src/utils/print-utils.js fulfills the
+> TileSystem role for now (pure tiling math, labels, test squares, registration
+> marks). A thin TileSystem.jsx wrapper component should be created in Pass 4
+> when tab components begin needing print UI rendering.
+
 ### Refactor Passes (in order)
 
 **Pass 1 — Extract utilities**
