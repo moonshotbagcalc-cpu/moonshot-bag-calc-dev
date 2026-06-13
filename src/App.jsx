@@ -4,13 +4,16 @@ import {
 } from "./utils/formatting.js";
 import { GA_MEASUREMENT_ID } from "./utils/constants.js";
 import "./moonshot.css";
-import ComingSoon from "./components/ComingSoon.jsx";
 import GussetPage from "./tabs/Gusset.jsx";
 import PipingPage from "./tabs/Piping.jsx";
 import LidPage from "./tabs/LidBottom.jsx";
 import AccordionPocketPage from "./tabs/AccordionPocket.jsx";
 import CurvedPanelPage from "./tabs/CurvedPanel.jsx";
 import BoxedCornerPage from "./tabs/BoxedCorner.jsx";
+import FoldTuckPage from "./tabs/FoldTuck.jsx";
+import ZipperedPocketPage from "./tabs/ZipperedPocket.jsx";
+import WeltPocketPage from "./tabs/WeltPocket.jsx";
+import TrimsStrapsPage from "./tabs/TrimsStraps.jsx";
 
 // ── Google Analytics (GA4) ──────────────────────────────────────────────────
 // Basic anonymous page tracking only. Do not send user-entered calculator values.
@@ -405,10 +408,10 @@ export default function MoonshotBagCalc() {
       <div style={{display:page==="bottle"   ?"block":"none"}}><AccordionPocketPage /></div>
       <div style={{display:page==="advanced" ?"block":"none"}}><CurvedPanelPage /></div>
       <div style={{display:page==="boxed"     ?"block":"none"}}><BoxedCornerPage /></div>
-      <div style={{display:page==="foldtuck"  ?"block":"none"}}><ComingSoon label="Fold & Tuck" /></div>
-      <div style={{display:page==="zippered"  ?"block":"none"}}><ComingSoon label="Zippered Pocket" /></div>
-      <div style={{display:page==="welt"      ?"block":"none"}}><ComingSoon label="Welt Pocket" /></div>
-      <div style={{display:page==="trims"     ?"block":"none"}}><ComingSoon label="Trims & Straps" /></div>
+      <div style={{display:page==="foldtuck"  ?"block":"none"}}><FoldTuckPage /></div>
+      <div style={{display:page==="zippered"  ?"block":"none"}}><ZipperedPocketPage /></div>
+      <div style={{display:page==="welt"      ?"block":"none"}}><WeltPocketPage /></div>
+      <div style={{display:page==="trims"     ?"block":"none"}}><TrimsStrapsPage /></div>
 
       {/* ── Footer ── */}
       <ContactFooter />
