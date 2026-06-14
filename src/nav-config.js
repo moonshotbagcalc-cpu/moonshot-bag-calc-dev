@@ -15,45 +15,47 @@ import ZipperPouchPage from "./tabs/ZipperPouch.jsx";
 import GroceryTotePage from "./tabs/GroceryTote.jsx";
 
 // Data-driven nav: adding a tab = one entry here (plus its file in src/tabs/).
+// Colors reference the per-group token families defined in moonshot.css
+// (--sp-, --bc-, --tp-, --hh-, --cb-) per the Pass 6 color system.
 export const NAV_GROUPS = [
   {
-    id:"sides-panels", label:"Sides & Panels", color:"#9a3e52",
+    id:"sides-panels", label:"Sides & Panels", color:"var(--sp-violet)",
     pages:[
-      {id:"curved-panel", label:"Curved Panels", color:"#7a1a2e", component:CurvedPanelPage},
-      {id:"gusset", label:"Gussets", color:"#1a6e3a", component:GussetPage},
-      {id:"tapered-panels", label:"Tapered Panels", color:"#b06a4a", component:TaperedPanelsPage, coming:true},
+      {id:"curved-panel", label:"Curved Panels", color:"var(--sp-violet)", component:CurvedPanelPage},
+      {id:"gusset", label:"Gussets", color:"var(--sp-plum)", component:GussetPage},
+      {id:"tapered-panels", label:"Tapered Panels", color:"var(--sp-lavender)", component:TaperedPanelsPage, coming:true},
     ],
   },
   {
-    id:"bottoms", label:"Bottoms", color:"#7658b3",
+    id:"bottoms", label:"Bottoms", color:"var(--bc-pumpkin)",
     pages:[
-      {id:"shaped-bottoms", label:"Shaped Bottoms", color:"#5a2da0", component:ShapedBottomsPage},
-      {id:"boxed-bottoms", label:"Boxed Bottoms", color:"#a84f14", component:BoxedBottomsPage},
-      {id:"folded-bottoms", label:"Folded Bottoms", color:"#9a4968", component:FoldedBottomsPage, coming:true},
+      {id:"shaped-bottoms", label:"Shaped Bottoms", color:"var(--bc-amber)", component:ShapedBottomsPage},
+      {id:"boxed-bottoms", label:"Boxed Bottoms", color:"var(--bc-pumpkin)", component:BoxedBottomsPage},
+      {id:"folded-bottoms", label:"Folded Bottoms", color:"var(--bc-ochre)", component:FoldedBottomsPage, coming:true},
     ],
   },
   {
-    id:"trims-pockets", label:"Trims & Pockets", color:"#356b9b",
+    id:"trims-pockets", label:"Trims & Pockets", color:"var(--tp-moss)",
     pages:[
-      {id:"piping", label:"Piping", color:"#8e1a9e", component:PipingPage},
-      {id:"accordion", label:"Accordion Pocket", color:"#1a4a7a", component:AccordionPocketPage},
-      {id:"zipper-pocket", label:"Zipper Pocket", color:"#176b78", component:ZipperPocketPage, coming:true},
-      {id:"welt-pocket", label:"Welt Pocket", color:"#3a5c99", component:WeltPocketPage, coming:true},
+      {id:"piping", label:"Piping", color:"var(--tp-forest)", component:PipingPage},
+      {id:"accordion", label:"Accordion Pocket", color:"var(--tp-sage)", component:AccordionPocketPage},
+      {id:"zipper-pocket", label:"Zipper Pocket", color:"var(--tp-moss)", component:ZipperPocketPage, coming:true},
+      {id:"welt-pocket", label:"Welt Pocket", color:"var(--tp-muted)", component:WeltPocketPage, coming:true},
     ],
   },
   {
-    id:"handles-hardware", label:"Handles & Hardware", color:"#8a6d3a",
+    id:"handles-hardware", label:"Handles & Hardware", color:"var(--hh-denim)",
     pages:[
-      {id:"handles-straps", label:"Handles & Straps", color:"#8a6d3a", component:HandlesStrapsPage, coming:true},
-      {id:"purse-feet", label:"Purse Feet Placement", color:"#a67c3a", component:PurseFeetPage, coming:true},
-      {id:"rivet-guides", label:"Rivet Guides", color:"#6b5a4a", component:RivetGuidesPage, coming:true},
+      {id:"handles-straps", label:"Handles & Straps", color:"var(--hh-slate)", component:HandlesStrapsPage, coming:true},
+      {id:"purse-feet", label:"Purse Feet Placement", color:"var(--hh-denim)", component:PurseFeetPage, coming:true},
+      {id:"rivet-guides", label:"Rivet Guides", color:"var(--hh-indigo)", component:RivetGuidesPage, coming:true},
     ],
   },
   {
-    id:"complete-bags", label:"Complete Bags", color:"#1d6b5a",
+    id:"complete-bags", label:"Complete Bags", color:"var(--cb-maroon)",
     pages:[
-      {id:"zipper-pouch", label:"Two Panel Zipper Pouch", color:"#2a6b8a", component:ZipperPouchPage, coming:true},
-      {id:"grocery-tote", label:"Grocery Tote", color:"#3a8a5a", component:GroceryTotePage, coming:true},
+      {id:"zipper-pouch", label:"Two Panel Zipper Pouch", color:"var(--cb-maroon)", component:ZipperPouchPage, coming:true},
+      {id:"grocery-tote", label:"Grocery Tote", color:"var(--cb-burgundy)", component:GroceryTotePage, coming:true},
     ],
   },
 ];

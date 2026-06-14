@@ -41,6 +41,7 @@
   --bc-pumpkin: #a84f14;
   --bc-pumpkin-dark: #763407;
   --bc-amber: #ca6b27;
+  --bc-amber-dark: #8f4a1a;
   --bc-cream: #fffaf6;
   --bc-soft: #f6e3d4;
   --bc-line: #e6b88f;
@@ -52,6 +53,64 @@
 
   /* Boxed Corner floating dock accent color */
   --bc-dock-accent-soft: #e2aa7d;
+
+  /* Bottoms family — extended tab accents (Pass 6) */
+  --bc-ochre: #b8841e;
+  --bc-ochre-dark: #7e5810;
+  --bc-sienna: #7a4828;
+  --bc-sienna-dark: #522e18;
+
+  /* Sides & Panels family (SP) */
+  --sp-violet: #5c3a9a;
+  --sp-violet-dark: #3c2068;
+  --sp-plum: #7a50b2;
+  --sp-plum-dark: #552e88;
+  --sp-lavender: #9470c8;
+  --sp-lavender-dark: #6a4ea0;
+  --sp-cream: #faf7ff;
+  --sp-soft: #ece5f8;
+  --sp-line: #c4aee0;
+  --sp-ink: #241550;
+  --sp-muted: #7a608e;
+
+  /* Trims & Pockets family (TP) */
+  --tp-sage: #789070;
+  --tp-sage-dark: #506248;
+  --tp-moss: #56703a;
+  --tp-moss-dark: #384e24;
+  --tp-forest: #2e5022;
+  --tp-forest-dark: #183212;
+  --tp-cream: #f6faf3;
+  --tp-soft: #dfe9d6;
+  --tp-line: #b0c89c;
+  --tp-ink: #192e11;
+  --tp-muted: #657e58;
+
+  /* Handles & Hardware family (HH) */
+  --hh-slate: #567296;
+  --hh-slate-dark: #324e70;
+  --hh-denim: #3a5e8a;
+  --hh-denim-dark: #223c60;
+  --hh-indigo: #1c385c;
+  --hh-indigo-dark: #0c2240;
+  --hh-cream: #f5f7fb;
+  --hh-soft: #d9e3ee;
+  --hh-line: #a4b9ce;
+  --hh-ink: #0e2033;
+  --hh-muted: #546c82;
+
+  /* Complete Bags family (CB) */
+  --cb-maroon: #8a1a2c;
+  --cb-maroon-dark: #5c0e1c;
+  --cb-burgundy: #691424;
+  --cb-burgundy-dark: #440c18;
+  --cb-wine: #a4203c;
+  --cb-wine-dark: #741428;
+  --cb-cream: #fdf7f8;
+  --cb-soft: #f0dde2;
+  --cb-line: #d2a0ac;
+  --cb-ink: #380c18;
+  --cb-muted: #8a4e5c;
 }
 
 /* =====================================================================

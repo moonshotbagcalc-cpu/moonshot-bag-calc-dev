@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moonshot Bag Calc — Color System</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #edecea;
+    padding: 24px 20px 48px;
+    color: #111;
+  }
+  .page-title { font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: #999; margin-bottom: 5px; }
+  .page-sub { font-size: 12px; color: #aaa; margin-bottom: 22px; }
+  .page-sub code { font-family: 'SF Mono','Fira Code',monospace; background: #e4e2df; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+  .section-title { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: #bbb; margin-bottom: 10px; margin-top: 4px; }
+
+  /* Global shell bar */
+  .global-bar { background: #1e1040; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .global-label { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.4); }
+  .global-name { font-size: 13px; font-weight: 600; color: #fff; }
+  .global-pfx { font-family: 'SF Mono',monospace; font-size: 10px; color: rgba(255,255,255,.5); background: rgba(255,255,255,.1); padding: 2px 7px; border-radius: 4px; }
+  .global-hex { margin-left: auto; font-family: 'SF Mono',monospace; font-size: 11px; color: rgba(255,255,255,.6); cursor: pointer; }
+  .global-hex:hover { color: #fff; }
+
+  /* Status row */
+  .status-bar { background: #fff; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; border: 1px solid rgba(0,0,0,.06); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .status-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #ccc; flex-shrink: 0; }
+  .status-chip { display: flex; align-items: center; gap: 6px; }
+  .status-swatch { width: 38px; height: 22px; border-radius: 4px; border: 1px solid rgba(0,0,0,.08); }
+  .status-name { font-family: 'SF Mono',monospace; font-size: 9.5px; color: #aaa; }
+  .status-hex { font-family: 'SF Mono',monospace; font-size: 10px; font-weight: 600; color: #444; cursor: pointer; }
+  .status-hex:hover { text-decoration: underline; }
+
+  /* Family cards */
+  .family { background: #fff; border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,.06); }
+  .fhead { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .fdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .fname { font-size: 14px; font-weight: 600; color: #111; }
+  .fpfx { font-family: 'SF Mono','Fira Code',monospace; font-size: 10px; background: #f2f1ef; color: #777; padding: 2px 7px; border-radius: 4px; }
+  .fbadge { margin-left: auto; font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #bbb; background: #f8f8f6; padding: 2px 8px; border-radius: 4px; border: 1px solid #eee; }
+  .fnote { font-size: 11px; color: #aaa; font-style: italic; margin: -6px 0 12px 19px; }
+  .slabel { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #ccc; margin-bottom: 8px; }
+
+  /* Accent chips */
+  .accent-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .accent-chip { display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+  .ablock { width: 84px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,.07); }
+  .amain { height: 46px; }
+  .adark { height: 12px; }
+  .acname { font-family: 'SF Mono',monospace; font-size: 9.5px; color: #aaa; }
+  .achex { font-family: 'SF Mono',monospace; font-size: 11px; font-weight: 600; color: #333; }
+  .adarkex { font-family: 'SF Mono',monospace; font-size: 9.5px; color: #ccc; cursor: pointer; }
+  .adarkex:hover { text-decoration: underline; color: #999; }
+
+  /* Group token chips */
+  .divider { height: 1px; background: #f0eeeb; margin: 10px 0 12px; }
+  .group-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .group-chip { display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+  .gswatch { width: 56px; height: 34px; border-radius: 6px; border: 1px solid rgba(0,0,0,.08); }
+  .gname { font-family: 'SF Mono',monospace; font-size: 9px; color: #bbb; }
+  .ghex { font-family: 'SF Mono',monospace; font-size: 10px; font-weight: 600; color: #555; }
+  .group-chip:hover .ghex { text-decoration: underline; }
+
+  /* Mascot section */
+  .mascot-card { background: #fff; border-radius: 14px; padding: 18px 20px; border: 1px solid rgba(0,0,0,.06); }
+  .mascot-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .mascot-dot { width: 11px; height: 11px; border-radius: 50%; background: conic-gradient(#b870d8, #f05880, #f0c030, #4890d0, #b870d8); flex-shrink: 0; }
+  .mascot-name { font-size: 14px; font-weight: 600; color: #111; }
+  .mascot-pfx { font-family: 'SF Mono',monospace; font-size: 10px; background: #f2f1ef; color: #777; padding: 2px 7px; border-radius: 4px; }
+  .mascot-note { font-size: 11px; color: #aaa; font-style: italic; margin: 0 0 14px 19px; }
+
+  /* Dark preview strip */
+  .dark-preview { background: #1e1040; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+  .dark-preview-label { font-size: 9.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 12px; }
+  .dark-dots { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .dark-dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .dark-dot { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.08); }
+  .dark-dot-label { font-family: 'SF Mono',monospace; font-size: 9px; color: rgba(255,255,255,.4); text-align: center; max-width: 44px; line-height: 1.3; }
+
+  /* Mascot color chips */
+  .mascot-group-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #ccc; margin: 0 0 8px; }
+  .mascot-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .mascot-chip { display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+  .mblock { width: 78px; height: 50px; border-radius: 8px; border: 1px solid rgba(0,0,0,.08); }
+  .mrole { font-size: 10px; color: #999; line-height: 1.3; max-width: 78px; }
+  .mtoken { font-family: 'SF Mono',monospace; font-size: 9px; color: #bbb; }
+  .mhex { font-family: 'SF Mono',monospace; font-size: 11px; font-weight: 600; color: #333; }
+  .mascot-chip:hover .mhex { text-decoration: underline; }
+
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; font-family: 'SF Mono',monospace; font-size: 11px; padding: 7px 14px; border-radius: 8px; opacity: 0; transition: opacity .15s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="page-title">Moonshot Bag Calculator</div>
+<div class="page-sub">Color system — click any hex to copy &nbsp;·&nbsp; dark strip = hover / active variant</div>
+
+<div class="section-title">Global shell</div>
+<div class="global-bar">
+  <span class="global-label">App header</span>
+  <span class="global-name">Midnight</span>
+  <span class="global-pfx">--ms-header-bg</span>
+  <span class="global-hex" onclick="copyHex('#1e1040',this)">#1e1040</span>
+</div>
+
+<div class="section-title" style="margin-top:14px;">Semantic / status tokens</div>
+<div class="status-bar">
+  <div class="status-label">Status OK</div>
+  <div class="status-chip">
+    <div class="status-swatch" style="background:#e8f5ee"></div>
+    <div><div class="status-name">--status-ok-bg</div><div class="status-hex" onclick="copyHex('#e8f5ee',this)">#e8f5ee</div></div>
+  </div>
+  <div class="status-chip">
+    <div class="status-swatch" style="background:#8ac7a7"></div>
+    <div><div class="status-name">--status-ok-border</div><div class="status-hex" onclick="copyHex('#8ac7a7',this)">#8ac7a7</div></div>
+  </div>
+  <div class="status-chip">
+    <div class="status-swatch" style="background:#185c3b"></div>
+    <div><div class="status-name">--status-ok-text</div><div class="status-hex" onclick="copyHex('#185c3b',this)">#185c3b</div></div>
+  </div>
+</div>
+
+<div class="section-title" style="margin-top:2px;">Nav group families</div>
+<div id="families"></div>
+
+<div class="section-title" style="margin-top:14px;">Mascot / character palette</div>
+<div class="mascot-card" id="mascot-section"></div>
+
+<div id="toast"></div>
+
+<script>
+const families = [
+  {
+    name: "Sides & Panels", prefix: "--sp-", dot: "#5c3a9a",
+    note: "sp-ink tuned toward ms-header-bg (#1e1040)",
+    accents: [
+      { name: "violet",   main: "#5c3a9a", dark: "#3c2068" },
+      { name: "plum",     main: "#7a50b2", dark: "#552e88" },
+      { name: "lavender", main: "#9470c8", dark: "#6a4ea0" },
+    ],
+    group: [
+      { name: "cream", hex: "#faf7ff" }, { name: "soft", hex: "#ece5f8" },
+      { name: "line",  hex: "#c4aee0" }, { name: "ink",  hex: "#241550" },
+      { name: "muted", hex: "#7a608e" },
+    ]
+  },
+  {
+    name: "Bottoms", prefix: "--bc-", dot: "#a84f14", badge: "extended",
+    accents: [
+      { name: "pumpkin", main: "#a84f14", dark: "#763407" },
+      { name: "amber",   main: "#ca6b27", dark: "#8f4a1a" },
+      { name: "ochre",   main: "#b8841e", dark: "#7e5810" },
+      { name: "sienna",  main: "#7a4828", dark: "#522e18" },
+    ],
+    group: [
+      { name: "cream", hex: "#fffaf6" }, { name: "soft", hex: "#f6e3d4" },
+      { name: "line",  hex: "#e6b88f" }, { name: "ink",  hex: "#4d2a15" },
+      { name: "muted", hex: "#9a6b4e" },
+    ]
+  },
+  {
+    name: "Trims & Pockets", prefix: "--tp-", dot: "#56703a",
+    accents: [
+      { name: "sage",   main: "#789070", dark: "#506248" },
+      { name: "moss",   main: "#56703a", dark: "#384e24" },
+      { name: "forest", main: "#2e5022", dark: "#183212" },
+    ],
+    group: [
+      { name: "cream", hex: "#f6faf3" }, { name: "soft", hex: "#dfe9d6" },
+      { name: "line",  hex: "#b0c89c" }, { name: "ink",  hex: "#192e11" },
+      { name: "muted", hex: "#657e58" },
+    ]
+  },
+  {
+    name: "Handles & Hardware", prefix: "--hh-", dot: "#3a5e8a",
+    accents: [
+      { name: "slate",  main: "#567296", dark: "#324e70" },
+      { name: "denim",  main: "#3a5e8a", dark: "#223c60" },
+      { name: "indigo", main: "#1c385c", dark: "#0c2240" },
+    ],
+    group: [
+      { name: "cream", hex: "#f5f7fb" }, { name: "soft", hex: "#d9e3ee" },
+      { name: "line",  hex: "#a4b9ce" }, { name: "ink",  hex: "#0e2033" },
+      { name: "muted", hex: "#546c82" },
+    ]
+  },
+  {
+    name: "Complete Bags", prefix: "--cb-", dot: "#8a1a2c",
+    accents: [
+      { name: "maroon",   main: "#8a1a2c", dark: "#5c0e1c" },
+      { name: "burgundy", main: "#691424", dark: "#440c18" },
+      { name: "wine",     main: "#a4203c", dark: "#741428" },
+    ],
+    group: [
+      { name: "cream", hex: "#fdf7f8" }, { name: "soft", hex: "#f0dde2" },
+      { name: "line",  hex: "#d2a0ac" }, { name: "ink",  hex: "#380c18" },
+      { name: "muted", hex: "#8a4e5c" },
+    ]
+  }
+];
+
+const mascot = {
+  note: "Vibrant against midnight indigo — works standalone on light backgrounds too",
+  fur: [
+    { role: "Fur — primary",   token: "--char-fur",    hex: "#b870d8" },
+    { role: "Fur — highlight", token: "--char-fur-hi", hex: "#e0a8f4" },
+    { role: "Fur — shadow",    token: "--char-fur-lo", hex: "#7838a0" },
+  ],
+  feature: [
+    { role: "Skin / face",     token: "--char-skin",   hex: "#f0c090" },
+    { role: "Eyes — alien",    token: "--char-eyes",   hex: "#f0c030" },
+    { role: "Space suit",      token: "--char-suit",   hex: "#4890d0" },
+    { role: "Energy / glow",   token: "--char-glow",   hex: "#f05880" },
+    { role: "Sparkle / star",  token: "--char-star",   hex: "#fff4d0" },
+  ]
+};
+
+function copyHex(hex, el) {
+  navigator.clipboard.writeText(hex).catch(()=>{});
+  const toast = document.getElementById('toast');
+  toast.textContent = hex + ' copied';
+  toast.classList.add('show');
+  if (el) {
+    const oc = el.style.color;
+    el.style.color = '#16a05a';
+    setTimeout(() => { el.style.color = oc; }, 1200);
+  }
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => toast.classList.remove('show'), 1400);
+}
+
+function buildFamily(f) {
+  const card = document.createElement('div');
+  card.className = 'family';
+
+  const head = document.createElement('div');
+  head.className = 'fhead';
+  head.innerHTML = `
+    <span class="fdot" style="background:${f.dot}"></span>
+    <span class="fname">${f.name}</span>
+    <span class="fpfx">${f.prefix}</span>
+    ${f.badge ? `<span class="fbadge">${f.badge}</span>` : ''}`;
+  card.appendChild(head);
+
+  if (f.note) {
+    const note = document.createElement('div');
+    note.className = 'fnote';
+    note.textContent = f.note;
+    card.appendChild(note);
+  }
+
+  const accLabel = document.createElement('div');
+  accLabel.className = 'slabel';
+  accLabel.textContent = 'Tab accents';
+  card.appendChild(accLabel);
+
+  const accRow = document.createElement('div');
+  accRow.className = 'accent-row';
+  f.accents.forEach(a => {
+    const chip = document.createElement('div');
+    chip.className = 'accent-chip';
+    chip.innerHTML = `
+      <div class="ablock"><div class="amain" style="background:${a.main}"></div><div class="adark" style="background:${a.dark}"></div></div>
+      <div class="acname">${f.prefix}${a.name}</div>
+      <div class="achex">${a.main}</div>
+      <div class="adarkex">${a.dark}</div>`;
+    const hexEl = chip.querySelector('.achex');
+    const darkEl = chip.querySelector('.adarkex');
+    chip.addEventListener('click', e => {
+      if (e.target === darkEl) copyHex(a.dark, darkEl);
+      else copyHex(a.main, hexEl);
+    });
+    accRow.appendChild(chip);
+  });
+  card.appendChild(accRow);
+
+  const div = document.createElement('div');
+  div.className = 'divider';
+  card.appendChild(div);
+
+  const grpLabel = document.createElement('div');
+  grpLabel.className = 'slabel';
+  grpLabel.textContent = 'Group tokens';
+  card.appendChild(grpLabel);
+
+  const grpRow = document.createElement('div');
+  grpRow.className = 'group-row';
+  f.group.forEach(g => {
+    const chip = document.createElement('div');
+    chip.className = 'group-chip';
+    chip.innerHTML = `
+      <div class="gswatch" style="background:${g.hex}"></div>
+      <div class="gname">${f.prefix}${g.name}</div>
+      <div class="ghex">${g.hex}</div>`;
+    chip.addEventListener('click', () => copyHex(g.hex, chip.querySelector('.ghex')));
+    grpRow.appendChild(chip);
+  });
+  card.appendChild(grpRow);
+
+  return card;
+}
+
+function buildMascot() {
+  const sec = document.getElementById('mascot-section');
+
+  const head = document.createElement('div');
+  head.className = 'mascot-head';
+  head.innerHTML = `
+    <span class="mascot-dot"></span>
+    <span class="mascot-name">Mascot character</span>
+    <span class="mascot-pfx">--char-</span>`;
+  sec.appendChild(head);
+
+  const note = document.createElement('div');
+  note.className = 'mascot-note';
+  note.textContent = mascot.note;
+  sec.appendChild(note);
+
+  // Dark preview
+  const preview = document.createElement('div');
+  preview.className = 'dark-preview';
+  preview.innerHTML = `<div class="dark-preview-label">How it lands on midnight — ${`#1e1040`}</div>`;
+
+  const dots = document.createElement('div');
+  dots.className = 'dark-dots';
+
+  const allColors = [...mascot.fur, ...mascot.feature];
+  allColors.forEach(c => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dark-dot-wrap';
+    wrap.innerHTML = `
+      <div class="dark-dot" style="background:${c.hex}" title="${c.hex}"></div>
+      <div class="dark-dot-label">${c.role.split(' — ')[0].split(' / ')[0]}</div>`;
+    wrap.style.cursor = 'pointer';
+    wrap.addEventListener('click', () => copyHex(c.hex, null));
+    dots.appendChild(wrap);
+  });
+  preview.appendChild(dots);
+  sec.appendChild(preview);
+
+  // Fur row
+  const furLabel = document.createElement('div');
+  furLabel.className = 'mascot-group-label';
+  furLabel.textContent = 'Fur — three-value range';
+  sec.appendChild(furLabel);
+
+  const furRow = document.createElement('div');
+  furRow.className = 'mascot-row';
+  mascot.fur.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'mascot-chip';
+    chip.innerHTML = `
+      <div class="mblock" style="background:${c.hex}"></div>
+      <div class="mrole">${c.role}</div>
+      <div class="mtoken">${c.token}</div>
+      <div class="mhex">${c.hex}</div>`;
+    chip.addEventListener('click', () => copyHex(c.hex, chip.querySelector('.mhex')));
+    furRow.appendChild(chip);
+  });
+  sec.appendChild(furRow);
+
+  // Feature row
+  const featLabel = document.createElement('div');
+  featLabel.className = 'mascot-group-label';
+  featLabel.textContent = 'Feature colors';
+  sec.appendChild(featLabel);
+
+  const featRow = document.createElement('div');
+  featRow.className = 'mascot-row';
+  mascot.feature.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'mascot-chip';
+    chip.innerHTML = `
+      <div class="mblock" style="background:${c.hex}"></div>
+      <div class="mrole">${c.role}</div>
+      <div class="mtoken">${c.token}</div>
+      <div class="mhex">${c.hex}</div>`;
+    chip.addEventListener('click', () => copyHex(c.hex, chip.querySelector('.mhex')));
+    featRow.appendChild(chip);
+  });
+  sec.appendChild(featRow);
+}
+
+const container = document.getElementById('families');
+families.forEach(f => container.appendChild(buildFamily(f)));
+buildMascot();
+</script>
+</body>
+</html>

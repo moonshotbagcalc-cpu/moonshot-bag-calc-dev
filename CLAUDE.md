@@ -18,6 +18,11 @@ There is no test suite/runner configured.
 
 ## Architecture
 
+> Note: moonshot-palette.html in the project root is the confirmed color
+> system reference. Read it before Pass 6 theming work. Reference only —
+> do not import or deploy it.
+
+
 ### Monolithic App.jsx
 
 Nearly the entire UI lives in `src/App.jsx` (~4500 lines). It contains, in roughly this order:
@@ -321,6 +326,14 @@ These are confirmed future features to add after the refactor is complete.
   Each tab within a group gets one unique accent token for header bars
   and active state buttons. All other styling inherits group-level tokens.
   Pattern: --[tab-id]-accent: [color]. Minimal per-tab footprint.
+
+- **Mascot character** — Illustrate a small branded character using the
+  --char-* token palette (fur: #b870d8, highlight: #e0a8f4, shadow: #7838a0,
+  skin: #f0c090, eyes: #f0c030, suit: #4890d0, glow: #f05880, star: #fff4d0).
+  Character should work on both light backgrounds and the midnight header
+  (#1e1040). Use cases: Coming Soon pages, empty states, error pages,
+  tutorial content, loading states. SVG format preferred for scalability.
+  Character personality should feel playful, space-themed, bag-maker-adjacent.
 
 > Note: moonshot-consolidated-reference.css in the project root is a
 > designer-authored style reference file. Claude Code should read this file
