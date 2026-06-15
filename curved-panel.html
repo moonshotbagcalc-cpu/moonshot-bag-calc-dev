@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curved Panel — Fair-Curve Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --maroon:#8e1d3c; --maroon-dark:#6f152e; --rose:#c2476b;
+    --pink-bg:#fdf4f6; --pink-card:#fff; --pink-soft:#f7e3e9;
+    --pink-line:#ecccd6; --ink:#4a2230; --green:#1d6b45;
+    --amber-bg:#fdf3e0; --amber-ink:#8a5a10; --amber-line:#e8c98a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:12px 16px;font-family:'Nunito',system-ui,sans-serif;background:var(--pink-bg);color:var(--ink)}
+  h1{font-size:18px;font-weight:800;color:var(--maroon);margin:0 0 1px}
+  .legend{color:var(--rose);font-weight:700;font-size:12px;margin:0 0 10px}
+  .wrap{max-width:1280px;margin:0 auto}
+
+  /* ── top bar: title + decimal toggle ── */
+  .topbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .decToggle{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--rose);white-space:nowrap;cursor:pointer;user-select:none}
+  .decToggle input{accent-color:var(--maroon);width:14px;height:14px;cursor:pointer}
+
+  /* ── two-column grid ── */
+  .grid{display:grid;grid-template-columns:minmax(0,460px) 1fr;gap:12px;align-items:start}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+
+  /* ghost (disabled) fi widget */
+  .fi.ghost input, .fi.ghost select{
+    color:var(--pink-line);border-color:#f0dce3;background:var(--pink-soft);pointer-events:none
+  }
+  .fi.ghost .inch{color:var(--pink-line)}
+  label.ghost{color:var(--pink-line)}
+
+  /* corner card layout: buttons left, softness box right */
+  .cornerCard{display:flex;gap:10px;align-items:flex-end}
+  .cornerBtns{display:flex;flex-direction:column;gap:5px;min-width:120px;flex-shrink:0}
+  .cornerBtns button{padding:6px 8px;font:inherit;font-weight:700;font-size:12px;
+    border:1.5px solid var(--pink-line);background:#fff;color:var(--ink);border-radius:7px;cursor:pointer;text-align:left}
+  .cornerBtns button.on{background:var(--maroon);border-color:var(--maroon);color:#fff}
+  .softnessBox{flex:1;border:1.5px solid var(--pink-line);border-radius:8px;padding:7px 9px;background:var(--pink-bg)}
+  .softnessBox.ghost{border-color:#f0dce3;background:#fdf8f9}
+  .softnessBox.ghost label{color:var(--pink-line)}
+  .softnessBox .row{margin-bottom:0}
+
+  /* sides & gusset two-up grid */
+  .sgGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;align-items:start}
+  @media(max-width:800px){.sgGrid{grid-template-columns:1fr}}
+  .printBtn.small{font-size:12.5px;padding:7px 14px;margin-top:8px;border-radius:8px}
+  .miniWrap{display:flex;flex-direction:column;gap:10px;margin:8px 0 4px;width:100%}
+  .mini{text-align:center;width:100%}
+  .mini svg{display:block;margin:0 auto}
+  .mini .mlabel{font-size:11px;font-weight:800;color:var(--maroon);margin-top:2px}
+  .mini .mdims{font-size:10.5px;color:#9a6b7b;font-weight:700}
+
+  /* diagram legend below diagram */
+  .diagLegend{font-size:10.5px;color:#9a6b7b;font-weight:600;margin:4px 0 0;line-height:1.4;text-align:center}
+
+  /* piece tables (Sides & Gusset results, trapezoid-calculator style) */
+  .pieceSection{margin-top:10px}
+  .pieceHead{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--rose);font-weight:800;margin:0 0 4px}
+  .pill{display:inline-block;background:var(--pink-soft);color:var(--maroon);font-weight:800;font-size:11px;letter-spacing:.05em;padding:3px 10px;border-radius:6px;margin:8px 0 2px}
+  .prow{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--pink-soft);padding:5px 2px;font-size:12.5px}
+  .prow .pl{font-weight:700;flex:1}
+  .prow .pc{font-weight:800;color:var(--maroon);text-align:right;min-width:70px}
+  .prow .ps{font-style:italic;color:#9a6b7b;text-align:right;min-width:130px;font-size:12px}
+  .pnote{font-size:10.5px;color:#9a6b7b;font-style:italic;margin:3px 2px 0}
+
+  .card{background:var(--pink-card);border:1px solid var(--pink-line);border-radius:10px;padding:8px 10px;box-shadow:0 1px 3px rgba(142,29,60,.05);margin-bottom:6px}
+  .card:last-child{margin-bottom:0}
+  .card h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--rose);margin:0 0 6px;font-weight:800}
+  .row{display:flex;gap:6px;margin-bottom:6px}
+  .row:last-child{margin-bottom:0}
+  .field{flex:1;min-width:0}
+  label{display:block;font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px}
+
+  /* fraction input widget */
+  .fi{display:flex;gap:3px;align-items:center}
+  .fi input[type=number]{width:46px;padding:4px 5px;font:inherit;font-weight:700;font-size:12px;
+    border:1.5px solid var(--pink-line);border-radius:6px;background:#fff;color:var(--ink);text-align:center}
+  .fi select.frac{padding:4px 2px 4px 3px;font:inherit;font-size:12px;font-weight:700;
+    border:1.5px solid var(--pink-line);border-radius:6px;background:#fff;color:var(--ink);cursor:pointer}
+  .fi input[type=number].dec{width:100%;padding:4px 6px;font-size:12px}
+  .fi input[type=number]:focus,.fi select:focus,.fi input.dec:focus{outline:2px solid var(--rose);outline-offset:1px;border-color:var(--rose)}
+  .fi .inch{font-size:11px;color:#9a6b7b;font-weight:700;margin-left:1px}
+  /* ghost state — must override the explicit background:#fff above */
+  .fi.ghost input[type=number],
+  .fi.ghost input[type=number].dec,
+  .fi.ghost select.frac{
+    background:var(--pink-soft) !important;
+    color:var(--pink-line) !important;
+    border-color:#f0dce3 !important;
+    pointer-events:none
+  }
+  .fi.ghost .inch{color:var(--pink-line)}
+
+  /* number-only inputs (select/gusset) */
+  input[type=number].plain,select.plain{
+    width:100%;padding:5px 7px;font:inherit;font-weight:600;font-size:13px;
+    border:1.5px solid var(--pink-line);border-radius:7px;background:#fff;color:var(--ink)
+  }
+  input[type=number].plain:focus,select.plain:focus{outline:2px solid var(--rose);outline-offset:1px;border-color:var(--rose)}
+
+  .seg{display:flex;gap:5px}
+  .seg button{flex:1;padding:5px 3px;font:inherit;font-weight:700;font-size:12px;
+    border:1.5px solid var(--pink-line);background:#fff;color:var(--ink);border-radius:7px;cursor:pointer}
+  .seg button.on{background:var(--maroon);border-color:var(--maroon);color:#fff}
+  .check{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin:5px 0 3px;cursor:pointer}
+  .hint{font-size:10.5px;color:#9a6b7b;margin-top:3px;line-height:1.3}
+
+  /* diagram */
+  .diagramCard{padding:10px 12px 8px;margin-bottom:0}
+  svg.diagram{width:100%;height:auto;display:block}
+  .symline{text-align:right;font-weight:800;font-size:12px;margin:3px 2px 0}
+  .symline.yes{color:var(--green)} .symline.no{color:var(--amber-ink)}
+
+  /* results */
+  .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px;margin-top:8px}
+  .stat{background:var(--pink-bg);border:1px solid var(--pink-soft);border-radius:8px;padding:7px 10px}
+  .stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--rose);font-weight:800}
+  .stat .v{font-size:16px;font-weight:800;color:var(--maroon);margin-top:1px}
+  .stat .d{font-size:10.5px;color:#9a6b7b;font-weight:600}
+
+  .warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber-ink);
+    border-radius:8px;padding:7px 10px;font-size:11.5px;font-weight:700;margin-top:8px}
+  .warn ul{margin:3px 0 0;padding-left:16px}
+  .warn li{margin:2px 0}
+
+  .printBtn{margin-top:10px;background:var(--maroon);color:#fff;border:none;cursor:pointer;
+    font:inherit;font-weight:800;font-size:14px;padding:9px 20px;border-radius:10px;
+    box-shadow:0 2px 5px rgba(111,21,46,.3)}
+  .printBtn:hover{background:var(--maroon-dark)}
+  .printNote{color:var(--rose);font-weight:700;font-size:12px;margin-top:6px}
+  .footNote{font-size:11px;color:#9a6b7b;margin-top:12px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Curved Panel — Fair-Curve Prototype</h1>
+    </div>
+    <label class="decToggle"><input type="checkbox" id="decMode"> Decimal input</label>
+  </div>
+
+  <div class="grid">
+    <!-- ============ CONTROLS ============ -->
+    <div>
+      <div class="card">
+        <h2>Starting Frame (design intent)</h2>
+        <div class="row">
+          <div class="field" id="f_topW"></div>
+          <div class="field" id="f_botW"></div>
+          <div class="field" id="f_height"></div>
+          <div class="field" id="f_sa"></div>
+        </div>
+        <p class="hint">Design intent only — actual cut &amp; sewline sizes reported in results.</p>
+      </div>
+
+      <div class="card">
+        <h2>Edge Fullness &amp; Crown</h2>
+        <!-- 4-across row: left(/right), right ghost, top crown, bottom crown -->
+        <div class="row" id="crownRow">
+          <div class="field" id="f_leftFull"></div>
+          <div class="field" id="f_rightFull"></div>
+          <div class="field" id="f_topCrown"></div>
+          <div class="field" id="f_botCrown"></div>
+        </div>
+        <label class="check"><input id="matchingSides" type="checkbox" checked> Matching Sides</label>
+        <label style="font-size:11.5px;font-weight:700;margin:6px 0 3px;display:block">Curve feel</label>
+        <div class="seg" id="feelSeg">
+          <button data-feel="gentle" class="on">Gentle</button>
+          <button data-feel="balanced">Balanced</button>
+          <button data-feel="defined">Defined</button>
+        </div>
+        <p class="hint">Fullness = bulge depth at midpoint. Feel = how it eases, never the depth.</p>
+      </div>
+
+      <div class="card">
+        <h2>Corner Softness</h2>
+        <div class="row">
+          <div class="field" id="f_topSoft"></div>
+          <div class="field" id="f_botSoft"></div>
+        </div>
+        <p class="hint">0 = crisp corner. Above 0 = fair tangent blend (how far back the edges blend). Top and bottom are independent — mix freely, e.g. crisp top with a soft bottom.</p>
+      </div>
+
+    </div>
+
+    <!-- ============ DIAGRAM + RESULTS ============ -->
+    <div>
+      <div id="warnBox"></div>
+
+      <div class="card diagramCard">
+        <svg id="diag" class="diagram" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg" aria-label="Live panel diagram"></svg>
+        <p class="diagLegend">&#9633; Corner junctions &nbsp;&nbsp; &#9671; Edge midpoints &nbsp;&nbsp; &#9711; Curve marks &nbsp;&nbsp;&mdash;&mdash; Solid = cut &middot; Dashed = sewline</p>
+        <p class="symline yes" id="symline">Fold-friendly symmetry: yes</p>
+        <button class="printBtn" id="printPanelBtn">Print Panel Pattern</button>
+        <p class="printNote">Tiled 7&Prime; &times; 10&Prime; pages — prints at 100% on both Letter and A4 &middot; 1&Prime; + 3&thinsp;cm test squares &middot; verify scale before cutting.</p>
+      </div>
+
+      <div class="results" id="results"></div>
+      <div class="results" id="runResults"></div>
+
+      <!-- ============ SIDES & GUSSET ============ -->
+      <div class="card" style="margin-top:10px">
+        <!-- Main toggle: Sides vs Gusset -->
+        <div class="seg" id="sgToggle" style="margin-bottom:10px">
+          <button data-sg="sides" class="on">Side Panels</button>
+          <button data-sg="gusset">Gusset</button>
+        </div>
+        <!-- Sub-toggle: 4-sided vs 3-sided (shared by both) -->
+        <div class="seg" id="topModeSeg" style="margin-bottom:6px">
+          <button data-mode="4side" class="on">4-Sided (enclosed)</button>
+          <button data-mode="3side">3-Sided (open top)</button>
+        </div>
+        <p class="hint" style="margin-bottom:8px">3-Sided assumes the top is the bag opening — Left, Bottom &amp; Right only, with stitch lines running out to the raw top edge.</p>
+
+        <!-- Sides content -->
+        <div id="sidesSection">
+          <div class="row"><div class="field" id="f_sideDepth"></div></div>
+          <div id="sidesDiagram"></div>
+          <div id="sidesResults"></div>
+          <button class="printBtn small" id="printSidesBtn">Print Side Panels</button>
+        </div>
+        <!-- Gusset content -->
+        <div id="gussetSection" style="display:none">
+          <div class="row"><div class="field" id="f_gussetW"></div></div>
+          <div id="gussetDiagram"></div>
+          <div id="gussetResults"></div>
+          <button class="printBtn small" id="printGussetBtn">Print Gusset</button>
+        </div>
+      </div>
+
+      <p class="footNote">Pipeline: control frame → depth-exact crowned edges → fair tangent corner blends (softness 0 = crisp) → cut path → inward SA offset → sewline. Inputs clamped to prevent loops; any clamping reported above. Notch/clip marks appear on side &amp; gusset strips only — never on the main panel.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   GEOMETRY CORE — keep this block portable; it is what we lift into the
+   Moonshot JSX later. All units are inches. SVG-style coords (y down).
+   Winding is clockwise: top → right → bottom → left.
+   ===================================================================== */
+
+const FEEL_ALPHA = { gentle: 0.32, balanced: 0.40, defined: 0.48 };
+const EDGE_SAMPLES = 160;
+const CORNER_SAMPLES = 64;
+
+function dist(a, b){ return Math.hypot(b.x - a.x, b.y - a.y); }
+
+/* Crowned edge as a symmetric cubic. Midpoint bulge == h exactly
+   (normal offset of controls = 4h/3 → curve midpoint = 0.75 · 4h/3 = h). */
+function sampleEdge(A, B, h, alpha, side){
+  const dx = B.x - A.x, dy = B.y - A.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx/len, uy = dy/len;
+  const nx = uy, ny = -ux;            // outward normal (clockwise, y-down)
+  const pts = [];
+  if (h <= 1e-6){
+    for (let i = 0; i <= EDGE_SAMPLES; i++){
+      const t = i / EDGE_SAMPLES;
+      pts.push({ x: A.x + dx*t, y: A.y + dy*t, side });
+    }
+    return pts;
+  }
+  const beta = (4/3) * h;
+  const c1 = { x: A.x + dx*alpha + nx*beta, y: A.y + dy*alpha + ny*beta };
+  const c2 = { x: B.x - dx*alpha + nx*beta, y: B.y - dy*alpha + ny*beta };
+  for (let i = 0; i <= EDGE_SAMPLES; i++){
+    const t = i / EDGE_SAMPLES, m = 1 - t;
+    pts.push({
+      x: m*m*m*A.x + 3*m*m*t*c1.x + 3*m*t*t*c2.x + t*t*t*B.x,
+      y: m*m*m*A.y + 3*m*m*t*c1.y + 3*m*t*t*c2.y + t*t*t*B.y,
+      side
+    });
+  }
+  return pts;
+}
+
+function polylineLength(pts, closed){
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += dist(pts[i-1], pts[i]);
+  if (closed) L += dist(pts[pts.length-1], pts[0]);
+  return L;
+}
+
+/* Trim a polyline by arc length from each end; returns points + end tangents. */
+function trimPolyline(pts, dStart, dEnd){
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i-1] + dist(pts[i-1], pts[i]));
+  const total = cum[cum.length - 1];
+  dStart = Math.max(0, Math.min(dStart, total * 0.49));
+  dEnd   = Math.max(0, Math.min(dEnd,   total * 0.49));
+  const tA = dStart, tB = total - dEnd;
+
+  function pointAt(s){
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < s) i++;
+    const seg = cum[i] - cum[i-1] || 1e-9;
+    const f = (s - cum[i-1]) / seg;
+    const a = pts[i-1], b = pts[i];
+    return { p: { x: a.x + (b.x-a.x)*f, y: a.y + (b.y-a.y)*f, side: a.side }, i };
+  }
+  const A = pointAt(tA), B = pointAt(tB);
+  let out = [A.p];
+  for (let i = A.i; i < B.i; i++) out.push(pts[i]);
+  out.push(B.p);
+  out = dedupe(out, false);     // exact-on-sample trims create duplicates
+
+  const n = out.length;
+  const tanStart = unit(out[1].x - out[0].x, out[1].y - out[0].y);
+  const tanEnd = unit(out[n-1].x - out[n-2].x, out[n-1].y - out[n-2].y);
+  return { pts: out, tanStart, tanEnd };
+}
+
+function unit(x, y){
+  const l = Math.hypot(x, y) || 1e-9;
+  return { x: x/l, y: y/l };
+}
+
+/* Fair tangent corner blend: a cubic that meets both trimmed edge ends with
+   matching tangents, with handle lengths chosen to approximate a circular
+   arc of the corner's turn angle (G1, near-G2 in practice). */
+function cornerBlend(P, tP, Q, tQ, sideA, sideB){
+  const chord = dist(P, Q);
+  const cosT = Math.max(-1, Math.min(1, tP.x*tQ.x + tP.y*tQ.y));
+  const turn = Math.acos(cosT);
+  let L;
+  if (turn > 1e-3 && Math.sin(turn/2) > 1e-6){
+    const R = chord / (2 * Math.sin(turn/2));
+    L = (4/3) * Math.tan(turn/4) * R;
+  } else {
+    L = chord * 0.39;
+  }
+  L = Math.min(L, chord * 0.6);
+  const c1 = { x: P.x + tP.x*L, y: P.y + tP.y*L };
+  const c2 = { x: Q.x - tQ.x*L, y: Q.y - tQ.y*L };
+  const pts = [];
+  for (let i = 1; i < CORNER_SAMPLES; i++){
+    const t = i / CORNER_SAMPLES, m = 1 - t;
+    pts.push({
+      x: m*m*m*P.x + 3*m*m*t*c1.x + 3*m*t*t*c2.x + t*t*t*Q.x,
+      y: m*m*m*P.y + 3*m*m*t*c1.y + 3*m*t*t*c2.y + t*t*t*Q.y,
+      side: (t < 0.5 ? sideA : sideB)
+    });
+  }
+  return pts;
+}
+
+/* Remove near-duplicate consecutive points (protects offset math). */
+function dedupe(pts, closed = true){
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++){
+    if (dist(out[out.length-1], pts[i]) > 1e-6) out.push(pts[i]);
+  }
+  if (closed){
+    while (out.length > 1 && dist(out[0], out[out.length-1]) < 1e-6) out.pop();
+  }
+  return out;
+}
+
+/* Inward offset of a closed clockwise polyline, with miter joins so sharp
+   corners land exactly at the intersection of the adjacent offset edges.
+   Inward normal for a clockwise (y-down) segment direction u is (-u.y, u.x). */
+function offsetInward(pts, d){
+  const n = pts.length, out = [];
+  for (let i = 0; i < n; i++){
+    const prev = pts[(i - 1 + n) % n], next = pts[(i + 1) % n];
+    const u1 = unit(pts[i].x - prev.x, pts[i].y - prev.y);
+    const u2 = unit(next.x - pts[i].x, next.y - pts[i].y);
+    const n1 = { x: -u1.y, y: u1.x };
+    const n2 = { x: -u2.y, y: u2.x };
+    const m = unit(n1.x + n2.x, n1.y + n2.y);
+    const cosHalf = Math.max(0.35, m.x*n1.x + m.y*n1.y);  // miter limit
+    const len = d / cosHalf;
+    out.push({ x: pts[i].x + m.x*len, y: pts[i].y + m.y*len, side: pts[i].side });
+  }
+  return out;
+}
+
+/* Detect local collapse: an offset segment reversing direction vs. source. */
+function offsetCollapsed(src, off){
+  const n = src.length;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    const sx = src[j].x - src[i].x, sy = src[j].y - src[i].y;
+    if (sx*sx + sy*sy < 1e-4) continue; // skip degenerate junction segments (< 0.01")
+    const ox = off[j].x - off[i].x, oy = off[j].y - off[i].y;
+    if (sx*ox + sy*oy < 0) return true;
+  }
+  return false;
+}
+
+/* Inward offset of an OPEN polyline (one edge), one-sided tangents at ends. */
+function offsetOpen(pts, d){
+  const n = pts.length, out = [];
+  for (let i = 0; i < n; i++){
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    const u = unit(b.x - a.x, b.y - a.y);
+    out.push({ x: pts[i].x - u.y*d, y: pts[i].y + u.x*d, side: pts[i].side });
+  }
+  return out;
+}
+
+function lineIntersect(p1, d1, p2, d2){
+  const den = d1.x*d2.y - d1.y*d2.x;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((p2.x - p1.x)*d2.y - (p2.y - p1.y)*d2.x) / den;
+  return { x: p1.x + d1.x*t, y: p1.y + d1.y*t };
+}
+
+const crossZ = (d, p, o) => d.x*(p.y - o.y) - d.y*(p.x - o.x);
+
+/* Miter-join two inward-offset edge polylines at a convex corner:
+   clip the overlap past each other's line, insert the exact intersection. */
+function joinMiter(A, B){
+  const endTan = unit(A[A.length-1].x - A[A.length-2].x, A[A.length-1].y - A[A.length-2].y);
+  const startTan = unit(B[1].x - B[0].x, B[1].y - B[0].y);
+  const aEnd0 = A[A.length-1], bStart0 = B[0];
+  const X = lineIntersect(aEnd0, endTan, bStart0, startTan);
+  if (!X) return;                                  // collinear — nothing to trim
+  // valid side reference taken mid-edge, away from the corner
+  const refA = Math.sign(crossZ(startTan, A[Math.floor(A.length/2)], bStart0)) || 1;
+  while (A.length > 2 && Math.sign(crossZ(startTan, A[A.length-1], bStart0)) !== refA) A.pop();
+  const refB = Math.sign(crossZ(endTan, B[Math.floor(B.length/2)], aEnd0)) || 1;
+  while (B.length > 2 && Math.sign(crossZ(endTan, B[0], aEnd0)) !== refB) B.shift();
+  A.push({ x: X.x, y: X.y, side: aEnd0.side });
+}
+
+function bbox(pts){
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of pts){
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+}
+
+function sideRuns(pts){
+  const runs = { top: 0, right: 0, bottom: 0, left: 0 };
+  const n = pts.length;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    const d = dist(pts[i], pts[j]);
+    if (pts[i].side === pts[j].side){
+      runs[pts[i].side] += d;
+    } else {
+      // segment bridges a side transition — half to each side
+      runs[pts[i].side] += d / 2;
+      runs[pts[j].side] += d / 2;
+    }
+  }
+  return runs;
+}
+
+/* Ray (origin, dir) vs polyline: nearest forward intersection or null. */
+function rayPolylineHit(origin, dir, poly){
+  let best = null, bestT = Infinity;
+  for (let i = 0; i < poly.length - 1; i++){
+    const a = poly[i], b = poly[i+1];
+    const sx = b.x - a.x, sy = b.y - a.y;
+    const den = dir.x * sy - dir.y * sx;
+    if (Math.abs(den) < 1e-12) continue;
+    const qx = a.x - origin.x, qy = a.y - origin.y;
+    const t = (qx * sy - qy * sx) / den;          // along ray
+    const u = (qx * dir.y - qy * dir.x) / den;    // along segment
+    if (t >= -1e-9 && u >= -1e-9 && u <= 1 + 1e-9 && t < bestT){
+      bestT = t;
+      best = { x: origin.x + dir.x * t, y: origin.y + dir.y * t };
+    }
+  }
+  return best;
+}
+
+/* Open-top sewline: offset the right→bottom→left run of the cut path
+   inward by SA, then extend both ends along their tangents until they
+   intersect the TOP cut edge (the raw edge). This is how seams terminate
+   at an open edge — the stitch line runs out to the raw cut edge.
+   Returns { pts, runs:{left,bottom,right}, total }. */
+function buildOpenSewline(cutPts, sa, botCrisp){
+  const n = cutPts.length;
+
+  // contiguous top run (wrap-safe)
+  let topStart = -1;
+  for (let i = 0; i < n; i++){
+    if (cutPts[i].side === "top" && cutPts[(i - 1 + n) % n].side !== "top"){ topStart = i; break; }
+  }
+  if (topStart < 0) return null;
+  const topPts = [];
+  for (let k = 0; k < n; k++){
+    const idx = (topStart + k) % n;
+    if (cutPts[idx].side !== "top") break;
+    topPts.push(cutPts[idx]);
+  }
+
+  // non-top run: right → bottom → left, contiguous after the top run
+  const rest = [];
+  for (let k = 0; k < n - topPts.length; k++){
+    rest.push(cutPts[(topStart + topPts.length + k) % n]);
+  }
+
+  let off;
+  if (botCrisp){
+    // per-edge offset + miter joins at the crisp bottom corners
+    const groups = [];
+    let cur = [rest[0]];
+    for (let i = 1; i < rest.length; i++){
+      if (rest[i].side === cur[0].side) cur.push(rest[i]);
+      else { groups.push(cur); cur = [rest[i]]; }
+    }
+    groups.push(cur);
+    const offs = groups.map(g => offsetOpen(g, sa));
+    off = offs[0];
+    for (let i = 1; i < offs.length; i++){
+      joinMiter(off, offs[i]);
+      off = off.concat(offs[i]);
+    }
+  } else {
+    off = offsetOpen(rest, sa); // smooth everywhere — single-pass offset is fair
+  }
+  off = dedupe(off, false);
+
+  // extend start (top of right side) up to the raw top edge
+  const t0 = unit(off[1].x - off[0].x, off[1].y - off[0].y);
+  const hitS = rayPolylineHit(off[0], { x: -t0.x, y: -t0.y }, topPts);
+  if (hitS) off.unshift({ x: hitS.x, y: hitS.y, side: off[0].side });
+
+  // extend end (top of left side) up to the raw top edge
+  const m = off.length;
+  const tE = unit(off[m-1].x - off[m-2].x, off[m-1].y - off[m-2].y);
+  const hitE = rayPolylineHit(off[m-1], tE, topPts);
+  if (hitE) off.push({ x: hitE.x, y: hitE.y, side: off[m-1].side });
+
+  // per-side runs on the open polyline (extensions count toward L/R);
+  // segments bridging a side transition split half to each side
+  const runs = { right: 0, bottom: 0, left: 0 };
+  for (let i = 0; i < off.length - 1; i++){
+    const d = dist(off[i], off[i+1]);
+    const sA = off[i].side, sB = off[i+1].side;
+    if (sA === sB){
+      if (runs[sA] !== undefined) runs[sA] += d;
+    } else {
+      if (runs[sA] !== undefined) runs[sA] += d / 2;
+      if (runs[sB] !== undefined) runs[sB] += d / 2;
+    }
+  }
+  return { pts: off, runs, total: runs.left + runs.bottom + runs.right };
+}
+
+/* Return corner junctions (where side tag changes) and edge midpoints
+   (arc-length midpoint within each side) on the sewline.
+   
+   The sewline is a closed polygon. The top side (and potentially others)
+   wraps around the end/start of the array, so we must handle that. */
+function sewLandmarks(pts){
+  const n = pts.length;
+  const sides = ['top','right','bottom','left'];
+  const junctions = [];
+  const midpoints = [];
+
+  // junction = first point of each new side (where tag changes)
+  for (let i = 0; i < n; i++){
+    if (pts[i].side !== pts[(i - 1 + n) % n].side) junctions.push(pts[i]);
+  }
+
+  for (const side of sides){
+    // find start index: first point tagged to this side after a transition from another
+    let startIdx = -1;
+    for (let i = 0; i < n; i++){
+      if (pts[i].side === side && pts[(i - 1 + n) % n].side !== side){
+        startIdx = i; break;
+      }
+    }
+    if (startIdx < 0) continue; // side not present
+
+    // walk forward collecting consecutive points tagged to this side (wrap-safe)
+    const sidePts = [];
+    for (let k = 0; k < n; k++){
+      const idx = (startIdx + k) % n;
+      if (pts[idx].side !== side) break;
+      sidePts.push(pts[idx]);
+    }
+    if (sidePts.length < 2) continue;
+
+    // arc-length midpoint
+    let cumL = 0;
+    const segs = [];
+    for (let k = 0; k < sidePts.length - 1; k++){
+      const d = dist(sidePts[k], sidePts[k+1]);
+      segs.push({ a: sidePts[k], b: sidePts[k+1], d, cum: cumL });
+      cumL += d;
+    }
+    if (!segs.length || cumL < 1e-9) continue;
+    const half = cumL / 2;
+    for (const s of segs){
+      if (s.cum + s.d >= half - 1e-9){
+        const f = s.d > 1e-9 ? Math.min(1, (half - s.cum) / s.d) : 0;
+        midpoints.push({ x: s.a.x + (s.b.x - s.a.x) * f, y: s.a.y + (s.b.y - s.a.y) * f });
+        break;
+      }
+    }
+  }
+
+  return { junctions, midpoints };
+}
+
+/* Extract one side's contiguous run from a tagged polyline.
+   For OPEN polylines (open sewline) pass closed=false. */
+function extractSideRun(pts, side, closed){
+  const n = pts.length;
+  if (closed){
+    let start = -1;
+    for (let i = 0; i < n; i++){
+      if (pts[i].side === side && pts[(i - 1 + n) % n].side !== side){ start = i; break; }
+    }
+    if (start < 0) return [];
+    const run = [];
+    for (let k = 0; k < n; k++){
+      const idx = (start + k) % n;
+      if (pts[idx].side !== side) break;
+      run.push(pts[idx]);
+    }
+    return run;
+  }
+  return pts.filter(q => q.side === side);
+}
+
+/* Notch/clip positions for a strip matching one sewline run.
+   Walk the run, classify local curvature, emit marks:
+   - radius < 1.5″  → clips every 3/8″   (tight curves / corner blends)
+   - radius < 100″  → notches every 1″   (gentle easing curves)
+   - straighter     → none
+   Returns { marks: [{s, kind}], len } with s = arc position from run start. */
+function notchPlan(run){
+  const n = run.length;
+  if (n < 3) return { marks: [], len: 0 };
+  const s = [0];
+  for (let i = 1; i < n; i++) s.push(s[i-1] + dist(run[i-1], run[i]));
+  const len = s[n-1];
+  const radius = new Array(n).fill(Infinity);
+  for (let i = 1; i < n - 1; i++){
+    const a = run[i-1], b = run[i], c = run[i+1];
+    const ab = dist(a,b), bc = dist(b,c), ca = dist(c,a);
+    const area2 = Math.abs((b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x));
+    if (area2 > 1e-12) radius[i] = (ab*bc*ca) / (2*area2);
+  }
+  // Sliding scale: r=1.5" → 3/8" spacing, r→10" → 2" spacing, r>50" → no mark.
+  function notchSpacing(r){
+    if (r >= 50)  return Infinity;   // essentially straight
+    if (r <= 1.5) return 0.375;      // tight — clip every 3/8"
+    if (r >= 10)  return 2.0;        // gentle — notch every 2"
+    return 0.375 + (r - 1.5) / (10 - 1.5) * (2.0 - 0.375);
+  }
+  const marks = [];
+  let lastMark = -Infinity;
+  for (let i = 1; i < n - 1; i++){
+    const sp = notchSpacing(radius[i]);
+    if (!isFinite(sp)) continue;
+    if (s[i] - lastMark >= sp - 1e-6){
+      marks.push({ s: s[i], kind: radius[i] < 1.5 ? "clip" : "notch" });
+      lastMark = s[i];
+    }
+  }
+  return { marks, len };
+}
+
+/* Landmark arc positions along a full sewline path (closed or open):
+   corner junctions + per-side midpoints, measured from the path start.
+   Used to transfer match points onto the gusset strip. */
+function pathLandmarkPositions(pts, closed){
+  const n = pts.length;
+  const lim = closed ? n : n - 1;
+  const s = [0];
+  for (let i = 1; i < n; i++) s.push(s[i-1] + dist(pts[i-1], pts[i]));
+  const total = closed ? s[n-1] + dist(pts[n-1], pts[0]) : s[n-1];
+  const out = [];
+  // junctions: where side tag changes
+  for (let i = 1; i < n; i++){
+    if (pts[i].side !== pts[i-1].side){
+      out.push({ s: s[i], kind: "junction", label: pts[i-1].side + "/" + pts[i].side });
+    }
+  }
+  // midpoints: arc midpoint of each side's contiguous span within this path
+  let spanStart = 0;
+  for (let i = 1; i <= n; i++){
+    if (i === n || pts[i].side !== pts[spanStart].side){
+      const mid = (s[spanStart] + s[i-1]) / 2;
+      if (s[i-1] - s[spanStart] > 0.5) // skip slivers
+        out.push({ s: mid, kind: "mid", label: pts[spanStart].side + " midpoint" });
+      if (i < n) spanStart = i;
+    }
+  }
+  out.sort((a,b) => a.s - b.s);
+  return { landmarks: out, total };
+}
+
+/* ============ MAIN BUILD ============ */
+function buildPanel(p){
+  const notes = [];
+  const clamp = (val, max, label) => {
+    if (val > max + 1e-9){
+      notes.push(label + " reduced to " + fmtIn(max) + " to keep the curve fair.");
+      return max;
+    }
+    return val;
+  };
+
+  const cx = Math.max(p.topW, p.botW) / 2;
+  const TL = { x: cx - p.topW/2, y: 0 };
+  const TR = { x: cx + p.topW/2, y: 0 };
+  const BR = { x: cx + p.botW/2, y: p.height };
+  const BL = { x: cx - p.botW/2, y: p.height };
+
+  const sideLen = dist(TR, BR);
+  const minW = Math.min(p.topW, p.botW);
+
+  const hTop = clamp(p.topCrown, Math.min(0.30 * p.topW,  0.35 * p.height),  "Top crown");
+  const hBot = clamp(p.botCrown, Math.min(0.30 * p.botW,  0.35 * p.height),  "Bottom crown");
+  // Side fullness: only capped by edge length (Bézier loop limit ~0.58).
+  // NOT capped by panel width — a narrow-but-tall panel with deep side crown
+  // is valid (produces a leaf/eye shape) and should not be clamped.
+  const hL   = clamp(p.leftFull,  0.55 * sideLen, "Left fullness");
+  const hR   = clamp(p.rightFull, 0.55 * sideLen, "Right fullness");
+
+  const alpha = FEEL_ALPHA[p.feel];
+
+  // Sample the four crowned edges (clockwise).
+  let eTop = sampleEdge(TL, TR, hTop, alpha, "top");
+  let eRight = sampleEdge(TR, BR, hR, alpha, "right");
+  let eBottom = sampleEdge(BR, BL, hBot, alpha, "bottom");
+  let eLeft = sampleEdge(BL, TL, hL, alpha, "left");
+
+  let cutPts, marks = [];
+
+  /* ── UNIFIED CORNERS ──────────────────────────────────────────────
+     Softness 0 = crisp corner (edges meet at the exact frame point).
+     Softness > 0 = fair tangent blend. Top and bottom are independent,
+     so mixed panels (crisp top + soft bottom, etc.) are fully supported. */
+  const EPS = 1e-6;
+  let ts = p.topSoft <= EPS ? 0 : clamp(p.topSoft, 0.42 * Math.min(p.topW, sideLen), "Top corner softness");
+  let bs = p.botSoft <= EPS ? 0 : clamp(p.botSoft, 0.42 * Math.min(p.botW, sideLen), "Bottom corner softness");
+
+  // A soft corner tighter than ~1.25×SA can't physically fit a smooth sewline.
+  // We don't auto-raise — we warn, so the choice stays with the designer.
+  const minSoft = p.sa * 1.25;
+  if (p.sa > 0 && ts > 0 && ts < minSoft - 1e-9){
+    notes.push("Top corner softness is below 1.25\u00D7SA — the sewline can't bend that tight. Use 0 for a crisp corner, or at least " + fmtIn(minSoft) + ".");
+  }
+  if (p.sa > 0 && bs > 0 && bs < minSoft - 1e-9){
+    notes.push("Bottom corner softness is below 1.25\u00D7SA — the sewline can't bend that tight. Use 0 for a crisp corner, or at least " + fmtIn(minSoft) + ".");
+  }
+
+  // Per-edge: total trim may not eat more than 75% of the edge.
+  function scaledTrims(len, dA, dB, label){
+    const tot = dA + dB;
+    if (tot > 0.75 * len){
+      const f = (0.75 * len) / tot;
+      notes.push(label + " trims scaled back to fit the edge length.");
+      return [dA * f, dB * f];
+    }
+    return [dA, dB];
+  }
+  const lenTop = polylineLength(eTop), lenBot = polylineLength(eBottom);
+  const lenL = polylineLength(eLeft), lenR = polylineLength(eRight);
+  const [tT1, tT2] = scaledTrims(lenTop, ts, ts, "Top edge");
+  const [tR1, tR2] = scaledTrims(lenR, ts, bs, "Right edge");
+  const [tB1, tB2] = scaledTrims(lenBot, bs, bs, "Bottom edge");
+  const [tL1, tL2] = scaledTrims(lenL, bs, ts, "Left edge");
+
+  const T = trimPolyline(eTop, tT1, tT2);
+  const R = trimPolyline(eRight, tR1, tR2);
+  const B = trimPolyline(eBottom, tB1, tB2);
+  const L = trimPolyline(eLeft, tL1, tL2);
+
+  // blends only where softness > 0; crisp corners get no blend (edges meet)
+  const cTR = ts > 0 ? cornerBlend(T.pts[T.pts.length-1], T.tanEnd, R.pts[0], R.tanStart, "top", "right") : [];
+  const cBR = bs > 0 ? cornerBlend(R.pts[R.pts.length-1], R.tanEnd, B.pts[0], B.tanStart, "right", "bottom") : [];
+  const cBL = bs > 0 ? cornerBlend(B.pts[B.pts.length-1], B.tanEnd, L.pts[0], L.tanStart, "bottom", "left") : [];
+  const cTL = ts > 0 ? cornerBlend(L.pts[L.pts.length-1], L.tanEnd, T.pts[0], T.tanStart, "left", "top") : [];
+
+  cutPts = dedupe([].concat(T.pts, cTR, R.pts, cBR, B.pts, cBL, L.pts, cTL));
+
+  // center marks: always emit midpoint of all 4 edges (kind:'edge') + blend midpoints (kind:'blend')
+  const tagEdge = pt => ({ x: pt.x, y: pt.y, side: pt.side, kind: 'edge' });
+  const tagBlend = pt => ({ x: pt.x, y: pt.y, side: pt.side, kind: 'blend' });
+  marks.push(tagEdge(T.pts[Math.floor(T.pts.length/2)]));
+  marks.push(tagEdge(R.pts[Math.floor(R.pts.length/2)]));
+  marks.push(tagEdge(B.pts[Math.floor(B.pts.length/2)]));
+  marks.push(tagEdge(L.pts[Math.floor(L.pts.length/2)]));
+  [cTR, cBR, cBL, cTL].forEach(c => { if (c.length) marks.push(tagBlend(c[Math.floor(c.length/2)])); });
+
+  // Sewline: per-group inward offset with miter joins at crisp corners.
+  // (At soft corners the offsets meet smoothly mid-blend — no join needed.)
+  let sa = p.sa;
+  let sewPts, sewValid = true;
+  if (sa <= 1e-9){
+    sewPts = cutPts.slice();
+  } else {
+    // contiguous side groups from the cut path (wrap-safe)
+    const groups = sideGroups(cutPts);          // { top, right, bottom, left }
+    const oT = offsetOpen(groups.top, sa),  oR = offsetOpen(groups.right, sa);
+    const oB = offsetOpen(groups.bottom, sa), oL = offsetOpen(groups.left, sa);
+    // collapse check per group BEFORE joins mutate the arrays (index pairing intact)
+    if (offsetCollapsedOpen(groups.top, oT) || offsetCollapsedOpen(groups.right, oR) ||
+        offsetCollapsedOpen(groups.bottom, oB) || offsetCollapsedOpen(groups.left, oL)) sewValid = false;
+    if (ts <= 0){ joinMiter(oT, oR); joinMiter(oL, oT); }   // TR + TL crisp
+    if (bs <= 0){ joinMiter(oR, oB); joinMiter(oB, oL); }   // BR + BL crisp
+    sewPts = dedupe([].concat(oT, oR, oB, oL));
+  }
+  if (!sewValid){
+    notes.push("Seam allowance is too large for the tightest curve — sewline would cross itself. Reduce SA, soften the curve, or set corner softness to 0 (crisp) or \u2265 1.25\u00D7SA; sewline numbers below are unreliable until fixed.");
+  }
+
+  const cutBB = bbox(cutPts), sewBB = bbox(sewPts);
+  const cutPerim = polylineLength(cutPts, true);
+  const sewPerim = polylineLength(sewPts, true);
+  const runs = sideRuns(sewPts);
+  const cutRuns = sideRuns(cutPts);
+  const openSew = buildOpenSewline(cutPts, sa, bs <= 0);
+
+  return {
+    frame: [TL, TR, BR, BL],
+    cutPts, sewPts, marks, notes, sewValid,
+    cutBB, sewBB, cutPerim, sewPerim, runs, cutRuns, openSew,
+    crowns: { hTop, hBot, hL, hR },
+    softness: { ts, bs }
+  };
+}
+
+/* Contiguous side groups of a closed tagged polyline (wrap-safe). */
+function sideGroups(pts){
+  const n = pts.length;
+  const out = {};
+  for (const side of ["top","right","bottom","left"]){
+    let start = -1;
+    for (let i = 0; i < n; i++){
+      if (pts[i].side === side && pts[(i - 1 + n) % n].side !== side){ start = i; break; }
+    }
+    const g = [];
+    if (start >= 0){
+      for (let k = 0; k < n; k++){
+        const idx = (start + k) % n;
+        if (pts[idx].side !== side) break;
+        g.push(pts[idx]);
+      }
+    }
+    out[side] = g;
+  }
+  return out;
+}
+
+/* Collapse check for an OPEN polyline pair (src vs offset, same indexing). */
+function offsetCollapsedOpen(src, off){
+  const n = Math.min(src.length, off.length);
+  for (let i = 0; i < n - 1; i++){
+    const sx = src[i+1].x - src[i].x, sy = src[i+1].y - src[i].y;
+    if (sx*sx + sy*sy < 1e-4) continue;
+    const ox = off[i+1].x - off[i].x, oy = off[i+1].y - off[i].y;
+    if (sx*ox + sy*oy < 0) return true;
+  }
+  return false;
+}
+
+/* =====================================================================
+   FORMATTING
+   ===================================================================== */
+const FR8 = ["", "\u215B", "\u00BC", "\u215C", "\u00BD", "\u215D", "\u00BE", "\u215E"];
+function fmtIn(v){
+  const neg = v < 0 ? "-" : "";
+  v = Math.abs(v);
+  let e = Math.round(v * 8);
+  let whole = Math.floor(e / 8), rem = e % 8;
+  let s;
+  if (whole === 0 && rem === 0) s = "0";
+  else if (rem === 0) s = String(whole);
+  else if (whole === 0) s = FR8[rem];
+  else s = whole + "\u2009" + FR8[rem];
+  return neg + s + "\u2033";
+}
+function fmtDec(v){ return v.toFixed(2) + "\u2033"; }
+
+/* =====================================================================
+   UI WIRING
+   ===================================================================== */
+
+/* ── Fraction Input System ──────────────────────────────────────────── */
+const SIXTEENTHS = [
+  ["0","0"],["1/16","0.0625"],["1/8","0.125"],["3/16","0.1875"],
+  ["1/4","0.25"],["5/16","0.3125"],["3/8","0.375"],["7/16","0.4375"],
+  ["1/2","0.5"],["9/16","0.5625"],["5/8","0.625"],["11/16","0.6875"],
+  ["3/4","0.75"],["13/16","0.8125"],["7/8","0.875"],["15/16","0.9375"]
+];
+
+let decMode = false;
+
+/* Build fraction widget into a container div. Returns { read, set } */
+function buildFI(containerId, labelText, defaultVal, minVal = 0, showUnit = true){
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return { read:()=>defaultVal, set:()=>{} };
+
+  const lbl = document.createElement("label");
+  lbl.textContent = labelText;
+
+  // fraction elements
+  const fiDiv = document.createElement("div");
+  fiDiv.className = "fi";
+
+  const whole = document.createElement("input");
+  whole.type = "number"; whole.min = String(minVal); whole.step = "1";
+  const wholeDefault = Math.floor(defaultVal);
+  whole.value = String(wholeDefault);
+
+  const fracSel = document.createElement("select");
+  fracSel.className = "frac";
+  SIXTEENTHS.forEach(([label, val]) => {
+    const o = document.createElement("option");
+    o.value = val; o.textContent = label;
+    fracSel.appendChild(o);
+  });
+  // pick closest 16th for default fractional part
+  const fracDefault = defaultVal - wholeDefault;
+  const closestIdx = SIXTEENTHS.reduce((best, [,v], i) =>
+    Math.abs(parseFloat(v) - fracDefault) < Math.abs(parseFloat(SIXTEENTHS[best][1]) - fracDefault) ? i : best, 0);
+  fracSel.selectedIndex = closestIdx;
+
+  fiDiv.appendChild(whole); fiDiv.appendChild(fracSel);
+  if (showUnit){ const inch = document.createElement("span"); inch.className = "inch"; inch.textContent = "″"; fiDiv.appendChild(inch); }
+
+  // decimal element
+  const decInput = document.createElement("input");
+  decInput.type = "number"; decInput.className = "dec"; decInput.step = "0.0625";
+  decInput.min = String(minVal); decInput.value = String(defaultVal);
+  const decFi = document.createElement("div");
+  decFi.className = "fi";
+  decFi.appendChild(decInput);
+  if (showUnit){ const inch2 = document.createElement("span"); inch2.className = "inch"; inch2.textContent = "″"; decFi.appendChild(inch2); }
+
+  wrap.appendChild(lbl);
+  wrap.appendChild(fiDiv);
+  wrap.appendChild(decFi);
+  decFi.style.display = "none";
+
+  function read(){
+    if (decMode) return Math.max(minVal, parseFloat(decInput.value) || 0);
+    return Math.max(minVal, (parseInt(whole.value) || 0) + parseFloat(fracSel.value));
+  }
+  function set(val){
+    const w = Math.floor(val), f = val - w;
+    whole.value = String(w);
+    const idx = SIXTEENTHS.reduce((best,[,v],i) =>
+      Math.abs(parseFloat(v)-f) < Math.abs(parseFloat(SIXTEENTHS[best][1])-f) ? i : best, 0);
+    fracSel.selectedIndex = idx;
+    decInput.value = String(val);
+  }
+  function syncMode(){
+    fiDiv.style.display = decMode ? "none" : "flex";
+    decFi.style.display = decMode ? "flex" : "none";
+  }
+  syncMode();
+
+  [whole, fracSel, decInput].forEach(el => el.addEventListener("change", render));
+  [whole, decInput].forEach(el => el.addEventListener("input", render));
+
+  return { read, set, syncMode };
+}
+
+/* Build all FracInputs */
+const FI = {};
+[
+  ["f_topW",    "Top width",             10,  1],
+  ["f_botW",    "Bottom width",          13,  1],
+  ["f_height",  "Height",                12,  1],
+  ["f_sa",      "Seam allowance",        0.375, 0],
+  ["f_leftFull","Left & Right Crown",    0.5, 0],   // label updated dynamically
+  ["f_rightFull","Right crown",          0.5, 0],
+  ["f_topCrown","Top crown",             1.25,0],
+  ["f_botCrown","Bottom crown",          0,   0],
+  ["f_topSoft", "Top corner softness",   1,   0],
+  ["f_botSoft", "Bottom corner softness",1,   0],
+  ["f_sideDepth","Side depth",           3,   0],
+  ["f_gussetW", "Gusset width",          3,   0],
+].forEach(([id, label, def, min]) => { FI[id] = buildFI(id, label, def, min, false); });
+
+/* ── Matching Sides toggle ──────────────────────────────────────────── */
+let matchingSides = true;
+
+function updateSidesUI(){
+  const leftFI  = FI["f_leftFull"];
+  const rightFI = FI["f_rightFull"];
+  const leftWrap  = document.getElementById("f_leftFull");
+  const rightWrap = document.getElementById("f_rightFull");
+
+  if (matchingSides){
+    // update left label to combined
+    const lbl = leftWrap.querySelector("label");
+    if (lbl) lbl.textContent = "Left & Right Crown";
+    // ghost the right widget
+    leftWrap.querySelectorAll(".fi").forEach(d => d.classList.remove("ghost"));
+    const lblR = rightWrap.querySelector("label");
+    if (lblR) lblR.classList.add("ghost");
+    rightWrap.querySelectorAll(".fi").forEach(d => d.classList.add("ghost"));
+  } else {
+    const lbl = leftWrap.querySelector("label");
+    if (lbl) lbl.textContent = "Left crown";
+    leftWrap.querySelectorAll(".fi").forEach(d => d.classList.remove("ghost"));
+    const lblR = rightWrap.querySelector("label");
+    if (lblR) lblR.classList.remove("ghost");
+    rightWrap.querySelectorAll(".fi").forEach(d => d.classList.remove("ghost"));
+  }
+}
+
+document.getElementById("matchingSides").addEventListener("change", e => {
+  matchingSides = e.target.checked;
+  updateSidesUI();
+  render();
+});
+
+/* Decimal toggle */
+document.getElementById("decMode").addEventListener("change", e => {
+  decMode = e.target.checked;
+  Object.values(FI).forEach(fi => fi.syncMode && fi.syncMode());
+  render();
+});
+
+const $ = id => document.getElementById(id);
+let feel = "gentle", topMode = "4side";
+
+function readParams(){
+  const lf = FI["f_leftFull"].read();
+  const rf = matchingSides ? lf : FI["f_rightFull"].read();
+  return {
+    topW:      Math.max(1, FI["f_topW"].read()),
+    botW:      Math.max(1, FI["f_botW"].read()),
+    height:    Math.max(1, FI["f_height"].read()),
+    sa:        Math.max(0, FI["f_sa"].read()),
+    topCrown:  Math.max(0, FI["f_topCrown"].read()),
+    botCrown:  Math.max(0, FI["f_botCrown"].read()),
+    leftFull:  Math.max(0, lf),
+    rightFull: Math.max(0, rf),
+    feel, topMode,
+    topSoft:   Math.max(0, FI["f_topSoft"].read()),
+    botSoft:   Math.max(0, FI["f_botSoft"].read()),
+    sideDepth: Math.max(0, FI["f_sideDepth"].read()),
+    gussetW:   Math.max(0, FI["f_gussetW"].read())
+  };
+}
+
+let model = null, params = null;
+
+// init UI state
+updateSidesUI();
+
+function ptsToPath(pts, close){
+  let d = "M " + pts.map(p => p.x.toFixed(3) + " " + p.y.toFixed(3)).join(" L ");
+  if (close) d += " Z";
+  return d;
+}
+
+function render(){
+  params = readParams();
+  model = buildPanel(params);
+
+  /* ---- diagram ---- */
+  const VW = 760, VH = 520, PAD = 40;
+  const bb = model.cutBB;
+  const scale = Math.min((VW - PAD*2) / bb.w, (VH - PAD*2) / bb.h);
+  const ox = (VW - bb.w * scale) / 2 - bb.minX * scale;
+  const oy = (VH - bb.h * scale) / 2 - bb.minY * scale;
+  const X = v => v * scale + ox, Y = v => v * scale + oy;
+  const map = pts => pts.map(p => ({ x: X(p.x), y: Y(p.y) }));
+
+  const cutPath = ptsToPath(map(model.cutPts), true);
+  const isOpen = params.topMode === "3side" && model.openSew;
+  const sewPath = isOpen
+    ? ptsToPath(map(model.openSew.pts), false)   // open path — runs out to raw top edge
+    : ptsToPath(map(model.sewPts), true);
+
+  let svg = "";
+
+  // Z-ORDER (bottom to top): midline → sewline → landmarks → center marks → cut path
+
+  // 1) center fold midline (cyan)
+  const fr = model.frame;
+  const midX = (fr[0].x + fr[1].x) / 2;
+  svg += `<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="#00bcd4" stroke-width="1.2" stroke-dasharray="4 6" opacity="0.6"/>`;
+
+  // 2) sewline
+  svg += `<path d="${sewPath}" fill="none" stroke="#8a8a8a" stroke-width="2" stroke-dasharray="9 7"/>`;
+
+  // 3) sewline landmarks
+  const lm = sewLandmarks(model.sewPts);
+  const MIN_LM_DIST = 14;
+  function dedupLM(pts){
+    const kept = [];
+    for (const p of pts){
+      const sx = X(p.x), sy = Y(p.y);
+      if (kept.every(k => Math.hypot(k.sx-sx, k.sy-sy) >= MIN_LM_DIST))
+        kept.push({p, sx, sy});
+    }
+    return kept.map(k => k.p);
+  }
+  const junctions = dedupLM(lm.junctions);
+  const midpoints = dedupLM(lm.midpoints);
+  const SQ = 3.8;
+  for (const j of junctions){
+    const cx = X(j.x), cy = Y(j.y);
+    svg += `<rect x="${(cx-SQ).toFixed(1)}" y="${(cy-SQ).toFixed(1)}" width="${(SQ*2).toFixed(1)}" height="${(SQ*2).toFixed(1)}" fill="#fff" stroke="#8e1d3c" stroke-width="1.8" rx="1"/>`;
+  }
+  const DI = 5;
+  for (const m of midpoints){
+    const cx = X(m.x), cy = Y(m.y);
+    svg += `<polygon points="${cx.toFixed(1)},${(cy-DI).toFixed(1)} ${(cx+DI).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+DI).toFixed(1)} ${(cx-DI).toFixed(1)},${cy.toFixed(1)}" fill="#fff" stroke="#8a8a8a" stroke-width="1.8"/>`;
+  }
+
+  // 4) center mark triangles + perp ticks
+  //    model.marks: kind='edge' → full triangle (11px base, 13px height) + perp tick
+  //                 kind='blend' → 55% triangle (6px base, 7px height), no perp tick
+  const mds = markDetails(model.cutPts, model.marks, 0, 0);
+  for (let mi = 0; mi < mds.length; mi++){
+    const md = mds[mi];
+    const mark = model.marks[mi];
+    const isEdge = !mark || mark.kind !== 'blend';
+    const px = X(md.x), py = Y(md.y);
+    const base = isEdge ? 7 : 3.8, ht = isEdge ? 11 : 6;
+    const b1xs = px - md.tx*base/2, b1ys = py - md.ty*base/2;
+    const b2xs = px + md.tx*base/2, b2ys = py + md.ty*base/2;
+    const apx = px + md.nx*ht, apy = py + md.ny*ht;
+    svg += `<polygon points="${b1xs.toFixed(1)},${b1ys.toFixed(1)} ${b2xs.toFixed(1)},${b2ys.toFixed(1)} ${apx.toFixed(1)},${apy.toFixed(1)}" fill="#8e1d3c" stroke="none"/>`;
+    if (isEdge){
+      svg += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*11).toFixed(1)}" y2="${(py+md.ny*11).toFixed(1)}" stroke="#8e1d3c" stroke-width="2"/>`;
+    }
+  }
+
+  // 5) cut path (top z-order)
+  svg += `<path d="${cutPath}" fill="#fbecef" stroke="#8e1d3c" stroke-width="3.5" stroke-linejoin="round" fill-opacity="0.5"/>`;
+
+  // size label
+  svg += `<text x="${VW/2}" y="${VH - 8}" text-anchor="middle" font-size="17" font-weight="800" fill="#8e1d3c">Cut ${fmtIn(bb.w)} W \u00D7 ${fmtIn(bb.h)} H &#183; Sewline ${fmtIn(model.sewBB.w)} W \u00D7 ${fmtIn(model.sewBB.h)} H</text>`;
+  $("diag").innerHTML = svg;
+
+  /* ---- symmetry ---- */
+  const sym = Math.abs(params.leftFull - params.rightFull) < 1e-9;
+  const symEl = $("symline");
+  symEl.textContent = "Fold-friendly symmetry: " + (sym ? "yes" : "no");
+  symEl.className = "symline " + (sym ? "yes" : "no");
+
+  /* ---- results ---- */
+  const R = [];
+  R.push(stat("Cut size", fmtIn(bb.w) + " W \u00D7 " + fmtIn(bb.h) + " H", fmtDec(bb.w) + " \u00D7 " + fmtDec(bb.h)));
+  R.push(stat("Sewline size", fmtIn(model.sewBB.w) + " W \u00D7 " + fmtIn(model.sewBB.h) + " H", fmtDec(model.sewBB.w) + " \u00D7 " + fmtDec(model.sewBB.h)));
+  R.push(stat("Cut perimeter", fmtIn(model.cutPerim), fmtDec(model.cutPerim)));
+  R.push(stat("Sewline perimeter", fmtIn(model.sewPerim), fmtDec(model.sewPerim)));
+  $("results").innerHTML = R.join("");
+
+  /* ---- side runs (spelled out): cut line first, sewline second ---- */
+  const runs = model.runs;
+  const isOpenMode = params.topMode === "3side" && model.openSew;
+  const oruns = isOpenMode ? model.openSew.runs : null;
+  const cRuns = model.cutRuns || { top:0, right:0, bottom:0, left:0 };
+  if (isOpenMode){
+    $("runResults").innerHTML =
+      stat("Side runs — cut line", "",
+        "Top " + fmtIn(cRuns.top) + " \u00B7 Right " + fmtIn(cRuns.right) + " \u00B7 Bottom " + fmtIn(cRuns.bottom) + " \u00B7 Left " + fmtIn(cRuns.left)) +
+      stat("Side runs — sewline (to raw edge)", "",
+        "Top: open \u00B7 Right " + fmtIn(oruns.right) + " \u00B7 Bottom " + fmtIn(oruns.bottom) + " \u00B7 Left " + fmtIn(oruns.left));
+  } else {
+    $("runResults").innerHTML =
+      stat("Side runs — cut line", "",
+        "Top " + fmtIn(cRuns.top) + " \u00B7 Right " + fmtIn(cRuns.right) + " \u00B7 Bottom " + fmtIn(cRuns.bottom) + " \u00B7 Left " + fmtIn(cRuns.left)) +
+      stat("Side runs — sewline", "",
+        "Top " + fmtIn(runs.top) + " \u00B7 Right " + fmtIn(runs.right) + " \u00B7 Bottom " + fmtIn(runs.bottom) + " \u00B7 Left " + fmtIn(runs.left));
+  }
+
+  /* ---- Sides & Gusset pieces ---- */
+  renderPieces();
+
+  /* ---- warnings ---- */
+  if (model.notes.length){
+    $("warnBox").innerHTML = `<div class="warn">Adjustments made for a fair, stable curve:<ul>` +
+      model.notes.map(n => "<li>" + n + "</li>").join("") + "</ul></div>";
+  } else {
+    $("warnBox").innerHTML = "";
+  }
+}
+
+/* Piece-table builders (trapezoid-calculator display style) */
+function prow(label, cutVal, sewVal){
+  return `<div class="prow"><div class="pl">${label}</div><div class="pc">${cutVal}</div><div class="ps">Sewline: ${sewVal}</div></div>`;
+}
+function pieceBlock(pill, rows, note){
+  return `<span class="pill">${pill}</span>` + rows.join("") + (note ? `<p class="pnote">${note}</p>` : "");
+}
+function stripRows(cutL, sewL, cutW, sewW){
+  return [
+    prow("Length — cut", fmtIn(cutL), fmtIn(sewL)),
+    prow("Width — cut", fmtIn(cutW), fmtIn(sewW)),
+    prow("Cut perimeter", fmtIn(2*(cutL+cutW)), fmtIn(2*(sewL+sewW)))
+  ];
+}
+
+/* Mini strip diagram (on-screen). Fills parent width proportionally.
+   opts: { ghost, flushStart, flushEnd, sa, plan, broken, runLen, topLabel, gussetW } */
+function miniStrip(cutL, cutW, label, dims, opts){
+  const o = opts || {};
+  const VBW = 400, PADm = 10;
+  const FILL = "#fbecef";
+  const FILL_GHOST = "#fdf0f2";
+  const STROKE = "#8e1d3c";
+  const STROKE_GHOST = "#ecccd6";
+
+  if (o.broken){
+    // GUSSET: height proportional to gussetW, pink gradient, thin hash marks
+    const gw = o.gussetW || cutW;
+    const scale = (VBW - 2*PADm) / cutL;
+    const h = Math.min(80, Math.max(24, Math.round(gw * scale)));
+    const segW = 130, gap = 60, y0 = 8;
+    const x2 = PADm + segW + gap;
+    const svgH = h + y0 + 16;
+    const gradId = 'gg' + Math.random().toString(36).slice(2,6);
+    const grad2 = 'gg2' + Math.random().toString(36).slice(2,6);
+    let s = `<svg viewBox="0 0 ${VBW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;margin:0 auto">`;
+    s += `<defs>
+      <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${FILL}" stop-opacity="1"/>
+        <stop offset="85%" stop-color="${FILL}" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="${FILL}" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="${grad2}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${FILL}" stop-opacity="0"/>
+        <stop offset="15%" stop-color="${FILL}" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="${FILL}" stop-opacity="1"/>
+      </linearGradient>
+    </defs>`;
+    s += `<rect x="${PADm}" y="${y0}" width="${segW}" height="${h}" fill="url(#${gradId})"/>`;
+    s += `<line x1="${PADm}" y1="${y0}" x2="${PADm+segW}" y2="${y0}" stroke="${STROKE}" stroke-width="1"/>`;
+    s += `<line x1="${PADm}" y1="${y0+h}" x2="${PADm+segW}" y2="${y0+h}" stroke="${STROKE}" stroke-width="1"/>`;
+    s += `<line x1="${PADm}" y1="${y0}" x2="${PADm}" y2="${y0+h}" stroke="${STROKE}" stroke-width="1.5"/>`;
+    s += `<rect x="${x2}" y="${y0}" width="${segW}" height="${h}" fill="url(#${grad2})"/>`;
+    s += `<line x1="${x2}" y1="${y0}" x2="${x2+segW}" y2="${y0}" stroke="${STROKE}" stroke-width="1"/>`;
+    s += `<line x1="${x2}" y1="${y0+h}" x2="${x2+segW}" y2="${y0+h}" stroke="${STROKE}" stroke-width="1"/>`;
+    s += `<line x1="${x2+segW}" y1="${y0}" x2="${x2+segW}" y2="${y0+h}" stroke="${STROKE}" stroke-width="1.5"/>`;
+    for (let d2 = 6; d2 < gap + h; d2 += 14){
+      const x1c = PADm+segW+d2, y1c = y0, x2c = PADm+segW+d2-h, y2c = y0+h;
+      s += `<line x1="${x1c}" y1="${y1c}" x2="${x2c}" y2="${y2c}" stroke="${STROKE}" stroke-width="0.7" opacity="0.35"/>`;
+    }
+    s += `</svg>`;
+    return `<div class="mini" style="width:100%;box-sizing:border-box;text-align:center">${s}<div class="mlabel">${label}</div><div class="mdims">${dims}</div></div>`;
+  }
+
+  // SIDE STRIP — consistent scale across all pieces via refL
+  // refL = max length of any piece in this render pass, so proportions are
+  // consistent: a 10" strip is visually shorter than a 12" strip.
+  const refLen = o.refL || cutL;
+  const scale = (VBW - 2*PADm) / refLen;
+  const displayW = cutL * scale;          // actual rendered width of this strip
+  const h = Math.min(120, Math.max(20, Math.round(cutW * scale)));
+  const y0 = o.ghost ? 14 : 8, x0 = PADm, gOff = 7;
+  // Cap saPx at 20% of strip height so shallow strips stay readable
+  const rawSaPx = (o.sa || 0) * scale;
+  const saPx = Math.max(3, Math.min(h * 0.20, rawSaPx));
+  const sx = o.flushStart ? x0 : x0 + saPx;
+  const ex = o.flushEnd ? x0 + displayW : x0 + displayW - saPx;
+  const runLen = o.runLen || cutL;
+  const midX = x0 + (o.flushStart ? 0 : saPx) + (runLen * scale / 2);
+  const svgH = h + y0 + (o.topLabel ? 20 : 14);
+  const VBH = svgH;
+
+  let s = `<svg viewBox="0 0 ${VBW} ${VBH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`;
+
+  // ghost (matched pair) — very faint pink offset, matching reference style
+  if (o.ghost){
+    s += `<rect x="${(x0+gOff).toFixed(1)}" y="${(y0-gOff).toFixed(1)}" width="${displayW.toFixed(1)}" height="${h.toFixed(1)}" fill="${FILL_GHOST}" stroke="${STROKE_GHOST}" stroke-width="1.5"/>`;
+  }
+
+  // notch ticks (green, bottom z-order)
+  if (o.plan && o.plan.marks.length){
+    for (const mk of o.plan.marks){
+      const tx = x0 + (o.flushStart ? 0 : saPx) + mk.s * scale;
+      const tl = mk.kind === "clip" ? saPx*0.8 : saPx*0.6;
+      const wg = mk.kind === "clip" ? 1.3 : 0.9;
+      s += `<line x1="${tx.toFixed(1)}" y1="${y0}" x2="${tx.toFixed(1)}" y2="${(y0+tl).toFixed(1)}" stroke="#2e7d32" stroke-width="${wg}" opacity="0.7"/>`;
+      s += `<line x1="${tx.toFixed(1)}" y1="${(y0+h).toFixed(1)}" x2="${tx.toFixed(1)}" y2="${(y0+h-tl).toFixed(1)}" stroke="#2e7d32" stroke-width="${wg}" opacity="0.7"/>`;
+    }
+  }
+  // center line (cyan)
+  s += `<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+h).toFixed(1)}" stroke="#00bcd4" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>`;
+  // sewline (grey dashed) inside SA
+  const saP = saPx;
+  s += `<path d="M ${sx.toFixed(1)} ${(y0+saP).toFixed(1)} H ${ex.toFixed(1)} M ${sx.toFixed(1)} ${(y0+h-saP).toFixed(1)} H ${ex.toFixed(1)}` +
+    (o.flushStart ? "" : ` M ${sx.toFixed(1)} ${(y0+saP).toFixed(1)} V ${(y0+h-saP).toFixed(1)}`) +
+    (o.flushEnd ? "" : ` M ${ex.toFixed(1)} ${(y0+saP).toFixed(1)} V ${(y0+h-saP).toFixed(1)}`) +
+    `" fill="none" stroke="#aaa" stroke-width="1" stroke-dasharray="4 3"/>`;
+  // center triangles on cut edges pointing inward
+  const tB = 6, tHt = 9;
+  s += `<polygon points="${midX},${y0} ${midX-tB/2},${y0-tHt} ${midX+tB/2},${y0-tHt}" fill="${STROKE}"/>`;
+  s += `<polygon points="${midX},${(y0+h).toFixed(1)} ${midX-tB/2},${(y0+h+tHt).toFixed(1)} ${midX+tB/2},${(y0+h+tHt).toFixed(1)}" fill="${STROKE}"/>`;
+  // filled strip rect — light red fill + maroon border (front/top z-order)
+  s += `<rect x="${x0}" y="${y0}" width="${displayW.toFixed(1)}" height="${h.toFixed(1)}" fill="${FILL}" fill-opacity="0.75" stroke="${STROKE}" stroke-width="2"/>`;
+  // "TOP" vertical label on flush end
+  if (o.topLabel){
+    const tx = o.flushStart ? x0 + 11 : x0 + cutL*scale - 11;
+    s += `<text x="${tx.toFixed(1)}" y="${(y0+h/2).toFixed(1)}" font-size="10" font-weight="800" font-family="Nunito,sans-serif" fill="${STROKE}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90,${tx.toFixed(1)},${(y0+h/2).toFixed(1)})">TOP</text>`;
+  }
+  s += `</svg>`;
+  return `<div class="mini" style="width:100%;box-sizing:border-box">${s}<div class="mlabel">${label}</div><div class="mdims">${dims}</div></div>`;
+}
+function renderPieces(){
+  const p = params, m = model;
+  const sa = p.sa, d = p.sideDepth, gw = p.gussetW;
+  const open = p.topMode === "3side" && m.openSew;
+  const r = open ? m.openSew.runs : m.runs;
+  const sewSrc = open ? m.openSew.pts : m.sewPts;
+
+  // curvature-based notch plans per side run (marks live on strips, never the panel)
+  const plans = {};
+  ["top","right","bottom","left"].forEach(sd => {
+    if (open && sd === "top") return;
+    plans[sd] = notchPlan(extractSideRun(sewSrc, sd, !open));
+  });
+
+  const wd = d + 2*sa;
+  const lrMatch = Math.abs(r.left - r.right) < 1/32;
+  // Compute reference length = longest strip for consistent cross-piece scaling
+  const allLengths = open
+    ? [r.left + sa, r.right + sa, r.bottom + 2*sa]
+    : [r.left + 2*sa, r.right + 2*sa, r.bottom + 2*sa, r.top + 2*sa];
+  const refL = Math.max(...allLengths);
+
+  /* ---- SIDES card ---- */
+  let minis = "";
+  if (lrMatch){
+    minis += miniStrip(r.left + (open ? sa : 2*sa), wd, "LEFT &amp; RIGHT — CUT 2",
+      fmtIn(r.left + (open ? sa : 2*sa)) + " L \u00D7 " + fmtIn(wd) + " D",
+      { ghost: true, sa, plan: plans.left, flushStart: open, flushEnd: false, runLen: r.left, topLabel: open, refL });
+  } else {
+    minis += miniStrip(r.left + (open ? sa : 2*sa), wd, "LEFT — CUT 1",
+      fmtIn(r.left + (open ? sa : 2*sa)) + " L \u00D7 " + fmtIn(wd) + " D",
+      { sa, plan: plans.left, flushStart: open, runLen: r.left, topLabel: open, refL });
+    minis += miniStrip(r.right + (open ? sa : 2*sa), wd, "RIGHT — CUT 1",
+      fmtIn(r.right + (open ? sa : 2*sa)) + " L \u00D7 " + fmtIn(wd) + " D",
+      { sa, plan: plans.right, flushStart: open, runLen: r.right, topLabel: open, refL });
+  }
+  minis += miniStrip(r.bottom + 2*sa, wd, "BOTTOM — CUT 1",
+    fmtIn(r.bottom + 2*sa) + " L \u00D7 " + fmtIn(wd) + " D",
+    { sa, plan: plans.bottom, runLen: r.bottom, refL });
+  if (!open){
+    minis += miniStrip(r.top + 2*sa, wd, "TOP — CUT 1",
+      fmtIn(r.top + 2*sa) + " L \u00D7 " + fmtIn(wd) + " D",
+      { sa, plan: plans.top, runLen: r.top, refL });
+  }
+  $("sidesDiagram").innerHTML = `<div class="miniWrap">${minis}</div>`;
+
+  let S = "";
+  if (open){
+    if (lrMatch){
+      S += pieceBlock("LEFT &amp; RIGHT — CUT 2", stripRows(r.left + sa, r.left, wd, d),
+        "Top end flush with raw edge — SA at bottom join only.");
+    } else {
+      S += pieceBlock("LEFT — CUT 1", stripRows(r.left + sa, r.left, wd, d), "Top end flush with raw edge.");
+      S += pieceBlock("RIGHT — CUT 1", stripRows(r.right + sa, r.right, wd, d), "Top end flush with raw edge.");
+    }
+    S += pieceBlock("BOTTOM — CUT 1", stripRows(r.bottom + 2*sa, r.bottom, wd, d));
+  } else {
+    if (lrMatch){
+      S += pieceBlock("LEFT &amp; RIGHT — CUT 2", stripRows(r.left + 2*sa, r.left, wd, d));
+    } else {
+      S += pieceBlock("LEFT — CUT 1", stripRows(r.left + 2*sa, r.left, wd, d));
+      S += pieceBlock("RIGHT — CUT 1", stripRows(r.right + 2*sa, r.right, wd, d));
+    }
+    S += pieceBlock("BOTTOM — CUT 1", stripRows(r.bottom + 2*sa, r.bottom, wd, d));
+    S += pieceBlock("TOP — CUT 1", stripRows(r.top + 2*sa, r.top, wd, d));
+  }
+  $("sidesResults").innerHTML = S;
+
+  /* ---- GUSSET card ---- */
+  const gwd = gw + 2*sa;
+  const run = open ? m.openSew.total : m.sewPerim;
+  const gCutL = open ? run : run + 2*sa;
+  $("gussetDiagram").innerHTML = `<div class="miniWrap">` +
+    miniStrip(gCutL, gwd, "GUSSET — CUT 1", fmtIn(gCutL) + " L \u00D7 " + fmtIn(gwd) + " W",
+      { broken: true, gussetW: gw }) +
+    `</div>`;
+  let G = "";
+  if (open){
+    G += pieceBlock("GUSSET — CUT 1", stripRows(run, run, gwd, gw),
+      "Both ends flush with the raw top edge. Notch/match positions on the printed strip.");
+  } else {
+    G += pieceBlock("GUSSET — CUT 1", stripRows(run + 2*sa, run, gwd, gw),
+      "Full sewline perimeter + 2\u00D7SA joining seam. Notch/match positions on the printed strip.");
+  }
+  $("gussetResults").innerHTML = G;
+}
+
+function stat(k, v, d){
+  return `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+}
+
+/* ---- remaining input listeners ---- */
+$("feelSeg").addEventListener("click", e => {
+  if (!e.target.dataset.feel) return;
+  feel = e.target.dataset.feel;
+  document.querySelectorAll("#feelSeg button").forEach(b => b.classList.toggle("on", b.dataset.feel === feel));
+  render();
+});
+$("topModeSeg").addEventListener("click", e => {
+  if (!e.target.dataset.mode) return;
+  topMode = e.target.dataset.mode;
+  document.querySelectorAll("#topModeSeg button").forEach(b => b.classList.toggle("on", b.dataset.mode === topMode));
+  render();
+});
+$("sgToggle").addEventListener("click", e => {
+  if (!e.target.dataset.sg) return;
+  const sg = e.target.dataset.sg;
+  document.querySelectorAll("#sgToggle button").forEach(b => b.classList.toggle("on", b.dataset.sg === sg));
+  $("sidesSection").style.display = sg === "sides" ? "" : "none";
+  $("gussetSection").style.display = sg === "gusset" ? "" : "none";
+});
+
+/* =====================================================================
+   TILED PRINT ENGINE — 7" × 10" tiles, Letter and A4 safe at 100%.
+   No overlap: just butt the borders edge-to-edge like a paper pattern.
+   Colors: maroon cut line, grey sewline, black border, cyan center line.
+   ===================================================================== */
+const TILE_W = 7, TILE_H = 9.68;  // SVG height; ~0.32" for label above = 10" total
+const CM3 = 3 / 2.54; // 1.1811"
+
+/* Colors */
+const C_CUT    = "#8e1d3c";   // maroon
+const C_SEW    = "#aaaaaa";   // light grey
+const C_BORDER = "#000000";   // black
+const C_CENTER = "#00bcd4";   // cyan
+const C_MARK   = "#8e1d3c";   // maroon (center triangles / arc perp lines)
+const C_NOTCH  = "#2e7d32";   // green (notch/clip marks)
+
+/* Test squares for the HTML summary page only — not on any pattern tile */
+function testSquareSVG(){
+  const szC = CM3, pad = 0.1, gap = 0.5;
+  const tw = 1 + gap + szC + 2*pad, th = 1 + 0.28 + 2*pad;
+  return `<svg width="${tw}in" height="${th}in" viewBox="0 0 ${tw} ${th}" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:6pt 0 4pt">` +
+    `<rect x="${pad}" y="${pad}" width="1" height="1" fill="none" stroke="#000" stroke-width="0.02"/>` +
+    `<text x="${pad}" y="${pad+1+0.2}" font-size="0.14" font-family="Nunito,sans-serif" fill="#000">1\u2033</text>` +
+    `<rect x="${pad+1+gap}" y="${pad}" width="${szC.toFixed(4)}" height="${szC.toFixed(4)}" fill="none" stroke="#000" stroke-width="0.02"/>` +
+    `<text x="${pad+1+gap}" y="${pad+szC+0.2}" font-size="0.14" font-family="Nunito,sans-serif" fill="#000">3\u2009cm</text>` +
+    `</svg>`;
+}
+
+function printDoc(title, geom, spanW, spanH, detailRows, legendLine){
+  const cols = Math.max(1, Math.ceil(spanW / TILE_W));
+  const rows = Math.max(1, Math.ceil(spanH / TILE_H));
+  let tiles = "";
+  for (let r = 0; r < rows; r++){
+    for (let c = 0; c < cols; c++){
+      const vx = c * TILE_W, vy = r * TILE_H;
+      const label = String.fromCharCode(65 + r) + (c + 1);
+      const isLast = r === rows-1 && c === cols-1;
+      let inner = geom;
+      inner += `<rect x="${vx}" y="${vy}" width="${TILE_W}" height="${TILE_H}" fill="none" stroke="${C_BORDER}" stroke-width="0.025"/>`;
+      tiles += `<div class="${isLast ? 'tile last' : 'tile'}">` +
+        `<div class="tlabel">${title} &mdash; ${label}</div>` +
+        `<svg width="${TILE_W}in" height="${TILE_H}in" viewBox="${vx} ${vy} ${TILE_W} ${TILE_H}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` +
+        `</div>`;
+    }
+  }
+  const details = detailRows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  const w = window.open("", "_blank");
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    @page { margin: 0.5in; }
+    body { font-family: Nunito, system-ui, sans-serif; margin: 0; color:#222; }
+    .page { page-break-after: always; }
+    .tile { page-break-after: always; text-align: center; }
+    .tile.last { page-break-after: auto; }
+    .tlabel { margin: 0; padding: 3pt 0 0; font-size: 7pt; font-weight: 700; font-family: Nunito, sans-serif; text-align: center; line-height: 1.2; }
+    .tile svg { display: block; margin: 0 auto; }
+    h1 { font-size: 15pt; margin: 0 0 3pt; color:#8e1d3c; } h2 { font-size: 10pt; margin: 0 0 8pt; color:#555; }
+    table { border-collapse: collapse; width: 100%; font-size: 10pt; }
+    td { border: 1px solid #ddd; padding: 4pt 7pt; } td:first-child { font-weight: 700; width: 38%; }
+    .note { font-size: 8pt; color:#666; margin-top: 9pt; line-height:1.45; }
+    .legend { font-size: 7.5pt; color:#444; margin-top:5pt; }
+  </style></head><body>
+    <div class="page">
+      <h1>${title}</h1>
+      <h2>Moonshot Bag Calculator \u00B7 ${rows} row(s) \u00D7 ${cols} col(s) \u00B7 7\u2033 \u00D7 9.75\u2033 tiles \u00B7 Letter &amp; A4 safe</h2>
+      <p style="font-size:9pt;font-weight:700;color:#555;margin:0 0 2pt">Verify both test squares before cutting fabric:</p>
+      ${testSquareSVG()}
+      <table>${details}</table>
+      ${legendLine ? '<p class="legend">' + legendLine + '</p>' : ''}
+      <p class="note">Print at 100% / actual size \u2014 never \u201Cfit to page.\u201D Assemble by butting tile borders edge-to-edge: A1, A2\u2026 then B1, B2\u2026 PROTOTYPE: verify all measurements before cutting good fabric.</p>
+    </div>
+    ${tiles}
+  </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
+}
+
+/* symbol helpers */
+function pSquare(x, y){ const s = 0.055; return `<rect x="${(x-s).toFixed(4)}" y="${(y-s).toFixed(4)}" width="${(2*s).toFixed(4)}" height="${(2*s).toFixed(4)}" fill="none" stroke="${C_BORDER}" stroke-width="0.018" rx="0.01"/>`; }
+function pDiamond(x, y){ const d = 0.07; return `<polygon points="${x},${y-d} ${x+d},${y} ${x},${y+d} ${x-d},${y}" fill="none" stroke="${C_SEW}" stroke-width="0.018"/>`; }
+
+/* Inward-pointing skinny triangle at point (px,py) on the cut line.
+   nx,ny = inward unit normal. Base along cut edge, apex pointing in. */
+function pTriangle(px, py, nx, ny, tang_x, tang_y){
+  const base = 0.16, height = 0.26;  // 2× — center fold/match marks
+  const b1x = px - tang_x * base/2, b1y = py - tang_y * base/2;
+  const b2x = px + tang_x * base/2, b2y = py + tang_y * base/2;
+  const apx = px + nx * height,     apy = py + ny * height;
+  return `<polygon points="${b1x.toFixed(4)},${b1y.toFixed(4)} ${b2x.toFixed(4)},${b2y.toFixed(4)} ${apx.toFixed(4)},${apy.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+}
+
+/* Perpendicular tick at point (px,py), direction inward (nx,ny). */
+function pPerpTick(px, py, nx, ny){
+  const len = 0.14;
+  return `<line x1="${px.toFixed(4)}" y1="${py.toFixed(4)}" x2="${(px + nx*len).toFixed(4)}" y2="${(py + ny*len).toFixed(4)}" stroke="${C_MARK}" stroke-width="0.025"/>`;
+}
+
+/* For each point in model.marks, find its position + tangent + inward normal
+   on the nearest segment of cutPts. Returns { x, y, tx, ty, nx, ny, isCrown }. */
+function markDetails(cutPts, marks, originX, originY){
+  const n = cutPts.length;
+  return marks.map(mk => {
+    const mx = mk.x, my = mk.y;
+    let bestI = 0, bestD = Infinity;
+    for (let i = 0; i < n; i++){
+      const d = Math.hypot(cutPts[i].x - mx, cutPts[i].y - my);
+      if (d < bestD){ bestD = d; bestI = i; }
+    }
+    const prev = cutPts[(bestI - 1 + n) % n], next = cutPts[(bestI + 1) % n];
+    const tx = next.x - prev.x, ty = next.y - prev.y;
+    const tl = Math.hypot(tx, ty) || 1;
+    const utx = tx/tl, uty = ty/tl;
+    // inward normal: clockwise winding = inward is (-ty, tx) for y-down SVG
+    const unx = -uty, uny = utx;
+    return { x: mx - originX, y: my - originY, tx: utx, ty: uty, nx: unx, ny: uny };
+  });
+}
+
+/* zone summary */
+function zoneSummary(marks){
+  if (!marks.length) return "none (straight)";
+  const groups = [];
+  let g = { kind: marks[0].kind, from: marks[0].s, to: marks[0].s, count: 1 };
+  for (let i = 1; i < marks.length; i++){
+    const mk = marks[i];
+    const gap = mk.kind === "clip" ? 0.6 : 1.6;
+    if (mk.kind === g.kind && mk.s - g.to <= gap){ g.to = mk.s; g.count++; }
+    else { groups.push(g); g = { kind: mk.kind, from: mk.s, to: mk.s, count: 1 }; }
+  }
+  groups.push(g);
+  return groups.map(z => z.kind + "s " + (z.count > 1 ? (fmtIn(z.from) + "\u2013" + fmtIn(z.to) + " (" + z.count + ")") : ("at " + fmtIn(z.from)))).join(" \u00B7 ");
+}
+
+/* ---- PRINT: MAIN PANEL ---- */
+$("printPanelBtn").addEventListener("click", () => {
+  const m = model, p = params;
+  const PADIN = 0.4;
+  const originX = m.cutBB.minX - PADIN, originY = m.cutBB.minY - PADIN;
+  const spanW = m.cutBB.w + PADIN*2, spanH = m.cutBB.h + PADIN*2;
+  const shift = pts => pts.map(q => ({ x: q.x - originX, y: q.y - originY, side: q.side }));
+  const open = p.topMode === "3side" && m.openSew;
+
+  let geom = "";
+
+  // sewline (grey dashed) — drawn first so cut line renders on top
+  geom += `<path d="${open ? ptsToPath(shift(m.openSew.pts), false) : ptsToPath(shift(m.sewPts), true)}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
+
+  // center fold line (cyan) — frame midX, cut path vertical extent
+  const midX = (m.frame[0].x + m.frame[1].x) / 2 - originX;
+  geom += `<line x1="${midX.toFixed(4)}" y1="${(m.cutBB.minY - originY - 0.05).toFixed(4)}" x2="${midX.toFixed(4)}" y2="${(m.cutBB.maxY - originY + 0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
+
+  // cut line (maroon solid)
+  geom += `<path d="${ptsToPath(shift(m.cutPts), true)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
+
+  // sewline landmarks (on sewline — matching symbols only, no notches on panel)
+  const lm = sewLandmarks(m.sewPts);
+  shift(lm.junctions).forEach(j => geom += pSquare(j.x, j.y));
+  shift(lm.midpoints).forEach(mp => geom += pDiamond(mp.x, mp.y));
+
+  // center marks on cut line: triangles at side midpoints + perp ticks at crowned arcs
+  const mds = markDetails(m.cutPts, m.marks, originX, originY);
+  mds.forEach(md => {
+    // inward-pointing triangle (center of edge — fold/match mark)
+    geom += pTriangle(md.x, md.y, md.nx, md.ny, md.tx, md.ty);
+    // perpendicular tick for arc geometry reference (same point, slightly longer inward)
+    geom += pPerpTick(md.x, md.y, md.nx, md.ny);
+  });
+
+  const r = open ? m.openSew.runs : m.runs;
+  const detailRows = [
+    ["Cut size", fmtIn(m.cutBB.w) + " W \u00D7 " + fmtIn(m.cutBB.h) + " H"],
+    ["Sewline size", fmtIn(m.sewBB.w) + " W \u00D7 " + fmtIn(m.sewBB.h) + " H"],
+    ["Cut perimeter", fmtIn(m.cutPerim) + "  (" + fmtDec(m.cutPerim) + ")"],
+    ["Sewline perimeter", fmtIn(m.sewPerim) + "  (" + fmtDec(m.sewPerim) + ")"],
+    ["Seam allowance", fmtIn(p.sa)],
+    ["Fullness / crown", "Left " + fmtIn(m.crowns.hL) + " \u00B7 Right " + fmtIn(m.crowns.hR) + " \u00B7 Top " + fmtIn(m.crowns.hTop) + " \u00B7 Bottom " + fmtIn(m.crowns.hBot) + " \u00B7 feel: " + p.feel],
+    ["Corner softness", "top " + fmtIn(m.softness.ts) + " \u00B7 bottom " + fmtIn(m.softness.bs) + " (0 = crisp)"],
+    ["Top edge", open ? "3-Sided (open top)" : "4-Sided (enclosed)"],
+    ["Sewline side runs", open
+      ? ("Top: open \u00B7 Right " + fmtIn(r.right) + " \u00B7 Bottom " + fmtIn(r.bottom) + " \u00B7 Left " + fmtIn(r.left) + " (to raw edge)")
+      : ("Top " + fmtIn(r.top) + " \u00B7 Right " + fmtIn(r.right) + " \u00B7 Bottom " + fmtIn(r.bottom) + " \u00B7 Left " + fmtIn(r.left))]
+  ];
+  printDoc("Curved Panel \u2014 Main Panel", geom, spanW, spanH, detailRows,
+    "Colors: maroon = cut line \u00B7 grey dashed = sewline \u00B7 cyan dashed = center fold line. \u25B2 = center/fold mark \u00B7 \u22A5 tick = arc center direction \u00B7 \u25A1 = corner junction \u00B7 \u25C7 = edge midpoint (gusset match). Notch/clip marks on gusset &amp; side strips only.");
+});
+
+/* Strip drawing — color-updated */
+/* pTriangleH: inward-pointing triangle on a HORIZONTAL strip edge.
+   py = y of cut edge, inward = direction toward strip center (+1 down, -1 up).
+   px = x position. */
+function pTriangleH(px, py, inward){
+  const base = 0.16, ht = 0.22;  // 2× — center match marks on strips
+  const bL = px - base/2, bR = px + base/2;
+  const apex = py + inward * ht;
+  return `<polygon points="${bL.toFixed(4)},${py.toFixed(4)} ${bR.toFixed(4)},${py.toFixed(4)} ${px.toFixed(4)},${apex.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+}
+
+/* Z-order in drawStrip: notches → center line → sewline → center triangles → cut rect */
+function drawStrip(pc){
+  const { x0, y0, cutL, w, sa } = pc;
+  // runLen: sewline run length for computing the center triangle position.
+  // If not given, fall back to cutL - 2*sa (approximate).
+  const runLen = pc.runLen !== undefined ? pc.runLen : (cutL - (pc.flushStart ? sa : 2*sa));
+  const sewStart = pc.flushStart ? x0 : x0 + sa;
+
+  let g = "";
+  const sx = pc.flushStart ? x0 : x0 + sa;
+  const ex = pc.flushEnd ? x0 + cutL : x0 + cutL - sa;
+
+  // 1) notches/clips (green, bottom z-order)
+  if (pc.plan){
+    for (const mk of pc.plan.marks){
+      const tx = sewStart + mk.s;
+      const len = mk.kind === "clip" ? sa * 0.75 : sa * 0.55;
+      const wgt = mk.kind === "clip" ? 0.022 : 0.016;
+      g += `<line x1="${tx.toFixed(4)}" y1="${y0}" x2="${tx.toFixed(4)}" y2="${(y0+len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+      g += `<line x1="${tx.toFixed(4)}" y1="${(y0+w).toFixed(4)}" x2="${tx.toFixed(4)}" y2="${(y0+w-len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+    }
+  }
+
+  // 2) center line (cyan)
+  const midL = sewStart + runLen / 2;
+  g += `<line x1="${midL.toFixed(4)}" y1="${y0}" x2="${midL.toFixed(4)}" y2="${(y0+w).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.016" stroke-dasharray="0.18 0.12"/>`;
+
+  // 3) sewline (grey dashed)
+  let d = `M ${sx.toFixed(4)} ${(y0+sa).toFixed(4)} H ${ex.toFixed(4)} M ${sx.toFixed(4)} ${(y0+w-sa).toFixed(4)} H ${ex.toFixed(4)}`;
+  if (!pc.flushStart) d += ` M ${sx.toFixed(4)} ${(y0+sa).toFixed(4)} V ${(y0+w-sa).toFixed(4)}`;
+  if (!pc.flushEnd) d += ` M ${ex.toFixed(4)} ${(y0+sa).toFixed(4)} V ${(y0+w-sa).toFixed(4)}`;
+  g += `<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="0.02" stroke-dasharray="0.15 0.1"/>`;
+
+  // 4) landmarks on sewline (junction squares + midpoint diamonds)
+  if (pc.landmarks){
+    for (const L of pc.landmarks){
+      const tx = sewStart + L.s;
+      if (L.kind === "junction"){ g += pSquare(tx, y0 + sa); g += pSquare(tx, y0 + w - sa); }
+      else { g += pDiamond(tx, y0 + sa); g += pDiamond(tx, y0 + w - sa); }
+    }
+  }
+
+  // 5) center triangles on BOTH cut edges (matching the panel center marks)
+  //    Position = sewline midpoint = sewStart + runLen/2
+  g += pTriangleH(midL, y0,    +1);  // top edge, pointing down (inward)
+  g += pTriangleH(midL, y0+w,  -1);  // bottom edge, pointing up (inward)
+
+  // 6) cut rect (top z-order = maroon)
+  g += `<rect x="${x0}" y="${y0}" width="${cutL.toFixed(4)}" height="${w.toFixed(4)}" fill="none" stroke="${C_CUT}" stroke-width="0.035"/>`;
+
+  g += `<text x="${(x0 + 0.12).toFixed(4)}" y="${(y0 + w/2 + 0.07).toFixed(4)}" font-size="0.18" font-family="Nunito, sans-serif" fill="#333">${pc.label}</text>`;
+  return g;
+}
+
+/* ---- PRINT: SIDE PANELS ---- */
+$("printSidesBtn").addEventListener("click", () => {
+  const m = model, p = params;
+  const sa = p.sa, dD = p.sideDepth, w = dD + 2*sa;
+  const open = p.topMode === "3side" && m.openSew;
+  const r = open ? m.openSew.runs : m.runs;
+  const sewSrc = open ? m.openSew.pts : m.sewPts;
+  const PADIN = 0.4, GAP = 0.6;
+
+  const pieces = [];
+  function addSide(side, label, flushStart){
+    const run = r[side];
+    const cutL = run + (flushStart ? sa : 2*sa);
+    pieces.push({ side, label, cutL, runLen: run, flushStart: !!flushStart, flushEnd: false,
+      plan: notchPlan(extractSideRun(sewSrc, side, !open)) });
+  }
+  if (open){
+    addSide("left",   "LEFT \u2014 CUT 1 (top end flush)", true);
+    addSide("right",  "RIGHT \u2014 CUT 1 (top end flush)", true);
+    addSide("bottom", "BOTTOM \u2014 CUT 1", false);
+  } else {
+    addSide("top",    "TOP \u2014 CUT 1", false);
+    addSide("right",  "RIGHT \u2014 CUT 1", false);
+    addSide("bottom", "BOTTOM \u2014 CUT 1", false);
+    addSide("left",   "LEFT \u2014 CUT 1", false);
+  }
+  let geom = "", y = PADIN;
+  const detailRows = [["Strip width (all)", fmtIn(w) + " cut \u00B7 " + fmtIn(dD) + " finished"], ["Seam allowance", fmtIn(sa)]];
+  let maxL = 0;
+  for (const pc of pieces){
+    geom += drawStrip({ x0: PADIN, y0: y, cutL: pc.cutL, w, sa, flushStart: pc.flushStart, flushEnd: pc.flushEnd, plan: pc.plan, label: pc.label });
+    detailRows.push([pc.label.replace(/ \u2014.*/, "") + " strip", "cut " + fmtIn(pc.cutL) + " \u00D7 " + fmtIn(w)]);
+    maxL = Math.max(maxL, pc.cutL);
+    y += w + GAP;
+  }
+  printDoc("Curved Panel \u2014 Side Panels", geom, maxL + PADIN*2, y - GAP + PADIN, detailRows,
+    "Maroon = cut \u00B7 grey dashed = sewline \u00B7 cyan = strip centerline. Ticks within SA: heavier maroon = clip (tight curve, every \u215C\u2033) \u00B7 lighter grey = notch (gentle curve, every 1\u2033). Butt tile borders edge-to-edge when assembling.");
+});
+
+/* ---- PRINT: GUSSET ---- */
+$("printGussetBtn").addEventListener("click", () => {
+  const m = model, p = params;
+  const sa = p.sa, gw = p.gussetW, w = gw + 2*sa;
+  const open = p.topMode === "3side" && m.openSew;
+  const PADIN = 0.4;
+  let path;
+  if (open){ path = m.openSew.pts; }
+  else {
+    const g = sideGroups(m.sewPts);
+    path = [].concat(g.top, g.right, g.bottom, g.left);
+  }
+  const run = open ? m.openSew.total : m.sewPerim;
+  const cutL = open ? run : run + 2*sa;
+  const plan = notchPlan(path);
+  const lmp = pathLandmarkPositions(path, !open);
+  const sy = open ? PADIN : PADIN + sa;
+  const ey = open ? PADIN + cutL : PADIN + cutL - sa;
+  const midY = sy + run / 2;   // sewline midpoint — correct center for matching triangle
+
+  /* Vertical gusset strip — inward triangle pointing right from left edge, left from right edge */
+  function pTriangleV(py, side){
+    // side = 1 → left edge (apex points right/inward), side = -1 → right edge (apex points left/inward)
+    const base = 0.16, ht = 0.22;  // 2× — center match marks on gusset
+    const edgeX = side === 1 ? PADIN : PADIN + w;
+    const apexX = edgeX + side * ht;
+    const t = base / 2;
+    return `<polygon points="${edgeX.toFixed(4)},${(py-t).toFixed(4)} ${edgeX.toFixed(4)},${(py+t).toFixed(4)} ${apexX.toFixed(4)},${py.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+  }
+
+  let geom = "";
+
+  // Z-ORDER: notches → center line → sewline → landmarks → center triangles → cut rect
+
+  // 1) notch/clip ticks (green)
+  for (const mk of plan.marks){
+    const ty = sy + mk.s;
+    const len = mk.kind === "clip" ? sa * 0.75 : sa * 0.55;
+    const wgt = mk.kind === "clip" ? 0.022 : 0.016;
+    geom += `<line x1="${PADIN}" y1="${ty.toFixed(4)}" x2="${(PADIN+len).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+    geom += `<line x1="${(PADIN+w).toFixed(4)}" y1="${ty.toFixed(4)}" x2="${(PADIN+w-len).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+  }
+
+  // 2) center line (cyan) — at sewline midpoint
+  geom += `<line x1="${PADIN}" y1="${midY.toFixed(4)}" x2="${(PADIN+w).toFixed(4)}" y2="${midY.toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.22 0.14"/>`;
+
+  // 3) sewlines (grey dashed)
+  let d = `M ${(PADIN+sa).toFixed(4)} ${sy.toFixed(4)} V ${ey.toFixed(4)} M ${(PADIN+w-sa).toFixed(4)} ${sy.toFixed(4)} V ${ey.toFixed(4)}`;
+  if (!open) d += ` M ${(PADIN+sa).toFixed(4)} ${sy.toFixed(4)} H ${(PADIN+w-sa).toFixed(4)} M ${(PADIN+sa).toFixed(4)} ${ey.toFixed(4)} H ${(PADIN+w-sa).toFixed(4)}`;
+  geom += `<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
+
+  // 4) landmarks (junction squares + midpoint diamonds)
+  for (const L of lmp.landmarks){
+    const ty = sy + L.s;
+    if (L.kind === "junction"){ geom += pSquare(PADIN + sa, ty); geom += pSquare(PADIN + w - sa, ty); }
+    else { geom += pDiamond(PADIN + sa, ty); geom += pDiamond(PADIN + w - sa, ty); }
+  }
+
+  // 5) center triangles: at every "mid" landmark AND at overall sewline midpoint
+  //    These match the panel's center-mark triangles.
+  const midLandmarks = lmp.landmarks.filter(L => L.kind === "mid");
+  // Also include the overall sewline midpoint if it's not already close to one
+  const overallMidAlreadyCovered = midLandmarks.some(L => Math.abs((sy + L.s) - midY) < 0.1);
+  if (!overallMidAlreadyCovered){
+    geom += pTriangleV(midY, 1) + pTriangleV(midY, -1);
+  }
+  for (const L of midLandmarks){
+    const ty = sy + L.s;
+    geom += pTriangleV(ty, 1) + pTriangleV(ty, -1);
+  }
+
+  // 6) cut rect (maroon — top z-order)
+  geom += `<rect x="${PADIN}" y="${PADIN}" width="${w.toFixed(4)}" height="${cutL.toFixed(4)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
+
+  const detailRows = [
+    ["Gusset strip", "cut " + fmtIn(cutL) + " \u00D7 " + fmtIn(w) + " \u00B7 finished width " + fmtIn(gw)],
+    ["Seam allowance", fmtIn(sa)],
+    ["Strip direction", open ? "Right \u2192 Bottom \u2192 Left (top ends flush)" : "Top \u2192 Right \u2192 Bottom \u2192 Left (ends join)"],
+  ];
+  for (const L of lmp.landmarks){
+    detailRows.push([(L.kind === "junction" ? "\u25A1 " : (L.kind === "mid" ? "\u25B2+\u25C7 " : "\u25C7 ")) + L.label,
+      fmtIn(L.s) + " from strip start"]);
+  }
+  printDoc("Curved Panel \u2014 Gusset", geom, w + PADIN*2, cutL + PADIN*2, detailRows,
+    "Maroon = cut \u00B7 grey dashed = sewline \u00B7 cyan line = strip/gusset midpoint. \u25B2 = center match triangle (align with panel triangle) \u00B7 \u25C7 = edge midpoint \u00B7 \u25A1 = corner junction. Green ticks = notch/clip marks.");
+});
+
+render();
+</script>
+</body>
+</html>

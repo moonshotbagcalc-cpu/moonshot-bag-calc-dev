@@ -1,0 +1,1167 @@
+<!doctype html>
+<!-- Machine database expanded and alphabetized: June 10, 2026 -->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Moonshot Bagmaker's Thread + Needle Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;padding:0;background:#33284f;font-family:Nunito,sans-serif;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23483c68' opacity='0.45'/%3E%3C/svg%3E");
+  padding-top:52px}
+
+/* ── Sticky top nav bar ───────────────────────────────────────────────── */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;
+  background:#1e1040;border-bottom:1px solid rgba(152,128,216,0.25);
+  box-shadow:0 2px 10px rgba(0,0,0,0.35);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;height:52px;gap:12px}
+.topbar-calc-btn{font-family:Nunito,sans-serif;font-size:12px;font-weight:900;
+  color:#c8b8f0;background:transparent;border:1.5px solid rgba(200,184,240,0.45);
+  border-radius:20px;padding:6px 14px;cursor:pointer;letter-spacing:0.04em;
+  white-space:nowrap;transition:all 0.15s;text-decoration:none;display:inline-block}
+.topbar-calc-btn:hover{background:rgba(200,184,240,0.12);border-color:#c8b8f0}
+.nu-wrap{display:flex;border:1.5px solid rgba(152,128,216,0.5);border-radius:20px;
+  overflow:hidden;background:rgba(255,255,255,0.06)}
+.nu-btn{font-size:12px;font-weight:900;color:rgba(255,255,255,0.68);
+  font-family:Nunito,sans-serif;letter-spacing:0.04em;background:transparent;
+  border:none;padding:5px 11px;min-width:48px;white-space:nowrap;cursor:pointer;transition:all 0.15s}
+.nu-btn.on{background:#c8b8f0;color:#1e1040}
+
+/* ── Back to Top FAB ─────────────────────────────────────────────────── */
+.top-fab{position:fixed;bottom:20px;right:16px;z-index:99;
+  background:#e2daf5;border:1.5px solid #b09ee0;border-radius:10px;
+  padding:8px 13px;font-size:12px;font-weight:900;color:#4a1f96;
+  font-family:Nunito,sans-serif;letter-spacing:0.06em;cursor:pointer;
+  text-decoration:none;box-shadow:0 3px 10px rgba(0,0,0,0.2);transition:background 0.13s}
+.top-fab:hover{background:#c8b8f0}
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+.app{max-width:820px;margin:0 auto;padding:0 0 80px}
+.content{padding:0 14px}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+.hdr{background:#1e1040;padding:18px 20px 16px;border-radius:0 0 12px 12px;
+  margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,0.24)}
+.hdr-title{font-family:Nunito,sans-serif;line-height:1.15}
+.hdr-brand{font-size:clamp(32px,8vw,48px);font-weight:900;color:#fff;display:block;letter-spacing:-0.02em}
+.hdr-sub{font-size:clamp(17px,4.6vw,26px);font-weight:700;color:#b09ee0;display:block;margin-top:3px}
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+.card{background:#faf8ff;border:1.5px solid #b09ee0;border-radius:14px;
+  padding:18px 20px;margin-bottom:14px;box-shadow:0 3px 12px rgba(25,8,60,0.08)}
+.ct{font-size:12px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;
+  color:#4a1f96;margin-bottom:14px;border-bottom:2px solid #b09ee0;padding-bottom:8px}
+
+/* ── Quick Lookup ────────────────────────────────────────────────────── */
+.ql-section{margin-bottom:8px}
+.ql-label{font-size:12px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;
+  color:#8a70c0;margin-bottom:7px}
+.ql-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.ql-pill{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;
+  padding:6px 12px;border-radius:999px;border:2px solid #b09ee0;
+  background:#f0ecfc;color:#4a1f96;cursor:pointer;transition:all 0.13s;white-space:nowrap}
+.ql-pill:hover{background:#e2daf5;border-color:#8a70c0}
+.ql-pill.active{background:#5a2da0;border-color:#5a2da0;color:#fff}
+.ql-pill.dim{opacity:0.35}
+.ql-pill.heavy{border-color:#9b1c31;color:#7a1020}
+.ql-pill.heavy.active{background:#9b1c31;border-color:#9b1c31;color:#fff}
+.ql-divider{height:1.5px;background:linear-gradient(90deg,transparent,#b09ee0 20%,#b09ee0 80%,transparent);
+  margin:14px 0}
+.ql-result{background:#f0ecfc;border-radius:12px;padding:16px 18px;margin-top:14px;
+  min-height:64px;display:flex;align-items:center}
+.ql-result-inner{width:100%}
+.ql-result-row{display:flex;align-items:baseline;gap:10px;padding:5px 0;flex-wrap:wrap}
+.ql-result-row:not(:last-child){border-bottom:1px solid rgba(176,158,224,0.4)}
+.ql-result-badge{font-size:11px;font-weight:900;text-transform:uppercase;
+  letter-spacing:0.09em;color:#8a70c0;min-width:82px;flex-shrink:0}
+.ql-result-val{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:#4a1f96;line-height:1}
+.ql-result-val.na{font-family:Nunito,sans-serif;font-size:14px;font-weight:800;color:#9b1c31}
+.ql-result-note{font-size:12px;font-weight:700;color:#8a70c0;margin-left:4px;align-self:center;line-height:1.4}
+.ql-idle{font-size:14px;font-weight:700;color:#8a70c0;text-align:center;width:100%}
+.ql-heavy-note{background:#fdf4e0;border:1.5px solid #d4a820;border-radius:8px;
+  padding:10px 13px;margin-top:10px;font-size:13px;font-weight:700;color:#6b4400;line-height:1.5}
+
+/* ── Result card ─────────────────────────────────────────────────────── */
+.rc{border:2px solid #5a2da0}
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.bs{background:#e2daf5;border-radius:12px;padding:14px 16px;border:2px solid transparent}
+.bs.bad{background:#fde7ea;border-color:#9b1c31}
+.bs.bad .bs-l,.bs.bad .bs-v{color:#9b1c31}
+.bs.caution{background:#fdf4e0;border-color:#d4a820}
+.bs.caution .bs-l,.bs.caution .bs-v{color:#7a4a00}
+.bs-l{font-size:12px;font-weight:900;color:#4a1f96;text-transform:uppercase;letter-spacing:0.08em}
+.bs-v{font-size:24px;font-family:'DM Mono',monospace;color:#4a1f96;margin-top:4px;line-height:1.1}
+.bs-s{font-size:12px;font-weight:700;color:#8a70c0;margin-top:4px}
+
+/* ── Info / Warn ─────────────────────────────────────────────────────── */
+.info{background:#ede8f7;border:1.5px solid #9880d0;border-radius:10px;
+  padding:12px 15px;margin-top:10px;font-size:14px;font-weight:650;color:#3a1880;line-height:1.55}
+.warn{background:#fdf4e0;border:1.5px solid #d4a820;border-radius:10px;
+  padding:12px 15px;margin-top:10px;font-size:14px;font-weight:700;color:#6b4400;line-height:1.55}
+.note-calm{background:#ede8f7;border:1.5px solid #9880d0;border-radius:10px;
+  padding:12px 15px;margin-top:14px;font-size:13px;font-weight:650;color:#3a1880;line-height:1.55}
+
+/* ── Suggested point link ────────────────────────────────────────────── */
+.point-link{color:#5a2da0;font-weight:900;text-decoration:underline;cursor:pointer;
+  background:none;border:none;font-family:Nunito,sans-serif;font-size:inherit;padding:0}
+.point-link:hover{color:#3a1060}
+
+/* ── Form fields ─────────────────────────────────────────────────────── */
+.f{margin-bottom:14px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start;margin-bottom:0}
+.tc-col{display:grid;grid-template-rows:auto auto auto;align-items:start}
+.tc-col .fl{margin-bottom:4px}
+.tc-col select{margin-bottom:0}
+.tc-sub{margin-top:5px;min-height:1em}
+.dive-divider{border:none;border-top:1.5px dashed #c0b0e0;margin:10px 0}
+.fl{font-size:14px;font-weight:900;color:#4a1f96;margin-bottom:4px}
+.fs{font-size:12px;font-weight:600;color:#8a70c0;margin-bottom:6px}
+select{width:100%;padding:10px;font-size:15px;font-family:Nunito,sans-serif;font-weight:700;
+  border-radius:8px;border:2px solid #b09ee0;background:#f3f0fc;color:#2e1060;outline:none;cursor:pointer}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Mode tabs ───────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tab{flex:1;padding:11px 8px;font-size:12px;font-weight:900;letter-spacing:0.04em;
+  text-transform:uppercase;border-radius:8px;border:none;cursor:pointer;
+  font-family:Nunito,sans-serif;transition:all 0.15s}
+.tab.on{background:#5a2da0;color:#fff}
+.tab.off{background:#e2daf5;color:#4a1f96}
+
+/* ── Machine box ─────────────────────────────────────────────────────── */
+.machine-pick{background:#f2eefb;border:1.5px solid #b09ee0;border-radius:10px;padding:10px 12px}
+.mc-box{background:#e2daf5;border-radius:10px;padding:14px 16px;margin-top:10px}
+.mc-system{font-size:20px;font-family:'DM Mono',monospace;font-weight:500;color:#4a1f96;margin:6px 0 4px}
+.mc-row{font-size:13px;font-weight:700;color:#2e1060;margin-top:5px;line-height:1.45}
+.mc-label{font-weight:900;color:#4a1f96}
+.mc-note{font-size:13px;font-weight:600;color:#3a1880;background:#ede8f7;
+  border:1.5px solid #9880d0;border-radius:8px;padding:10px 12px;margin-top:10px;line-height:1.5}
+.mc-cap-note{font-size:12.5px;font-weight:700;color:#6b4400;background:#fdf4e0;
+  border:1.5px solid #d4a820;border-radius:8px;padding:9px 11px;margin-top:10px;line-height:1.5}
+
+.mc-label-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px;position:relative}
+.mc-label-row .fl{margin-bottom:0}
+.mc-info-wrap{position:relative;flex:0 0 auto}
+.mc-info-btn{width:25px;height:25px;border-radius:50%;border:1.5px solid #8a70c0;
+  background:#faf8ff;color:#4a1f96;font-family:Nunito,sans-serif;font-size:14px;font-weight:900;
+  line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  transition:background 0.15s,border-color 0.15s,transform 0.15s}
+.mc-info-btn:hover,.mc-info-btn[aria-expanded="true"]{background:#e2daf5;border-color:#5a2da0}
+.mc-info-btn:focus-visible{outline:3px solid rgba(90,45,160,0.25);outline-offset:2px}
+.mc-info-pop{display:none;position:absolute;right:0;top:33px;width:min(470px,calc(100vw - 56px));
+  background:#fff;border:1.5px solid #8a70c0;border-radius:12px;padding:14px 15px;z-index:30;
+  box-shadow:0 8px 24px rgba(30,16,64,0.22);color:#2e1060}
+.mc-info-pop.open{display:block}
+.mc-info-pop:before{content:"";position:absolute;right:7px;top:-7px;width:12px;height:12px;
+  background:#fff;border-left:1.5px solid #8a70c0;border-top:1.5px solid #8a70c0;transform:rotate(45deg)}
+.mc-info-title{font-size:14px;font-weight:900;color:#4a1f96;line-height:1.35;padding-right:22px;margin-bottom:10px}
+.mc-info-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#8a70c0;
+  font-size:20px;font-weight:700;line-height:1;cursor:pointer;padding:2px 4px}
+.mc-feed-item{padding:9px 0;border-top:1px solid #ddd4ef}
+.mc-feed-item:first-of-type{border-top:0;padding-top:0}
+.mc-feed-name{font-size:12px;font-weight:900;color:#4a1f96;text-transform:uppercase;letter-spacing:0.055em}
+.mc-feed-copy{font-size:12.5px;font-weight:650;line-height:1.48;margin-top:3px;color:#2e1060}
+
+/* ── Collapsible sections ────────────────────────────────────────────── */
+.section-toggle{width:100%;text-align:left;background:#e2daf5;border:1.5px solid #b09ee0;
+  border-radius:10px;padding:13px 16px;font-size:14px;font-weight:900;color:#4a1f96;
+  font-family:Nunito,sans-serif;cursor:pointer;display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:6px;transition:background 0.15s,border-color 0.15s;margin-top:6px}
+.section-toggle:hover{background:#d4c8f0}
+.section-toggle.open{background:#c4b4e8;border-color:#8a60c0;color:#2e1060}
+.tog-arrow{font-size:22px;font-weight:900;color:#4a1f96;line-height:1;
+  transition:transform 0.2s;display:inline-block;margin-left:8px;user-select:none}
+.section-toggle.open .tog-arrow{color:#2e1060;transform:rotate(180deg)}
+.section-body{display:none;margin-bottom:8px}
+.section-body.open{display:block}
+
+/* ── Why This Thread detail ──────────────────────────────────────────── */
+.detail-block{background:#f3f0fc;border-radius:12px;padding:15px 16px;border:1.5px solid #b09ee0;margin-bottom:10px}
+.detail-mat-note{font-size:15px;font-weight:700;color:#2e1060;line-height:1.6;margin-bottom:10px}
+.detail-fam-title{font-size:13px;font-weight:900;color:#4a1f96;margin-bottom:3px;margin-top:8px}
+.detail-fam-body{font-size:13px;font-weight:600;color:#2e1060;line-height:1.55;margin-bottom:4px}
+.detail-point{font-size:13px;font-weight:700;color:#2e1060;line-height:1.55;
+  margin-top:10px;padding-top:10px;border-top:1px solid #c7b8e8}
+.detail-caveat{font-size:12px;font-weight:600;color:#8a70c0;margin-top:6px;font-style:italic;line-height:1.45}
+
+/* ── Needle point entries ────────────────────────────────────────────── */
+.np-cat{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.11em;
+  color:#8a70c0;margin:18px 0 8px}
+.np-item{background:#f3f0fc;border-radius:12px;padding:13px 15px;border:1.5px solid #b09ee0;margin-bottom:9px}
+.np-label{font-size:16px;font-weight:900;color:#4a1f96;line-height:1.25}
+.np-tip{font-size:13px;font-weight:800;color:#8a70c0;margin-top:4px}
+.np-use{font-size:14px;font-weight:700;color:#2e1060;margin-top:6px;line-height:1.5}
+.np-detail{font-size:14.5px;line-height:1.65;color:#4b2388;margin-top:10px;
+  padding-top:10px;border-top:1px solid #c7b8e8;display:none}
+.np-item.open .np-detail{display:block}
+.np-nerd{font-size:14px;font-weight:700;line-height:1.62;color:#2e1060;
+  background:#fdf4e0;border-left:5px solid #d4a820;border-radius:10px;
+  padding:11px 13px;margin-top:5px;display:none}
+.np-item.open .np-nerd{display:block}
+.np-toggle{font-size:12px;font-weight:900;color:#5a2da0;cursor:pointer;margin-top:8px;
+  display:inline-block;background:#e2daf5;border:1px solid #b09ee0;border-radius:999px;padding:4px 10px}
+
+/* ── Coatings ────────────────────────────────────────────────────────── */
+.coat-item{background:#f3f0fc;border:1.5px solid #b09ee0;border-radius:12px;padding:13px 15px;margin-bottom:9px}
+.coat-title{font-size:15px;font-weight:900;color:#4a1f96;line-height:1.25}
+.coat-quick{font-size:14px;font-weight:700;color:#2e1060;line-height:1.5;margin-top:5px}
+.coat-nerd{font-size:13.5px;font-weight:600;color:#4b2388;line-height:1.6;
+  margin-top:9px;padding-top:9px;border-top:1px solid #c7b8e8}
+
+/* ── Thread families ─────────────────────────────────────────────────── */
+details{background:#f3f0fc;border-radius:12px;padding:13px 15px;
+  border:1.5px solid #b09ee0;margin-bottom:9px;box-shadow:0 1px 0 rgba(255,255,255,0.7) inset}
+summary{cursor:pointer;font-size:16px;font-weight:900;color:#4a1f96;list-style:none;line-height:1.25}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+ ";color:#8a70c0}
+details[open] summary::before{content:"- ";color:#8a70c0}
+.det-body{font-size:15px;line-height:1.65;color:#2e1060;margin-top:9px;font-weight:650}
+.det-chem{font-size:13.5px;font-weight:650;color:#4b2388;line-height:1.62;margin-top:11px;
+  padding:11px 13px;border:1px solid #c7b8e8;border-radius:10px;background:#faf8ff}
+.det-chem-label{font-size:11px;font-weight:900;text-transform:uppercase;
+  letter-spacing:0.1em;color:#8a70c0;margin-bottom:4px}
+.det-nerd{font-size:14px;font-weight:700;color:#2e1060;line-height:1.62;margin-top:5px;
+  padding:12px 14px;border-left:5px solid #d4a820;background:#fdf4e0;border-radius:10px}
+.det-ex{font-size:13px;font-weight:800;color:#8a70c0;line-height:1.5;margin-top:9px}
+
+/* ── Reference table ─────────────────────────────────────────────────── */
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{text-align:left;padding:8px 6px;color:#4a1f96;font-size:12px;font-weight:900;
+  text-transform:uppercase;border-bottom:2px solid #b09ee0}
+td{padding:8px 6px;border-bottom:1px solid #b09ee0;font-size:13px;
+  font-weight:600;color:#2e1060;vertical-align:top}
+td.m{font-family:'DM Mono',monospace;font-weight:500;color:#4a1f96}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.footer{text-align:center;font-size:12px;font-weight:500;color:rgba(160,130,200,0.5);margin-top:18px}
+
+/* ── Mobile ──────────────────────────────────────────────────────────── */
+@media(max-width:600px){
+  .topbar{padding:0 10px;height:50px}
+  .topbar-calc-btn{font-size:11px;padding:5px 10px}
+  body{padding-top:50px}
+  .card{padding:14px 14px}
+  .g2,.rg{grid-template-columns:1fr}
+  .three-col{grid-template-columns:1fr}
+  .tc-col{margin-bottom:8px}
+  .hdr{padding:16px 14px}
+  .hdr-brand{font-size:32px}
+  .hdr-sub{font-size:18px}
+  .nu-btn{font-size:11px;min-width:42px;padding:5px 7px}
+  .ql-pill{font-size:16px;padding:9px 14px}
+  .ql-result-val{font-size:24px}
+  .ql-result-badge{font-size:12px}
+  .ql-result-note{font-size:13px}
+  .bs-v{font-size:20px}
+  .top-fab{bottom:14px;right:10px;font-size:11px;padding:7px 11px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-calc-btn" href="https://moonshotbagcalc-cpu.github.io/moonshot-bag-calc/" target="_self">Moonshot Bag Calculator</a>
+  <div class="nu-wrap">
+    <button id="nu-us" class="nu-btn on" onclick="setNeedleUnit('us')">Imperial</button>
+    <button id="nu-nm" class="nu-btn off" onclick="setNeedleUnit('nm')">Metric</button>
+  </div>
+</div>
+
+<a class="top-fab" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;" href="#">&#8679; Top</a>
+
+<div class="app">
+  <div class="hdr">
+    <div class="hdr-title"><span class="hdr-brand">Moonshot</span><span class="hdr-sub">Bagmaker's Thread + Needle Guide</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- Quick Lookup -->
+    <div class="card">
+      <div class="ct">Quick Lookup</div>
+      <div class="ql-section">
+        <div class="ql-label">Thread size</div>
+        <div class="ql-pills" id="ql-thread-pills"></div>
+      </div>
+      <div class="ql-divider"></div>
+      <div class="ql-section">
+        <div class="ql-label">Needle size</div>
+        <div class="ql-pills" id="ql-needle-pills"></div>
+      </div>
+      <div id="ql-result" class="ql-result">
+        <div class="ql-idle">Tap a thread or needle size above.</div>
+      </div>
+    </div>
+
+    <!-- Deep Dive -->
+    <div class="card">
+      <div class="ct">Deep Dive</div>
+      <div class="tabs">
+        <button class="tab on" id="t-th" onclick="setMode('thread')">THREAD</button>
+        <button class="tab off" id="t-nd" onclick="setMode('needle')">NEEDLE</button>
+      </div>
+      <!-- Three-column: Thread/Needle Size | Material | Thread Family -->
+      <div class="three-col">
+        <div class="tc-col" id="mf-col"><!-- rendered by rmf() --></div>
+        <div class="tc-col">
+          <div class="fl">Material</div>
+          <select id="s-mat" onchange="state.matId=this.value;rmf();render()"></select>
+          <div class="fs tc-sub">&nbsp;</div>
+        </div>
+        <div class="tc-col" id="mff-col"><!-- thread family, rendered by rmf() --></div>
+      </div>
+      <!-- Dashed divider -->
+      <div class="dive-divider"></div>
+      <!-- Machine type — full width below divider -->
+      <div class="f" style="margin-bottom:0">
+        <div class="fl">Machine type</div>
+        <select id="s-mac" onchange="renderMachineSelector();rmf();render()">
+          <option value="domestic">Domestic / Home Machine</option>
+          <option value="semi">Semi-Industrial / High-Speed</option>
+          <option value="industrial">Industrial</option>
+        </select>
+      </div>
+      <!-- Machine picker — full width, shown only for semi/industrial -->
+      <div id="machine-pick" class="machine-pick" style="display:none;margin-top:10px">
+        <div class="mc-label-row">
+          <div class="fl">Select your machine</div>
+          <div class="mc-info-wrap" id="mc-info-wrap" style="display:none">
+            <button class="mc-info-btn" id="mc-info-btn" type="button" aria-expanded="false" aria-controls="mc-info-pop" aria-label="Explain industrial machine feed systems" onclick="toggleMachineInfo(event)">i</button>
+            <div class="mc-info-pop" id="mc-info-pop" role="dialog" aria-labelledby="mc-info-title">
+              <button class="mc-info-close" type="button" aria-label="Close" onclick="closeMachineInfo()">&times;</button>
+              <div class="mc-info-title" id="mc-info-title">What’s the difference between bag-making industrial machines?</div>
+              <div class="mc-feed-item">
+                <div class="mc-feed-name">Drop / Needle Feed</div>
+                <div class="mc-feed-copy">A bottom feed dog moves the material. On needle-feed models, the needle also moves with the material. These machines are generally used for flatter assemblies, linings, and lighter stacks.</div>
+              </div>
+              <div class="mc-feed-item">
+                <div class="mc-feed-name">Walking Foot</div>
+                <div class="mc-feed-copy">An upper walking foot and the lower feed dog move the layers while the needle remains stationary. This adds control through stacked canvas, denim, vinyl, leather, interfacing, zipper tape, and raised seam intersections.</div>
+              </div>
+              <div class="mc-feed-item">
+                <div class="mc-feed-name">Compound Walking Foot</div>
+                <div class="mc-feed-copy">The needle, inner presser foot, and feed dog move together while the outer foot alternates. This provides the most consistent feeding through thick layered assemblies and changes in seam thickness.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <select id="s-mc" onchange="renderMachine();rmf();render()"></select>
+        <div id="mc-result"></div>
+      </div>
+    </div>
+
+    <div id="ra"></div>
+
+    <!-- Needle Point Types — collapsible; id used as scroll anchor -->
+    <button class="section-toggle" id="np-tog" onclick="toggleSection('np-tog','np-body')">
+      Needle Point Types <span class="tog-arrow">&#9660;</span>
+    </button>
+    <div class="section-body" id="np-body">
+      <div class="card" style="margin-bottom:0">
+        <div class="info" style="margin-top:0;margin-bottom:12px">Point type controls how the needle enters the material. Choose the point for the material, then choose size for thread clearance and blade stiffness.</div>
+        <div id="np-area"></div>
+      </div>
+    </div>
+
+    <!-- Needle Coatings — collapsible -->
+    <button class="section-toggle" id="nc-tog" onclick="toggleSection('nc-tog','nc-body')">
+      Needle Coatings &amp; Finishes <span class="tog-arrow">&#9660;</span>
+    </button>
+    <div class="section-body" id="nc-body">
+      <div class="card" style="margin-bottom:0">
+        <div class="info" style="margin-top:0;margin-bottom:12px">Coating is the bonus layer: it can reduce heat, sticking, residue, and wear. It does not replace the correct needle system, point, or size.</div>
+        <div id="nc-area"></div>
+      </div>
+    </div>
+
+    <!-- Thread Families — collapsible -->
+    <button class="section-toggle" id="fa-tog" onclick="toggleSection('fa-tog','fa-body')">
+      Thread Families — Chemistry &amp; Background <span class="tog-arrow">&#9660;</span>
+    </button>
+    <div class="section-body" id="fa-body">
+      <div class="card" style="margin-bottom:0">
+        <div id="fa"></div>
+      </div>
+    </div>
+
+    <!-- Reference Chart — collapsible -->
+    <button class="section-toggle" id="ref-tog" onclick="toggleSection('ref-tog','ref-body')">
+      Needle + Thread Reference Chart <span class="tog-arrow">&#9660;</span>
+    </button>
+    <div class="section-body" id="ref-body">
+      <div class="card" style="margin-bottom:0">
+        <div class="tbl"><table id="rt"></table></div>
+        <div class="info" style="margin-top:12px">Needle systems are not universal. Always verify against your machine manual.</div>
+      </div>
+    </div>
+
+    <div class="note-calm">
+      Thread and needle charts are starting points. Final results depend on your machine, bobbin case, tension range, feed system, presser foot pressure, material stack, and stitch length. Always test on a real sample before sewing your final bag.
+    </div>
+
+    <div class="footer">&#169; Moonshot &middot; made with love for the bag-making community</div>
+  </div>
+</div>
+
+<script>
+// ── Thread data ───────────────────────────────────────────────────────────────
+var T=[
+  {id:"tex30", label:"Tex 30", tex:30,  dom:"80/12–90/14",  ind:"80/12–90/14",  stitch:"2.5–3.0", bestFor:"Linings, quilting cotton, light fabric bags"},
+  {id:"tex40", label:"Tex 40", tex:40,  dom:"80/12–90/14",  ind:"90/14",         stitch:"2.5–3.5", bestFor:"Cotton bags, linings, canvas, general construction"},
+  {id:"tex45", label:"Tex 45", tex:45,  dom:"90/14–100/16", ind:"90/14–100/16",  stitch:"3.0–3.5", bestFor:"Canvas, waterproof canvas, cork, vinyl, medium topstitching"},
+  {id:"tex60", label:"Tex 60", tex:60,  dom:"100/16–110/18",ind:"100/16–110/18", stitch:"3.0–4.0", bestFor:"Heavier canvas, vinyl, cork, utility bags, visible topstitching"},
+  {id:"tex70", label:"Tex 70", tex:70,  dom:"100/16–110/18",ind:"110/18–120/19", stitch:"3.0–4.0", bestFor:"Vinyl, cork, canvas, webbing, straps, bold topstitching"},
+  {id:"tex90", label:"Tex 90", tex:90,  dom:"not-rec",       ind:"110/18–125/20", stitch:"3.5–4.5", bestFor:"Heavy vinyl, leather, webbing, straps, luggage-style seams"},
+  {id:"tex135",label:"Tex 135",tex:135, dom:"not-rec",       ind:"125/20–140/22", stitch:"4.0–5.0", bestFor:"Leather goods, heavy straps, heavy visible topstitching"},
+  {id:"tex210",label:"Tex 210",tex:210, dom:"not-rec",       ind:"160/23–180/24", stitch:"5.0+",    bestFor:"Very heavy leather, tack, heavy-duty outdoor and gear applications"},
+  {id:"tex270",label:"Tex 270",tex:270, dom:"not-rec",       ind:"180/24–200/25", stitch:"5.0+",    bestFor:"Heavy leather stitchers, saddle work, thick tack and harness"},
+  {id:"tex350",label:"Tex 350",tex:350, dom:"not-rec",       ind:"220/26–250/27", stitch:"5.0+",    bestFor:"Extra-heavy leather stitchers only — saddle, harness, and tack work",isHeavy:true}
+];
+
+// ── Needle data ───────────────────────────────────────────────────────────────
+var N=[
+  {id:"70-10", label:"70/10", us:10, thread:"Tex 21–30",  maxTex:30,  stitch:"2.0–2.5"},
+  {id:"80-12", label:"80/12", us:12, thread:"Tex 27–35",  maxTex:35,  stitch:"2.5–3.0"},
+  {id:"90-14", label:"90/14", us:14, thread:"Tex 30–45",  maxTex:45,  stitch:"2.5–3.5"},
+  {id:"100-16",label:"100/16",us:16, thread:"Tex 45–70",  maxTex:70,  stitch:"3.0–4.0"},
+  {id:"110-18",label:"110/18",us:18, thread:"Tex 60–90",  maxTex:90,  stitch:"3.0–4.5"},
+  {id:"120-19",label:"120/19",us:19, thread:"Tex 70–90",  maxTex:90,  stitch:"3.5–4.5"},
+  {id:"125-20",label:"125/20",us:20, thread:"Tex 90–135", maxTex:135, stitch:"3.5–5.0"},
+  {id:"130-21",label:"130/21",us:21, thread:"Tex 90–135", maxTex:135, stitch:"3.5–5.0"},
+  {id:"140-22",label:"140/22",us:22, thread:"Tex 135–210",maxTex:210, stitch:"4.0–5.0+"},
+  {id:"160-23",label:"160/23",us:23, thread:"Tex 135–210",maxTex:210, stitch:"4.0–5.0+"},
+  {id:"180-24",label:"180/24",us:24, thread:"Tex 210–270",maxTex:270, stitch:"4.5–5.0+"},
+  {id:"200-25",label:"200/25",us:25, thread:"Tex 270",    maxTex:270, stitch:"5.0+"},
+  {id:"220-26",label:"220/26",us:26, thread:"Tex 270–350",maxTex:350, stitch:"5.0+"},
+  {id:"250-27",label:"250/27",us:27, thread:"Tex 350–400",maxTex:400, stitch:"5.0+"},
+  {id:"280-28",label:"280/28",us:28, thread:"Tex 350–410",maxTex:410, stitch:"5.0+"},
+  {id:"300-29",label:"300/29",us:29, thread:"Tex 410",    maxTex:410, stitch:"5.0+"}
+];
+
+// ── Material data ─────────────────────────────────────────────────────────────
+// pointDom / pointInd: suggested point label + id for link
+// familyConfidence: strong | default | soft
+var M=[
+  // Natural Fibers
+  {id:"cotton",       grp:"Natural Fibers",         label:"Cotton / Lining",
+   family:"polycore",    range:"Tex 27–40",
+   pointDom:{label:"Universal, Microtex/Sharp, or Topstitch",id:"universal"},
+   pointInd:{label:"Round point",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Good for quilting cotton, linings, and light fabric bags. Poly-core is a stronger everyday default than cotton thread for bag construction."},
+  {id:"canvas",       grp:"Natural Fibers",         label:"Canvas",
+   family:"polycore",    range:"Tex 40–70",
+   pointDom:{label:"Jeans/Denim or Microtex/Sharp",id:"jeans"},
+   pointInd:{label:"Round point",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Plain canvas is a woven fabric — choose point for the weave, needle size for the stack. A medium polyester thread is the standard choice."},
+  {id:"waxed-canvas", grp:"Natural Fibers",         label:"Waxed Canvas",
+   family:"bonded-poly", range:"Tex 40–70",
+   pointDom:{label:"Microtex/Sharp (primary); Jeans/Denim for heavier stacks; nonstick finish if wax drags",id:"sharp"},
+   pointInd:{label:"Round point; nonstick needles if residue builds",id:"round-ind"},
+   familyConfidence:"default",
+   note:"Waxed canvas can be grippy under the presser foot. Test for needle residue, stitch length, and whether marks press out."},
+  // Technical Fabrics
+  {id:"wpc",          grp:"Technical Fabrics",      label:"WPC (Waterproof Canvas)",
+   family:"polycore",    range:"Tex 40–70",
+   pointDom:{label:"Microtex/Sharp (primary for coated surface); Jeans/Denim for heavier stacks",id:"sharp"},
+   pointInd:{label:"Round point",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Behaves like canvas plus a coating. Use a fresh needle, test stitch length, and avoid short stitches that can perforate the coating."},
+  {id:"cordura",      grp:"Technical Fabrics",      label:"CORDURA® / Cordura-style Nylon",
+   family:"bonded-poly", range:"Tex 45–90",
+   pointDom:{label:"Microtex/Sharp for lighter deniers; Jeans/Denim for heavier stacks",id:"sharp"},
+   pointInd:{label:"Round point matched to denier and stack",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"CORDURA is a brand family, not one fixed weight. Choose thread and needle by actual denier, coating, and number of layers."},
+  {id:"ripstop",      grp:"Technical Fabrics",      label:"Ripstop Nylon",
+   family:"bonded-poly", range:"Tex 30–70",
+   pointDom:{label:"Microtex/Sharp for light ripstop; Jeans/Denim for heavier coated stacks",id:"sharp"},
+   pointInd:{label:"Round point matched to coating and weave",id:"round-ind"},
+   familyConfidence:"default",
+   note:"Ripstop describes the grid-reinforced weave, not the weight. It ranges from featherweight lining to coated pack material — choose thread and needle to match the actual fabric."},
+  {id:"nylon-twill",  grp:"Technical Fabrics",      label:"Nylon Twill / Packcloth",
+   family:"bonded-poly", range:"Tex 40–70",
+   pointDom:{label:"Microtex/Sharp or Jeans/Denim depending on weight",id:"sharp"},
+   pointInd:{label:"Round point matched to weave and coating",id:"round-ind"},
+   familyConfidence:"default",
+   note:"For non-ripstop woven nylon: twill, oxford, packcloth, and similar bag fabrics. Weight and coating matter more than fiber content."},
+  {id:"neoprene",     grp:"Technical Fabrics",      label:"Neoprene / Scuba Knit",
+   family:"bonded-poly", range:"Tex 40–70",
+   pointDom:{label:"Stretch/Ball Point, or Jeans/Denim after testing",id:"ballpoint"},
+   pointInd:{label:"Round or ball point depending on face fabric",id:"round-ind"},
+   familyConfidence:"soft",
+   note:"Can be thick, springy, and grippy — test feeding, stitch length, and whether the face prefers a ball point or piercing point. Bonded poly is a reasonable starting thread but test before committing."},
+  // Vinyls & Coated Synthetics
+  {id:"vinyl",        grp:"Vinyls & Coated Synthetics",label:"Vinyl / Faux Leather",
+   family:"bonded-poly", range:"Tex 45–90",
+   pointDom:{label:"Microtex/Sharp or Topstitch; leather point only after testing",id:"sharp"},
+   pointInd:{label:"Round point for most vinyls; cutting point only when hole shape is acceptable",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Every backing behaves differently. Avoid tiny stitches — they can create a tear line. Test point type before committing."},
+  {id:"ultraleather", grp:"Vinyls & Coated Synthetics",label:"Ultraleather-style PU",
+   family:"bonded-poly", range:"Tex 40–70",
+   pointDom:{label:"Microtex/Sharp or Topstitch",id:"sharp"},
+   pointInd:{label:"Round point; test before using a leather/cutting point",id:"round-ind"},
+   familyConfidence:"default",
+   note:"True Ultraleather is polyurethane rather than PVC. Treat as a soft synthetic leather and test for needle marks before topstitching."},
+  {id:"mora",         grp:"Vinyls & Coated Synthetics",label:"Mora Faux Leather",
+   family:"bonded-poly", range:"Tex 40–70",
+   pointDom:{label:"Microtex/Sharp, Topstitch, or Jeans/Denim",id:"sharp"},
+   pointInd:{label:"Round point; leather/cutting point only after testing",id:"round-ind"},
+   familyConfidence:"default",
+   note:"Soft and flexible, but can show needle holes — test stitch length and point type before visible seams."},
+  {id:"pvc-coated",   grp:"Vinyls & Coated Synthetics",label:"PVC-Coated / Tarp Vinyl",
+   family:"bonded-poly", range:"Tex 70–135+",
+   pointDom:{label:"Topstitch or Jeans/Denim if your machine can feed the stack",id:"topstitch-dom"},
+   pointInd:{label:"Round point or specialty coated needle; avoid cutting points unless tested",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Can be sticky, thick, and perforation-sensitive. Increase stitch length and test feeding before committing to a seam."},
+  // Cork
+  {id:"cork",         grp:"Cork",                   label:"Cork Fabric",
+   family:"bonded-poly", range:"Tex 45–70",
+   pointDom:{label:"Microtex/Sharp or Topstitch",id:"sharp"},
+   pointInd:{label:"Round point; avoid cutting points unless tested",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Cork can mark and perforate permanently. Use a longer stitch and test before any visible topstitching."},
+  // Leather
+  {id:"leather",      grp:"Leather",                label:"Leather",
+   family:"bonded-nylon",range:"Tex 70–135+",
+   pointDom:{label:"Leather (wedge/cutting) point",id:"leather-dom"},
+   pointInd:{label:"Cutting/leather point (135x16 style) — geometry depends on leather type",id:"cutting-ind"},
+   familyConfidence:"strong",
+   note:"Bonded nylon is the standard in leather goods production. Bonded polyester is the correct choice when outdoor or UV exposure is a factor. Always use a longer stitch — short stitches perforate and weaken the seam."},
+  // Straps & Specialty
+  {id:"webbing",      grp:"Straps & Specialty",     label:"Webbing / Straps",
+   family:"bonded-poly", range:"Tex 70–135+",
+   pointDom:{label:"Jeans/Denim or Topstitch if the machine can handle the stack",id:"jeans"},
+   pointInd:{label:"Round point matched to the webbing material",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"High-stress application. Test reinforcement stitching on scraps. Use a thread your machine can tension cleanly at the required weight."},
+  {id:"outdoor",      grp:"Straps & Specialty",     label:"Outdoor / UV Exposure",
+   family:"bonded-poly", range:"Tex 70–135+",
+   pointDom:{label:"Topstitch or Jeans/Denim where appropriate",id:"topstitch-dom"},
+   pointInd:{label:"Round point matched to material and thread size",id:"round-ind"},
+   familyConfidence:"strong",
+   note:"Bonded polyester is the correct choice for sunlight, moisture, marine, and outdoor use. Nylon degrades under prolonged UV exposure — this is a chemistry difference, not a preference."}
+];
+
+// ── Thread families ───────────────────────────────────────────────────────────
+var F=[
+  {id:"polycore",     label:"Polyester / Poly-Core",
+   why:"The standard choice for general bag construction. Strong, colorfast, resistant to abrasion and mildew, and available in a wide range of weights. Works well on domestic and industrial machines with minimal tension adjustment.",
+   use:"General bag construction, seams, and assembly work where durability and broad availability matter.",
+   examples:"Gutermann Mara, Coats Dual Duty, A&E Perma Core, Perform-X poly-wrapped poly core.",
+   chem:"Polyester is PET — polyethylene terephthalate — a synthetic polymer with low moisture absorption and good resistance to sunlight and mildew. Poly-core thread wraps a continuous polyester filament core with a spun outer layer, giving you filament strength inside with a softer, less-glossy surface outside.",
+   nerd:"The continuous filament core is where the strength lives. The spun outer wrap gives the surface texture, helping the thread grip tension discs and guides consistently. Pure filament thread is stronger per diameter but can slip through tension on machines not calibrated for low-friction thread."},
+  {id:"bonded-poly",  label:"Bonded Polyester",
+   why:"The preferred thread for bag applications involving UV exposure, moisture, outdoor use, or abrasion. The bonding process locks the plies together, reduces fraying, and improves resistance to breakdown in harsh conditions.",
+   use:"Outdoor gear, marine and patio bags, travel bags, and applications with prolonged sun or moisture exposure.",
+   examples:"WAWAK Optipop, Superior Bonded Polyester, A&E Polybond, Coats Dabond.",
+   chem:"Bonded thread is treated after twisting with a resin or finish that locks the plies together, reduces fraying, lowers surface drag, and improves abrasion resistance. Polyester brings better UV and moisture resistance than nylon — the safer default for bags that live in sun, humidity, or outdoor conditions.",
+   nerd:"Gummy buildup on the needle usually points to something specific: friction heat, vinyl or adhesive coating transfer, running speed too high, or a needle eye too small for the thread diameter. Try a fresh needle, a larger eye, a nonstick coating, or lower speed before assuming the thread is the problem."},
+  {id:"filament-poly",label:"Continuous-Filament Polyester",
+   why:"Smooth, strong, and very low-lint. Used where surface consistency and seam appearance matter. Common in industrial production settings and precision topstitching.",
+   use:"Production sewing, precision topstitching, serger work, and applications where lint accumulation is a concern.",
+   examples:"Gutermann Tera, A&E Anefil Poly, Amann Serafil.",
+   chem:"Made from long, unbroken strands of polymer extruded in one continuous length — unlike spun thread, which twists together short fiber lengths. With no fiber ends breaking the surface, filament thread is smoother and more consistent in diameter. It can be bonded (resin-coated, for industrial and heavy sewing) or soft-finished (lighter surface, for decorative topstitching and serger work).",
+   nerd:"The slick surface that gives clean topstitching can cause tension issues on machines not calibrated for low-friction thread. Switching to poly-core with a spun outer surface usually gives comparable strength and is easier to balance on domestic and semi-industrial setups."},
+  {id:"bonded-nylon", label:"Bonded Nylon",
+   why:"Strong, flexible, and abrasion-resistant. The preferred thread in leather goods manufacturing and upholstery for its smooth machine handling, consistent feed, and the flex and recovery it brings to structural seams. Best kept for indoor and non-UV applications.",
+   use:"Leather goods, structured bags, straps, and webbing — primarily for indoor or low-UV use.",
+   examples:"Amann Strongbond, A&E Anefil Nylon, Superior Bonded Nylon, Coats Nylbond.",
+   chem:"Nylon is a polyamide. Compared with polyester, it is more elastic and handles repeated flexing well — a key reason it is standard in leather goods and upholstery production. The tradeoff is moisture sensitivity and weaker UV resistance. Bonded polyester is the correct choice where outdoor or sun exposure is a factor.",
+   nerd:"The UV weakness is chemistry: nylon's amide bonds absorb UV radiation and degrade over time. Polyester's ester bonds are more stable under UV, which is why outdoor and marine applications specify polyester. For bags that remain indoors, bonded nylon is a strong and well-proven choice."},
+  {id:"cotton",       label:"Cotton / Cotton-Wrapped Poly",
+   why:"Valued for its matte finish and traditional appearance. Used in heirloom sewing, quilting, and fabric bags where a non-synthetic look is preferred. Not the strongest option for load-bearing bag seams.",
+   use:"Fabric bags, quilting, heirloom and decorative work, and projects where a matte non-synthetic finish is the goal.",
+   examples:"Cotton quilting thread, Perform-X cotton-wrapped poly core.",
+   chem:"Cotton is a natural cellulose fiber with a soft matte appearance and good heat tolerance, but less abrasion resistance, mildew resistance, and weather stability than polyester. Cotton-wrapped poly uses a polyester core for strength with a cotton outer wrap for the traditional look.",
+   nerd:"Cotton does not melt under a hot iron like synthetic thread — relevant when pressing seams in garment work. For bag construction where abrasion, moisture, and load bearing are the primary concerns, polyester is the stronger long-term choice."},
+  {id:"waxed",        label:"Waxed Cord / Hand Stitching",
+   why:"Designed for hand stitching through pre-punched holes in leather and heavy materials. The wax lubricates the pull, helps the stitch seat, and adds grip once tightened. Not intended for machine sewing.",
+   use:"Hand-stitched leather handles, saddle-stitch details, and decorative leatherwork.",
+   examples:"Maine Thread waxed polyester cord, braided polyester leathercraft cords.",
+   chem:"Waxed cord is typically twisted or braided polyester, nylon, linen, or similar fiber saturated with wax — often paraffin, microcrystalline, beeswax, or a blend. The wax lubricates the pull through pre-punched holes and helps the stitch seat cleanly.",
+   nerd:"A machine lockstitch and a hand saddle stitch are structurally different. Hand saddle stitching uses two needles and two threads interlocking through the same hole in opposite directions — if one thread breaks, the stitch holds. A machine lockstitch can unravel from a single break. The finished appearance can be similar; the failure mode is not."},
+  {id:"mono",         label:"Monofilament / Invisible",
+   why:"A single-strand invisible thread used for specialty applications where thread color must not show. Not a structural thread and not suitable for load-bearing bag seams.",
+   use:"Invisible stitching in quilting, appliqué, and specialty decorative techniques.",
+   examples:"Generic nylon or polyester invisible thread; fine polyester monofilament.",
+   chem:"A single extruded strand of polymer — usually nylon or polyester — with no twist and no plies. Its transparency comes from the optical clarity and small diameter of the strand. It is slick, springy, and sensitive to spool feeding, needle size, and tension setup.",
+   nerd:"Loops on the underside almost always mean top tension is too loose or the thread is not tracking through the tension discs evenly. One technique worth knowing: on Janome and Elna machines, using monofilament as top thread with the Janome/Elna Low Tension Bobbin Case (Blue Dot) and colored thread in the bobbin can produce a sashiko-style appearance — the bobbin thread surfaces in a way that reads as visible hand stitching on decorative bag panels."}
+];
+
+// ── Machine data ──────────────────────────────────────────────────────────────
+var MC_SEMI=[
+  {id:"babylock-accomplish",    label:"Baby Lock Accomplish",                    system:"Standard domestic flat-shank or HLx5",sizes:"11–18",maxTex:70, minNeedleUS:11,maxNeedleUS:18,maxThreadLabel:"Tex 70", note:"Feed: pin-feed straight stitch. Powerhouse semi-industrial straight stitcher with excellent layer control."},
+  {id:"brother-pq",             label:"Brother PQ1500SL / PQ1600S",              system:"Standard domestic flat-shank or HLx5",sizes:"11–18",maxTex:70, minNeedleUS:11,maxNeedleUS:18,maxThreadLabel:"Tex 70", note:"Feed: pin-feed straight stitch. High-speed semi-industrial with excellent piercing power."},
+  {id:"elna-720pro-janome-6700",label:"Elna eXcellence 720PRO / Janome MC6700P",system:"Standard domestic flat-shank",         sizes:"11–18",maxTex:70, minNeedleUS:11,maxNeedleUS:18,maxThreadLabel:"Tex 70", note:"Feed: domestic drop feed with optional even-feed accessories. All-metal frame, high-speed motor, and fully capable with its high-performance foot and plate system. Tex 45 is the sweet spot for structural seams; Tex 70 is achievable for topstitching with careful tensioning. One of the most capable domestics available for bag work."},
+  {id:"janome-hd9",             label:"Janome HD9 Professional",                 system:"HLx5 flat-shank",                     sizes:"11–18",maxTex:92, minNeedleUS:11,maxNeedleUS:18,maxThreadLabel:"Tex 70 (can push Tex 92 with heavy guide)", note:"Feed: straight-stitch drop feed. True bridge machine between domestic and industrial."},
+  {id:"juki-tl",                label:"JUKI TL Series (TL-2000Qi, TL-2010Q)",   system:"Standard domestic flat-shank or HLx5",sizes:"11–18",maxTex:70, minNeedleUS:11,maxNeedleUS:18,maxThreadLabel:"Tex 70", note:"Feed: straight-stitch drop feed. Sews Tex 45 cleanly; Tex 70 requires careful tensioning."}
+];
+
+var MC_FLAT=[
+  {id:"cobra-17",        label:"Cobra Class 17",                    system:"135x17 fabric / 135x16 leather",sizes:"12–24",         maxTex:138,minNeedleUS:12,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot flatbed. Lighter duty than the Class 18 — good for lighter leathers, fabrics, straps, and bag work that doesn't require the heavier Class 18 capacity."},
+  {id:"cobra-18",        label:"Cobra Class 18",                    system:"135x17 fabric / 135x16 leather",sizes:"12–24",         maxTex:210,minNeedleUS:12,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot flatbed with safety throw-out clutch. Handles leather and fabric up to 8mm. Thread sizes Tex 69–207. Good for wallets, belts, straps, upholstery, and medium bag work."},
+  {id:"cobra-20",        label:"Cobra Class 20",                    system:"135x17 fabric / 135x16 leather",sizes:"12–24",         maxTex:210,minNeedleUS:12,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot flatbed with speed reducer. One of the most versatile machines in the Cobra lineup — sews leather up to 12.7mm, thread Tex 69–207. Good choice for bag panels, flat leather goods, chaps, sheaths, and belts."},
+  {id:"cedar-cs1541s",   label:"CEDAR Special CS-1541S",            system:"135x17 fabric / 135x16 leather",sizes:"18–24 (verify)",maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135 (verify)", note:"Feed: compound/triple-feed walking-foot flatbed. 1541S-style. Confirm final needle/thread limits with Collier — specs can vary by in-house branding."},
+  {id:"consew-206rb5",   label:"Consew 206RB-5",                    system:"135x17 fabric / 135x16 leather",sizes:"12–25",         maxTex:210,minNeedleUS:12,maxNeedleUS:25,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot flatbed. Widely used in bag, upholstery, and leather production."},
+  {id:"adler-667",       label:"Dürkopp Adler 667 M-TYPE",          system:"134-35",                        sizes:"16–22+ (verify subclass)",maxTex:138,minNeedleUS:16,maxNeedleUS:22,maxThreadLabel:"Tex 135+ depending on subclass", note:"Feed: M-TYPE triple-feed/compound-feed flatbed. Verify exact subclass before choosing needles — capacity is subclass-dependent."},
+  {id:"adler-867",       label:"Dürkopp Adler 867-M M-TYPE",        system:"134-35",                        sizes:"16–24 (subclass-dependent)",maxTex:277,minNeedleUS:16,maxNeedleUS:24,maxThreadLabel:"Up to Tex 270 on heavier subclasses", note:"Feed: M-TYPE triple-feed/compound-feed flatbed. Premium M-TYPE walking-foot flatbed; thread capacity is subclass-dependent."},
+  {id:"juki-dnu",        label:"JUKI DNU-1541 / DNU-1541S",         system:"135x17 fabric / 135x16 leather",sizes:"18–23",         maxTex:138,minNeedleUS:18,maxNeedleUS:23,maxThreadLabel:"Tex 138", note:"Feed: JUKI unison feed (compound/triple-feed walking foot). Industry-standard flatbed walking foot for bag, leather goods, and upholstery production."},
+  {id:"juki-ddl8700",    label:"JUKI DDL-8700",                     system:"DBx1 / 16x257; 16x230 leather",sizes:"9–18",          maxTex:70, minNeedleUS:9, maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 30.7 mm. Maximum speed: 5,500 SPM. Automatic lubrication and full-rotary hook."},
+  {id:"pfaff-1245",      label:"Pfaff 1245",                         system:"134-35",                        sizes:"18–22",         maxTex:138,minNeedleUS:18,maxNeedleUS:22,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot flatbed. Well-regarded in upholstery and bag production shops."},
+  {id:"sailrite-fabricator",label:"Sailrite Fabricator",             system:"135x17 fabric / 135x16 leather",sizes:"10–24",        maxTex:138,minNeedleUS:10,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: compound walking foot: the needle, inner presser foot, and feed dog advance the material together. Full-size industrial flatbed. Published needle size range: 10–24. Published thread range: Tex 30–138."},
+  {id:"sailrite-ultrafeed",label:"Sailrite Ultrafeed",               system:"135x17 fabric / 135x16 leather",sizes:"10–22",        maxTex:92, minNeedleUS:10,maxNeedleUS:22,maxThreadLabel:"Tex 90", note:"Feed: walking foot; this is not a needle-feed compound/triple-feed system. Portable flatbed machine. Published needle size range: 10–22. Published thread range: Tex 30–92."},
+  {id:"thor-1541",       label:"Thor GC-1541S",                      system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot flatbed. Well-regarded clone of the Juki DNU-1541S."}
+];
+
+var MC_CYL=[
+  {id:"cedar-cs1341-7",  label:"CEDAR Special CS-1341-7",            system:"135x17 fabric / 135x16 leather",sizes:"18–24 (verify)",maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135 (verify)", note:"Feed: compound/triple-feed walking-foot cylinder arm. 1341 clone family; verify exact arm diameter with Collier/dealer before buying needles in bulk."},
+  {id:"cobra-26",        label:"Cobra Class 26",                      system:"135x17 fabric / 135x16 leather",sizes:"12–24",        maxTex:210,minNeedleUS:12,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot cylinder arm. Scaled-down cylinder arm well-suited for bags, purses, caps, wallets, and gusset work. Thread sizes Tex 69–207."},
+  {id:"cobra-4",         label:"Cobra Class 4",                       system:"794 / 7x4 / 7x3",               sizes:"23–29",        maxTex:415,minNeedleUS:23,maxNeedleUS:29,maxThreadLabel:"Tex 415", note:"Feed: heavy compound/triple-feed cylinder arm. 16.5\" arm. Thread sizes Tex 69–415. Heavy leather stitcher for saddle, harness, tack, and thick leather goods. Not a general bag machine."},
+  {id:"consew-227r",     label:"Consew 227R",                         system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:210,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot cylinder arm. Popular for tight gussets and binding work."},
+  {id:"cowboy-3278",     label:"Cowboy CB3278",                       system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot cylinder arm. Direct competitor to the Thor 1341 and Techsew 2750."},
+  {id:"cowboy-4500",     label:"Cowboy CB4500 (heavy leather stitcher)",system:"794 / 7x4",                   sizes:"23–29",        maxTex:415,minNeedleUS:23,maxNeedleUS:29,maxThreadLabel:"Tex 415", note:"Feed: heavy compound/triple-feed walking-foot leather stitcher. Heavy harness stitcher for thick leather and tack."},
+  {id:"adler-669",       label:"Dürkopp Adler 669",                   system:"134-35",                        sizes:"16–22 (Nm 100–150)",maxTex:138,minNeedleUS:16,maxNeedleUS:22,maxThreadLabel:"Tex 135", note:"Feed: M-TYPE triple-feed/compound-feed cylinder arm. 50 mm narrow cylinder arm for curves, binding, and tight bag work. The DA 669 is a premium, precision-engineered machine manufactured to Dürkopp Adler's industrial standards — well established in European production shops and with a dedicated following among serious bag and leather makers in the US. If you own one, you already know."},
+  {id:"juki-ls1341",     label:"JUKI LS-1341",                        system:"135x17 fabric / 135x16 leather",sizes:"18–23",        maxTex:138,minNeedleUS:18,maxNeedleUS:23,maxThreadLabel:"Tex 135", note:"Feed: JUKI unison feed (compound/triple-feed cylinder arm). 72 mm cylinder diameter — a premium choice for bags, gussets, and binding work."},
+  {id:"techsew-2750",    label:"Techsew 2750 PRO",                    system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:210,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot cylinder arm. 3 in / 76 mm cylinder arm. Widely used for structured bags."},
+  {id:"techsew-4800",    label:"Techsew 4800",                        system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:270,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 270", note:"Feed: heavy compound/triple-feed walking-foot cylinder arm. 3 in / 76 mm cylinder arm for thicker assemblies and heavier thread."},
+  {id:"thor-1341",       label:"Thor GC-1341",                        system:"135x17 fabric / 135x16 leather",sizes:"18–24",        maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot cylinder arm. 72 mm cylinder diameter. Well-regarded workhorse in the 1341-clone category."},
+  {id:"weaver-205",      label:"Weaver 205 (heavy leather stitcher)",  system:"794",                           sizes:"23–29",        maxTex:415,minNeedleUS:23,maxNeedleUS:29,maxThreadLabel:"Tex 415", note:"Feed: heavy compound/triple-feed leather stitcher for thick leather and tack."}
+];
+
+
+
+// ── Additional industrial machines researched June 2026 ─────────────────────
+// The dropdown remains focused on single-needle machines useful for bags,
+// leather goods, canvas, upholstery, binding, and related structured work.
+// When a manufacturer thread limit is unavailable, the displayed ceiling is estimated
+// from the largest listed needle and must be confirmed with the dealer or manual.
+MC_FLAT.push(
+  {id:"consew-205rb1",     label:"Consew 205RB-1",                    system:"135x17 fabric / 135x16 leather",sizes:"16–23",maxTex:138,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: top-and-bottom walking-foot flatbed; the needle does not participate in feeding. Maximum stitch length: 8 mm. Presser-foot lift: up to 16 mm."},
+  {id:"consew-p1541s",     label:"Consew P1541S / P1541S-CC",         system:"135x17 fabric / 135x16 leather",sizes:"18–24",maxTex:210,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed walking-foot flatbed. Thread range: Tex 69–207. Maximum stitch length: 9 mm. Presser-foot lift: 16 mm. Maximum speed: 2,800 SPM."},
+  {id:"highlead-gc0618",   label:"Highlead GC0618-1SC",               system:"135x17 fabric / 135x16 leather",sizes:"18–23",maxTex:138,minNeedleUS:18,maxNeedleUS:23,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot flatbed with large rotary hook. Maximum stitch length: 10 mm. Presser-foot lift: 14 mm."},
+  {id:"jack-a4",           label:"Jack A4 / JK-A4 Straight-Stitch Series",system:"DBx1 / 16x231 (verify exact model)",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70", note:"Feed: industrial drop-feed straight stitch. Needle system: DBx1 / 16x231, subject to exact model. Needle range: sizes 9–18. This is not a walking-foot or compound-feed machine."},
+  {id:"jack-2060",         label:"Jack 2060",                         system:"Verify exact model plate / manual",sizes:"Subclass-dependent",maxTex:999,minNeedleUS:0,maxNeedleUS:99,maxThreadLabel:"Verify exact subclass", note:"Feed: triple-transport heavy-duty flatbed with a large hook and 335 × 150 mm working area. Needle system and thread limit vary by subclass; verify the model plate and manual."},
+  {id:"jack-z7",           label:"Jack Z7",                           system:"Verify exact model plate / manual",sizes:"Subclass-dependent",maxTex:999,minNeedleUS:0,maxNeedleUS:99,maxThreadLabel:"Verify exact subclass", note:"Feed: electronically controlled triple transport with an XXL hook and 850 W motor. Needle system and thread limit vary by version; verify the model plate and manual."},
+  {id:"juki-du1181n",      label:"JUKI DU-1181N",                     system:"135x17 fabric / 135x16 leather",sizes:"16–23",maxTex:90,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 90", note:"Feed: top-and-bottom feed flatbed with a large top-loading bobbin; the needle does not participate in feeding. Maximum stitch length: 9 mm. Knee lift: 15 mm. Published thread range: B33–B92."},
+  {id:"juki-lu1508n",      label:"JUKI LU-1508N / LU-1508NS",          system:"135x17 fabric / 135x16 leather",sizes:"20–24 (Nm 125–180)",maxTex:138,minNeedleUS:20,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: unison/compound feed with a vertical-axis double-capacity hook. Maximum stitch length: 9 mm. Presser-foot lift: 16 mm by knee. Needle-bar stroke: 36 mm. Maximum speed: 2,500 SPM. Thread range: B46–B138. The NS version includes a safety mechanism."},
+  {id:"kingmax-gc0303",    label:"Kingmax GC0302 / GC0303 Series",     system:"135x17 / DPx17",sizes:"14–25",maxTex:138,minNeedleUS:14,maxNeedleUS:25,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: alternating top-and-bottom walking foot; the needle does not participate in feeding. Maximum stitch length: 8 mm. Presser-foot lift: 14 mm. Double-capacity horizontal hook. Direct-drive and automatic variants are available."},
+  {id:"kingmax-gc0617d",   label:"Kingmax GC0617D Series",            system:"135x17 / DPx17 (verify exact variant)",sizes:"16–23",maxTex:138,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: direct-drive compound/triple-feed walking-foot flatbed. Manual and automatic variants are available. Automation and hook configuration depend on the exact suffix."},
+  {id:"kingmax-gc1541",    label:"Kingmax GC1541 / GC1541S Series",    system:"135x17 / DPx17 fabric; 135x16 leather",sizes:"19–23",maxTex:138,minNeedleUS:19,maxNeedleUS:23,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot flatbed. Maximum stitch length: 9 mm. Presser-foot lift: 16 mm. Maximum speed: 2,500 SPM. Needle range: DPx17 sizes 19–23. GC1541S includes a safety clutch; GC1541S-BH uses an extra-large hook."},
+  {id:"seiko-sth8bld3",   label:"Seiko STH-8BLD-3",                  system:"135x17 fabric / 135x16 leather",sizes:"16–24",maxTex:138,minNeedleUS:16,maxNeedleUS:24,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot flatbed. Maximum stitch length: 10 mm. Presser-foot lift: 13 mm."},
+  {id:"thor-re0303",      label:"Thor RE-0303",                      system:"135x17 fabric / 135x16 leather",sizes:"16–23",maxTex:138,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 135", note:"Feed: alternating top-and-bottom walking foot; the needle does not participate in feeding. Thread range: Tex 40–138. Maximum stitch length: 8 mm. Knee lift: 16 mm. Maximum speed: 2,000 SPM."},
+  {id:"typical-gc0605a",  label:"Typical GC0605A",                   system:"135x17 / DPx17 (verify manual)",sizes:"18–24",maxTex:270,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 270 (verify)", note:"Feed: compound/triple-feed walking-foot flatbed. Published thread capacity: up to Tex 270. Maximum stitch length: 9 mm. Presser-foot lift: 16 mm. Maximum speed: 2,000 SPM. Verify the supplied needle range before using the heaviest thread."},
+
+  // Single-needle flatbeds listed in Sewing Gold's current Single Needle category.
+  // Notes below retain technical specifications only. Unpublished thread limits are
+  // converted to a needle-pairing ceiling and clearly marked as estimates below.
+  {id:"consew-7360r2ss", label:"Consew 7360R-2SS",                  system:"16x257; 16x230 leather",sizes:"9–18 (verify)",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot clearance: 6 mm by hand and 13 mm by knee. Needle-bar stroke: 31.8 mm. Maximum speed: 5,500 SPM. L-size bobbin, horizontal-axis rotary hook, and automatic lubrication."},
+  {id:"juki-ddl5550n",  label:"JUKI DDL-5550N",                    system:"DBx1 / 16x257; 16x230 leather",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 30.7 mm. Maximum speed: 5,500 SPM. Automatic lubrication and full-rotary hook."},
+  {id:"juki-ddl8100e",  label:"JUKI DDL-8100e",                    system:"DBx1 / 16x257; 16x230 leather",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: 3-row drop feed, single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 30.7 mm. Maximum speed: 4,500 SPM. Automatic lubrication and full-rotary hook."},
+  {id:"juki-ddl8100ehx",label:"JUKI DDL-8100eH/X",                 system:"135x5 fabric / 135x8 leather",sizes:"14–22",maxTex:90,minNeedleUS:14,maxNeedleUS:22,maxThreadLabel:"Tex 90 (conservative)", note:"Feed: 3-row drop feed, single-needle lockstitch flatbed for medium- to heavy-weight materials. Maximum stitch length: 7 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 35 mm. Maximum speed: 4,000 SPM. Double-capacity M-class bobbin and automatic-lubricating full-rotary hook."},
+  {id:"juki-ddl8700-7", label:"JUKI DDL-8700-7",                  system:"DBx1 / 16x257; 16x230 leather",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed with automatic thread trimming. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 30.7 mm. Maximum speed: 5,000 SPM. Automatic-lubricating full-rotary hook."},
+  {id:"juki-ddl8700h",  label:"JUKI DDL-8700H",                    system:"135x5 / 1955 fabric; 135x8 leather",sizes:"19–23",maxTex:90,minNeedleUS:19,maxNeedleUS:23,maxThreadLabel:"Tex 90 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed for medium- to heavy-weight materials. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 35 mm. Maximum speed: 4,000 SPM. Automatic lubrication and horizontal-axis rotary hook."},
+  {id:"juki-dln5410n",  label:"JUKI DLN-5410N",                    system:"DBx1 / 16x257; 16x230 leather",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: needle feed with bottom feed, single-needle lockstitch flatbed. Maximum stitch length: 4 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 30.7 mm. Maximum speed: 5,000 SPM. Automatic lubrication and full-rotary hook."},
+  {id:"reliable-3200sn",label:"Reliable 3200SN",                    system:"16x257",sizes:"9–18 (verify)",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: needle feed with bottom feed, single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot lift: 5 mm by hand and 11 mm by knee. Needle-bar stroke: 31.8 mm. Maximum speed: 5,000 SPM. 3-row feed dog, rotary hook, and automatic lubrication."},
+  {id:"reliable-3300sd",label:"Reliable 3300SD",                    system:"16x257",sizes:"9–18",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, direct-drive single-needle lockstitch flatbed. Maximum stitch length: 5 mm. Presser-foot lift: 5 mm by hand and 15 mm by knee. Needle-bar stroke: 31.8 mm. Maximum speed: 4,500 SPM. Automatic lubrication."},
+  {id:"singer-191d20",  label:"Singer 191D-20",                    system:"1955 / 135x7 fabric; 135x8 leather",sizes:"14 standard; verify range",maxTex:70,minNeedleUS:9,maxNeedleUS:18,maxThreadLabel:"Tex 70 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed for light- to medium-weight materials. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 35 mm. Maximum speed: 4,500 SPM. Horizontal-axis rotary hook and automatic lubrication."},
+  {id:"singer-191d30",  label:"Singer 191D-30",                    system:"1955 / 135x7 fabric; 135x8 leather",sizes:"18 standard; verify range",maxTex:90,minNeedleUS:14,maxNeedleUS:21,maxThreadLabel:"Tex 90 (conservative)", note:"Feed: drop-feed, single-needle lockstitch flatbed for medium- to medium/heavy-weight materials. Maximum stitch length: 5 mm. Presser-foot lift: 5.5 mm by hand and 13 mm by knee. Needle-bar stroke: 35 mm. Maximum speed: 4,000 SPM. Horizontal-axis rotary hook and automatic lubrication."},
+
+  // Additional standard-workspace, single-needle walking-foot machines.
+  {id:"consew-p1206rb1", label:"Consew P1206RB-1",                  system:"135x17 fabric / 135x16 leather",sizes:"16–24",maxTex:138,minNeedleUS:16,maxNeedleUS:24,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot flatbed. Maximum stitch length: 7 mm. Presser-foot lift: 8 mm by hand and 16 mm by knee. Needle-bar stroke: 37 mm. Maximum speed: 3,000 SPM. Large horizontal rotary hook and M bobbin."},
+  {id:"highlead-gc20618-1",label:"Highlead GC20618-1",               system:"135x17 fabric / 135x16 leather",sizes:"18–23",maxTex:138,minNeedleUS:18,maxNeedleUS:23,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot flatbed. Maximum stitch length: 9 mm. Presser-foot lift: 8 mm by hand and 16 mm by knee. Needle-bar stroke: 36 mm. Maximum speed: 2,000 SPM. Automatic lubrication, large vertical-axis hook, 2.5-capacity bobbin, and safety clutch."},
+  {id:"juki-jin-na11ut", label:"JUKI JIN NA-11 / NA-11UT",         system:"135x17 / DPx17",sizes:"18–24",maxTex:138,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: direct-drive top-and-bottom walking foot; the needle does not participate in feeding. Maximum stitch length: 8 mm. Presser-foot lift: 8 mm by hand and 16 mm by knee. Needle-bar stroke: 37 mm. Maximum speed: 2,000 SPM. Horizontal-axis double-capacity hook. NA-11UT includes automatic thread trimming."},
+  {id:"juki-lu1508nh",  label:"JUKI LU-1508NH",                    system:"190R / MTx190 fabric; 190R leather point",sizes:"23–25 (Nm 160–200)",maxTex:210,minNeedleUS:23,maxNeedleUS:25,maxThreadLabel:"Tex 210", note:"Feed: unison/compound feed for extra-heavy materials with a vertical-axis double-capacity hook. Maximum stitch length: 10 mm. Presser-foot lift: 16 mm by knee. Needle-bar stroke: 38 mm. Maximum speed: 2,000 SPM. Thread range: B69–B207."},
+  {id:"juki-lu2810a",   label:"JUKI LU-2810A",                     system:"135x17 fabric / 135x16 leather",sizes:"20–24 (Nm 125–180)",maxTex:138,minNeedleUS:20,maxNeedleUS:24,maxThreadLabel:"Tex 135", note:"Feed: direct-drive unison/compound-feed walking-foot flatbed. Maximum stitch length: 9 mm. Presser-foot lift: 10 mm by hand and 20 mm automatically. Alternating-foot movement: 1–9 mm. Maximum speed: 3,000 SPM. Vertical-axis large hook, thread range B46–B138, semi-dry automatic lubrication, and safety mechanism."},
+  {id:"typical-gc6-6",  label:"Typical GC6-6",                     system:"135x17 fabric / 135x16 leather",sizes:"16–22",maxTex:138,minNeedleUS:16,maxNeedleUS:22,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: alternating top-and-bottom walking foot; the needle does not participate in feeding. Maximum stitch length: 9 mm. Maximum presser-foot lift: 13 mm. Needle-bar stroke: 37 mm. Maximum speed: 2,000 SPM. M bobbin and standard 260 × 120 mm workspace."},
+  {id:"typical-gc6-7d", label:"Typical GC6-7-D",                   system:"135x17 fabric / 135x16 leather",sizes:"16–24 (verify supplied range)",maxTex:138,minNeedleUS:16,maxNeedleUS:24,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot flatbed. Maximum stitch length: 8 mm. Presser-foot lift: 13 mm. Needle-bar stroke: 37 mm. Maximum speed: 2,500 SPM. Large horizontal rotary hook, M bobbin, and automatic lubrication."}
+);
+
+MC_CYL.push(
+  {id:"kingmax-gc1341",      label:"Kingmax GC1341 Series",             system:"135x17 / DPx17 fabric; 135x16 leather (verify suffix)",sizes:"18–24",maxTex:210,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 210 (verify exact suffix)", note:"Feed: compound/triple-feed walking-foot cylinder arm. Standard, direct-drive, automatic, and big-hook variants are available. Specifications depend on the exact suffix."},
+  {id:"kingmax-gc1341scbh",  label:"Kingmax GC1341-SC-BH",              system:"135x17 / DPx17 fabric; 135x16 leather",sizes:"18–24",maxTex:210,minNeedleUS:18,maxNeedleUS:24,maxThreadLabel:"Tex 210 (verify)", note:"Feed: compound/triple-feed cylinder arm with a 50 mm cylinder, large horizontal hook, and automatic lubrication. Maximum stitch length: 9 mm. Presser-foot lift: 16 mm. Maximum speed: 2,000 SPM."},
+  {id:"kingmax-gc335",       label:"Kingmax GC335",                     system:"134-35 / DPx35 (verify supplied subclass)",sizes:"16–23",maxTex:210,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 210 (verify)", note:"Feed: compound/triple-feed walking-foot cylinder arm with a large horizontal hook. Presser-foot lift: 14 mm. Alternating-foot movement: 7 mm. Confirm the needle system on the model plate because 335-style subclasses can differ."},
+  {id:"pfaff-335",           label:"Pfaff 335",                         system:"134-35 (verify subclass)",sizes:"16–23",maxTex:210,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 210", note:"Feed: compound/triple-feed narrow cylinder arm. For the 335-G-17/01 binding subclass: maximum stitch length 8 mm, presser-foot lift 14 mm, maximum speed 2,500 SPM, and thread up to Tex 207. Other subclasses may have different equipment and limits."},
+  {id:"highlead-gc22618-8b",label:"Highlead GC22618-8B",             system:"135x17 fabric / 135x16 leather",sizes:"18–22",maxTex:138,minNeedleUS:18,maxNeedleUS:22,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot cylinder arm. Cylinder diameter: 62 mm; cylinder length: 9.5 in. Maximum stitch length: 5 mm. Presser-foot lift: 8 mm by hand and 14 mm by foot. Needle-bar stroke: 33.4 mm. Maximum speed: 2,200 SPM. Vertical rotary hook and G bobbin."},
+  {id:"highlead-gc2268",    label:"Highlead GC2268",                system:"135x17 / DPx17 fabric; 135x16 leather",sizes:"18–22",maxTex:138,minNeedleUS:18,maxNeedleUS:22,maxThreadLabel:"Tex 135", note:"Feed: compound/triple-feed walking-foot cylinder arm. Cylinder diameter: 71 mm. Maximum stitch length: 6 mm. Presser-foot lift: 8 mm by hand and 14 mm by foot. Needle-bar stroke: 33.4 mm. Maximum speed: 2,200 SPM. Large vertical-axis hook, double-capacity bobbin, and safety clutch."},
+  {id:"highlead-gc2698-1b", label:"Highlead GC2698-1B",             system:"135x17 / DPx17 fabric; 135x16 leather",sizes:"14–19",maxTex:90,minNeedleUS:14,maxNeedleUS:19,maxThreadLabel:"Tex 90 (conservative)", note:"Feed: compound/triple-feed walking-foot narrow cylinder arm. Cylinder diameter: 47 mm. Maximum stitch length: 6 mm. Presser-foot lift: 5 mm by hand and 14 mm by foot. Needle-bar stroke: 33.4 mm. Maximum speed: 2,400 SPM. Enlarged 1.4-capacity hook; synchronized-binder version available."},
+  {id:"reliable-4500cw",    label:"Reliable 4500CW",                system:"135x17 fabric / 135x16 leather",sizes:"16–23",maxTex:138,minNeedleUS:16,maxNeedleUS:23,maxThreadLabel:"Tex 135 (conservative)", note:"Feed: compound/triple-feed walking-foot cylinder arm. Cylinder diameter: 47 mm. Maximum stitch length: 10 mm. Presser-foot lift: 8.5 mm. Needle-bar stroke: 33.4 mm. Maximum speed: 2,500 RPM. Vertical drop-in bobbin, automatic lubrication, safety clutch, built-in bobbin winder, and needle-position synchronizer."}
+);
+
+var MC_POST=[
+  {id:"jack-s5",            label:"Jack S5 Series",                    system:"DPx5 / 135x5 (INDPx5)",sizes:"16 standard; verify subclass",maxTex:999,minNeedleUS:16,maxNeedleUS:16,maxThreadLabel:"Verify exact subclass", note:"Feed: roller-foot post-bed. Needle system: INDPx5 / DPx5, with size 16 specified for the standard configuration. Presser-foot lift: 12 mm. Variants include S5-91, S5-91CX, and S5-92. Verify thread capacity for the exact subclass."},
+  {id:"jack-s7",            label:"Jack S7 Series",                    system:"DPx5 / 135x5 or 134 family — verify exact subclass",sizes:"9–23 reported; verify plate/manual",maxTex:999,minNeedleUS:9,maxNeedleUS:23,maxThreadLabel:"Verify exact subclass", note:"Feed: programmable post-bed with independent dual rollers and needle feed. Needle-system notation varies by subclass and published source; use the model plate and supplied manual for needle selection."}
+];
+
+// Thread ceilings below are estimates only where a manufacturer/dealer did not
+// publish a machine-specific thread limit. The estimate uses the largest listed
+// needle and the guide's own needle/thread pairing table.
+var ESTIMATED_THREAD_CAP_IDS=[
+  "cedar-cs1541s","juki-ddl8700","cedar-cs1341-7",
+  "consew-205rb1","highlead-gc0618","jack-a4",
+  "kingmax-gc0303","kingmax-gc0617d","kingmax-gc1541",
+  "seiko-sth8bld3","consew-7360r2ss","juki-ddl5550n",
+  "juki-ddl8100e","juki-ddl8100ehx","juki-ddl8700-7",
+  "juki-ddl8700h","juki-dln5410n","reliable-3200sn",
+  "reliable-3300sd","singer-191d20","singer-191d30",
+  "consew-p1206rb1","highlead-gc20618-1","juki-jin-na11ut",
+  "typical-gc6-6","typical-gc6-7d","kingmax-gc1341",
+  "kingmax-gc1341scbh","kingmax-gc335","highlead-gc22618-8b",
+  "highlead-gc2268","highlead-gc2698-1b","reliable-4500cw",
+  "jack-s5","jack-s7"
+];
+function texCeilingFromNeedleUS(us){
+  var match=null;
+  N.forEach(function(n){if(n.us<=us&&(!match||n.us>match.us)) match=n;});
+  return match?match.maxTex:30;
+}
+function applyEstimatedThreadCaps(list){
+  list.forEach(function(mc){
+    if(ESTIMATED_THREAD_CAP_IDS.indexOf(mc.id)===-1) return;
+    if(!mc.maxNeedleUS||mc.maxNeedleUS>=90) return;
+    mc.maxTex=texCeilingFromNeedleUS(mc.maxNeedleUS);
+    mc.maxThreadLabel='Tex '+mc.maxTex;
+    mc.capEstimated=true;
+  });
+}
+[MC_SEMI,MC_FLAT,MC_CYL,MC_POST].forEach(applyEstimatedThreadCaps);
+
+function alphaMachines(list){
+  list.sort(function(a,b){return a.label.toLowerCase().localeCompare(b.label.toLowerCase());});
+}
+[MC_SEMI,MC_FLAT,MC_CYL,MC_POST].forEach(alphaMachines);
+
+// Industrial flatbeds are presented by feed class. "Walking Foot" here means
+// top-and-bottom feed without needle feed; compound/unison feed is separate.
+var MC_FLAT_NONWALK_IDS=[
+  "consew-7360r2ss","jack-a4","juki-ddl5550n","juki-ddl8100e",
+  "juki-ddl8100ehx","juki-ddl8700","juki-ddl8700-7","juki-ddl8700h",
+  "juki-dln5410n","reliable-3200sn","reliable-3300sd",
+  "singer-191d20","singer-191d30"
+];
+var MC_FLAT_WALK_IDS=[
+  "consew-205rb1","juki-du1181n","juki-jin-na11ut",
+  "kingmax-gc0303","sailrite-ultrafeed","thor-re0303","typical-gc6-6"
+];
+var MC_FLAT_NONWALK=MC_FLAT.filter(function(m){return MC_FLAT_NONWALK_IDS.indexOf(m.id)>-1;});
+var MC_FLAT_WALK=MC_FLAT.filter(function(m){return MC_FLAT_WALK_IDS.indexOf(m.id)>-1;});
+var MC_FLAT_COMPOUND=MC_FLAT.filter(function(m){
+  return MC_FLAT_NONWALK_IDS.indexOf(m.id)===-1&&MC_FLAT_WALK_IDS.indexOf(m.id)===-1;
+});
+
+var MC=[
+  {id:"none",label:"Select your machine...",maxTex:999,minNeedleUS:0,maxNeedleUS:99,maxThreadLabel:"unknown"},
+  {id:"not-listed",label:"My machine is not listed / I need to check",system:"Check your manual",sizes:"Per manual",maxTex:999,minNeedleUS:0,maxNeedleUS:99,maxThreadLabel:"manual limit",note:"Look for needle system, needle class, or needle type in the manual. Useful terms: drop feed, needle feed, walking foot, compound feed, roller foot, post-bed, cylinder arm, flatbed."}
+].concat(MC_SEMI).concat(MC_FLAT).concat(MC_CYL).concat(MC_POST);
+
+// ── Needle point data ─────────────────────────────────────────────────────────
+var NP=[
+  {id:"universal",    cat:"Domestic",   label:"Universal",                               tip:"Slightly rounded compromise point",                   use:"Most woven fabrics; a general-purpose default",                                      detail:"Designed to behave acceptably on a wide range of woven and some knit fabrics, but not optimized for any one demanding material.",                                                                             nerd:"On coated synthetics, dense canvas, cork, or precision topstitching, a more specialized point will usually give cleaner holes and fewer puckers."},
+  {id:"sharp",        cat:"Domestic",   label:"Sharp / Microtex",                        tip:"Very slim, acute point",                              use:"Tightly woven fabric, microfiber, coated or laminated fabric",                       detail:"Enters dense weave structures cleanly, which helps with precise stitch placement and less fabric distortion. Good for quilting cotton linings, technical coated fabrics, and crisp topstitching.",              nerd:"The fine point dulls faster in dense or abrasive bag materials than a jeans needle. If stitches start looking fuzzy or wandering, try a fresh needle before adjusting tension."},
+  {id:"jeans",        cat:"Domestic",   label:"Jeans / Denim",                           tip:"Medium ball point with reinforced blade",             use:"Dense woven fabric, multiple seam layers, heavy canvas, bulky bag stacks",          detail:"The reinforced blade resists bending and deflection when crossing bulky seams, webbing, or dense stacks. That stiffness reduces skipped stitches caused by the needle bowing away from the hook.",             nerd:"For bag makers on domestic or semi-industrial machines, a size 18 jeans needle often handles rough seam intersections better than the correct thread size alone would suggest."},
+  {id:"topstitch-dom",cat:"Domestic",   label:"Topstitch",                               tip:"Sharp point with an extra-large eye and groove",     use:"Decorative topstitching with heavier thread; any time the thread needs more eye clearance", detail:"The larger eye and deeper groove give heavier thread more room to pass through, reducing shredding, skipped stitches, and abrasion at the needle eye.",                                                     nerd:"With bonded polyester or heavier decorative thread, the extra clearance reduces heat buildup before the thread starts shredding or snapping mid-seam."},
+  {id:"leather-dom",  cat:"Domestic",   label:"Leather (Domestic)",                     tip:"Wedge-shaped cutting point",                         use:"Genuine leather and some thick faux leathers",                                       detail:"Cuts a slit rather than pushing fibers aside — cleaner hole in leather, but permanently cuts the material. Can weaken woven or knit fabrics.",                                                                  nerd:"Vinyl is test-first territory. Some vinyls do better with a sharp or microtex point than a cutting point — especially thinner coated fabrics where the slit can become a tear line."},
+  {id:"ballpoint",    cat:"Domestic",   label:"Ball Point",                              tip:"Rounded ball tip",                                   use:"Knit fabrics, jersey, and stretch materials",                                        detail:"Slides between knit loops instead of severing them, preventing runs and laddering. Generally not the right tool for woven bag fabrics.",                                                                        nerd:"On tight technical wovens, a ball point can push and drag instead of piercing cleanly — a common cause of skipped stitches that looks like a tension or timing problem."},
+  {id:"round-ind",    cat:"Industrial", label:"Round Point (135x17 style)",              tip:"Tapered round point",                                use:"Woven fabrics, canvas, waterproof canvas, cork, vinyl, and non-leather bag materials",detail:"The standard industrial point for fabric work. Penetrates woven materials without cutting a leather-style slit. Common in 135x17 needles on walking-foot machines for canvas and fabric bag construction.",   nerd:"Industrial machines are timed precisely, and loop formation depends on the needle system, scarf, groove, thread, speed, and material behavior all lining up. Point type is one part of that equation."},
+  {id:"cutting-ind",  cat:"Industrial", label:"Cutting / Leather Point (135x16 style)",  tip:"Triangular, diamond, wedge, or other cutting geometry",use:"Genuine leather, thick vinyl where a cut hole is acceptable, heavy faux leather",  detail:"Industrial leather needles come in different cutting geometries that change seam appearance, hole shape, penetration force, and tear behavior. 135x16 and 135x17 share the same basic system dimensions but use different point geometry.", nerd:"There is no single universal leather point. Diamond, triangular, and wedge geometries each make slightly different holes. Test on your actual leather and stitch length before committing to stress points or straps."},
+  {id:"sys-134-35",   cat:"Industrial", label:"134-35 System (Dürkopp Adler M-TYPE)",   tip:"Available in leather and fabric point versions",     use:"Dürkopp Adler 669, 667, 867, Pfaff 1245, and other machines requiring the 134-35 system", detail:"Also written as 2134-35, DPx35, or CANU 32:10. A machine-specific needle system used by M-TYPE cylinder-arm and flatbed machines. Use the system your machine is timed for.",                                nerd:"Do not substitute a 135x17 because it looks similar. Needle systems control shank geometry, length, scarf, and hook clearance — all of which affect timing. Wrong system means skipped stitches at best, mechanical damage at worst."}
+];
+
+var NC=[
+  {label:"Chrome / hard chrome",                quick:"The standard durable industrial finish — reliable and adequate for most fabric work.",        nerd:"Baseline coating. Affordable and consistent enough for standard bag fabrics at normal speeds."},
+  {label:"Titanium nitride / TiN / gold needles",quick:"A hard, wear-resistant coating. Extends point life in high-speed or abrasive conditions.",   nerd:"Does not change needle system, blade geometry, or make an undersized needle correct for a heavy thread. Use it to extend the life of the right needle, not to compensate for the wrong one."},
+  {label:"Nonstick / anti-adhesive coatings",   quick:"Reduces drag and residue accumulation when sewing sticky or coated synthetics.",              nerd:"Most useful when gummy buildup, vinyl coatings, fusibles, or adhesive-backed materials are causing dragging, shredding, or skipped stitches. Does not fix incorrect needle size or system."},
+  {label:"The practical takeaway",              quick:"Coating helps machine behavior. Point type and needle system do the actual geometry work.",   nerd:"Get the needle system right first, then point type, then size, then coating. A coating can reduce heat, sticking, and wear — it cannot make a wrong needle perform correctly."}
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+var state={mode:"thread",machine:"domestic",matId:"canvas",thId:"tex45",ndId:"90-14",fam:"auto"};
+var needleUnit='us';
+var qlMode=null, qlSelected=null;
+var usToNm={9:65,10:70,11:75,12:80,14:90,16:100,18:110,19:120,20:125,21:130,22:140,23:160,24:180,25:200,26:220,27:250,28:280,29:300};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function bi(l,id){return l.find(function(x){return x.id===id;})||l[0];}
+function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ndLabel(n){var p=n.label.split('/');return needleUnit==='us'?p[1]:p[0];}
+function pnr(s){
+  if(!s||s==='not-rec') return s;
+  if(s.indexOf('/')===-1) return s;
+  var parts=s.split('\u2013');if(parts.length===1) parts=s.split('-');
+  return parts.map(function(p){
+    p=p.trim();var sl=p.indexOf('/');if(sl===-1) return p;
+    return needleUnit==='us'?p.substring(sl+1):p.substring(0,sl);
+  }).join('\u2013');
+}
+function mcSizes(mc){
+  if(mc&&mc.capEstimated&&mc.sizes) return mc.sizes;
+  if(!mc||mc.maxTex>=900||mc.maxNeedleUS>=99) return mc?mc.sizes:'';
+  if(needleUnit==='us') return mc.minNeedleUS+'\u2013'+mc.maxNeedleUS;
+  return (usToNm[mc.minNeedleUS]||mc.minNeedleUS)+'\u2013'+(usToNm[mc.maxNeedleUS]||mc.maxNeedleUS);
+}
+function fmtMaxNeedle(s){
+  if(!s||s==='manual limit'||s==='unknown') return s;
+  var clean=s.replace(/Nm\s*/g,'').replace(/#/g,'');
+  var sl=clean.indexOf('/');if(sl===-1) return clean.trim();
+  var nm=clean.substring(0,sl).trim().split('\u2013')[0].replace(/[^0-9]/g,'');
+  var us=clean.substring(sl+1).trim().split(/[\s\u2013]/)[0].replace(/[^0-9]/g,'');
+  return needleUnit==='us'?us:nm;
+}
+function needleUS(n){
+  if(n&&typeof n.us==='number') return n.us;
+  var m=String(n&&n.label||'').match(/\/(\d+)/);return m?parseInt(m[1],10):0;
+}
+function currentMachine(){
+  var macEl=document.getElementById('s-mac'),mcEl=document.getElementById('s-mc');
+  return {mac:macEl?macEl.value:'domestic',mc:bi(MC,mcEl?mcEl.value:'none')};
+}
+function allowedNeedles(){
+  var ctx=currentMachine();
+  if(ctx.mac==='domestic') return N.filter(function(n){return needleUS(n)<=22;});
+  if(ctx.mc&&ctx.mc.id&&ctx.mc.id!=='none'&&ctx.mc.id!=='not-listed'&&ctx.mc.maxNeedleUS<90)
+    return N.filter(function(n){var u=needleUS(n);return u>=(ctx.mc.minNeedleUS||0)&&u<=ctx.mc.maxNeedleUS;});
+  return N.filter(function(n){return needleUS(n)>=14;});
+}
+function ensureNeedleAllowed(){
+  var a=allowedNeedles();if(!a.length) return;
+  if(!a.some(function(n){return n.id===state.ndId;})) state.ndId=a[0].id;
+}
+function machineLimitMessage(mode,mac,mc,th,nd){
+  if((mac!=='industrial'&&mac!=='semi')||!mc||mc.id==='none'||mc.id==='not-listed'||mc.maxTex>=900) return '';
+  if(mode==='thread'&&th.tex>mc.maxTex) return 'The selected thread exceeds this machine\u2019s '+(mc.capEstimated?'needle-pairing estimate':'listed capacity')+'. Choose '+e(mc.maxThreadLabel)+' or smaller, and verify the exact machine limit with the dealer or manual.';
+  if(mode==='needle'&&needleUS(nd)<(mc.minNeedleUS||0)) return 'The selected needle is smaller than this machine is listed to use. Stay within '+e(mcSizes(mc))+'.';
+  if(mode==='needle'&&needleUS(nd)>mc.maxNeedleUS) return 'The selected needle exceeds this machine\u2019s listed range. Choose '+e(fmtMaxNeedle(mc.maxNeedleLabel))+' or smaller.';
+  if(mode==='needle'&&nd.maxTex>mc.maxTex) return 'This needle can accommodate thread heavier than the machine\u2019s '+(mc.capEstimated?'estimated needle-pairing ceiling':'listed capacity')+'. Stay at '+e(mc.maxThreadLabel)+', verify with the dealer or manual, and test the real stack.';
+  return '';
+}
+
+// ── Navigate to needle point section and open it ──────────────────────────────
+function goToPointType(npId){
+  var tog=document.getElementById('np-tog');
+  var body=document.getElementById('np-body');
+  if(!body.classList.contains('open')){
+    tog.classList.add('open');
+    body.classList.add('open');
+  }
+  // scroll to the specific np-item if possible, otherwise scroll to section
+  var target=document.getElementById('np-item-'+npId)||tog;
+  setTimeout(function(){
+    var top=target.getBoundingClientRect().top+window.scrollY-68;
+    window.scrollTo({top:top,behavior:'smooth'});
+  },80);
+}
+
+// ── Quick Lookup ──────────────────────────────────────────────────────────────
+function buildQLPills(){
+  document.getElementById('ql-thread-pills').innerHTML=T.map(function(t){
+    var heavy=t.isHeavy?'heavy':'';
+    return '<button class="ql-pill '+heavy+'" data-type="thread" data-id="'+t.id+'" onclick="qlClick(this)">'+e(t.label)+'</button>';
+  }).join('');
+  var ndShow=N.filter(function(n){return needleUS(n)<=24;});
+  document.getElementById('ql-needle-pills').innerHTML=ndShow.map(function(n){
+    return '<button class="ql-pill" data-type="needle" data-id="'+n.id+'" onclick="qlClick(this)">'+e(ndLabel(n))+'</button>';
+  }).join('');
+}
+
+function qlClick(el){
+  qlSelect(el.dataset.type, el.dataset.id);
+}
+
+function qlSelect(type,id){
+  qlMode=type;qlSelected=id;
+  document.querySelectorAll('.ql-pill').forEach(function(p){
+    p.classList.remove('active','dim');
+    if(p.dataset.type===type) p.classList.add(p.dataset.id===id?'active':'dim');
+  });
+  var html='',noteHtml='';
+  if(type==='thread'){
+    var t=bi(T,id);
+    var domVal=t.dom==='not-rec'
+      ?'<span class="ql-result-val na">Not recommended for domestic</span>'
+      :'<span class="ql-result-val">'+e(pnr(t.dom))+'</span>';
+    html='<div class="ql-result-inner">'
+      +'<div class="ql-result-row"><span class="ql-result-badge">Domestic</span>'+domVal+'<span class="ql-result-note">'+e(t.stitch)+' mm stitch</span></div>'
+      +'<div class="ql-result-row"><span class="ql-result-badge">Industrial</span><span class="ql-result-val">'+e(pnr(t.ind))+'</span></div>'
+      +'</div>';
+    if(t.isHeavy){
+      noteHtml='<div class="ql-heavy-note">Tex 350 is leather-stitcher territory. Machines in this range include the Cobra Class 4, Cowboy CB4500, and Weaver 205. Not a general bag-making thread.</div>';
+    }
+  } else {
+    var n=bi(N,id);
+    html='<div class="ql-result-inner"><div class="ql-result-row"><span class="ql-result-badge">Thread</span><span class="ql-result-val">'+e(n.thread)+'</span><span class="ql-result-note">'+e(n.stitch)+' mm stitch</span></div></div>';
+  }
+  document.getElementById('ql-result').innerHTML=html+(noteHtml||'');
+}
+
+// ── Collapsible sections ──────────────────────────────────────────────────────
+function toggleSection(togId,bodyId){
+  var tog=document.getElementById(togId),body=document.getElementById(bodyId);
+  var open=body.classList.contains('open');
+  tog.classList.toggle('open',!open);
+  body.classList.toggle('open',!open);
+}
+
+// ── Needle unit ───────────────────────────────────────────────────────────────
+function setNeedleUnit(u){
+  needleUnit=u;
+  document.getElementById('nu-us').className='nu-btn '+(u==='us'?'on':'off');
+  document.getElementById('nu-nm').className='nu-btn '+(u==='nm'?'on':'off');
+  buildQLPills();
+  if(qlMode&&qlSelected) qlSelect(qlMode,qlSelected);
+  rmf();render();renderMachine();renderTable();
+}
+
+// ── Machine selector ──────────────────────────────────────────────────────────
+function closeMachineInfo(){
+  var pop=document.getElementById('mc-info-pop'),btn=document.getElementById('mc-info-btn');
+  if(pop) pop.classList.remove('open');
+  if(btn) btn.setAttribute('aria-expanded','false');
+}
+function toggleMachineInfo(ev){
+  if(ev) ev.stopPropagation();
+  var pop=document.getElementById('mc-info-pop'),btn=document.getElementById('mc-info-btn');
+  if(!pop||!btn) return;
+  var open=!pop.classList.contains('open');
+  pop.classList.toggle('open',open);
+  btn.setAttribute('aria-expanded',open?'true':'false');
+}
+document.addEventListener('click',function(ev){
+  var wrap=document.getElementById('mc-info-wrap');
+  if(wrap&&!wrap.contains(ev.target)) closeMachineInfo();
+});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape') closeMachineInfo();});
+
+function renderMachineSelector(){
+  var mac=document.getElementById('s-mac')?document.getElementById('s-mac').value:'domestic';
+  var box=document.getElementById('machine-pick'),sMc=document.getElementById('s-mc');
+  var infoWrap=document.getElementById('mc-info-wrap');
+  if(box) box.style.display=(mac==='industrial'||mac==='semi')?'block':'none';
+  if(infoWrap) infoWrap.style.display=mac==='industrial'?'block':'none';
+  if(mac!=='industrial') closeMachineInfo();
+  if((mac==='industrial'||mac==='semi')&&sMc){
+    var currentVal=sMc.value;
+    var html='<option value="none">Select your machine...</option><option value="not-listed">My machine is not listed / I need to check</option>';
+    if(mac==='semi'){
+      html+=MC_SEMI.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+    } else {
+      html+='<optgroup label="Flatbed — Drop / Needle Feed">';
+      html+=MC_FLAT_NONWALK.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+      html+='</optgroup><optgroup label="Flatbed — Walking Foot (Top & Bottom Feed)">';
+      html+=MC_FLAT_WALK.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+      html+='</optgroup><optgroup label="Flatbed — Compound Walking Foot (Unison / Triple Feed)">';
+      html+=MC_FLAT_COMPOUND.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+      html+='</optgroup><optgroup label="Cylinder Arm — Compound Walking Foot">';
+      html+=MC_CYL.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+      html+='</optgroup><optgroup label="Post-Bed — Roller / Needle Feed">';
+      html+=MC_POST.map(function(m){return '<option value="'+m.id+'">'+e(m.label)+'</option>';}).join('');
+      html+='</optgroup>';
+    }
+    sMc.innerHTML=html;
+    var allIds=MC_SEMI.concat(MC_FLAT).concat(MC_CYL).concat(MC_POST).map(function(m){return m.id;});
+    sMc.value=(allIds.indexOf(currentVal)>-1||currentVal==='none'||currentVal==='not-listed')?currentVal:'not-listed';
+  }
+  if(mac==='industrial'||mac==='semi') renderMachine();
+}
+
+function renderMachine(){
+  var result=document.getElementById('mc-result');if(!result) return;
+  var id=document.getElementById('s-mc')?document.getElementById('s-mc').value:'none';
+  if(id==='none'){result.innerHTML='<div class="mc-note">Select your machine to show the needle system.</div>';return;}
+  var mc=bi(MC,id);if(!mc||!mc.system){result.innerHTML='';return;}
+  result.innerHTML='<div class="mc-box">'
+    +'<div class="bs-l">Needle System</div>'
+    +'<div class="mc-system">'+e(mc.system)+'</div>'
+    +(mc.equiv?'<div class="mc-row"><span class="mc-label">Also seen as: </span>'+e(mc.equiv)+'</div>':'')
+    +'<div class="mc-row"><span class="mc-label">Needle size range: </span>'+e(mcSizes(mc))+'</div>'
+    +(mc.maxThreadLabel&&mc.maxTex<900?'<div class="mc-row"><span class="mc-label">'+(mc.capEstimated?'Needle-pairing ceiling: ':'Thread cap: ')+'</span>'+e(mc.maxThreadLabel)+'</div>':'')
+    +(mc.capEstimated?'<div class="mc-cap-note">Estimated from the largest listed needle size—not a manufacturer-rated machine limit. Confirm the actual maximum thread size with the dealer or machine manual.</div>':'')
+    +'</div>'
+    +'<div class="mc-note">'+e(mc.note)+'</div>';
+}
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+function setMode(m){
+  state.mode=m;
+  document.getElementById('t-th').className='tab '+(m==='thread'?'on':'off');
+  document.getElementById('t-nd').className='tab '+(m==='needle'?'on':'off');
+  rmf();render();
+}
+
+// ── Render fields ─────────────────────────────────────────────────────────────
+function rmf(){
+  var mat=bi(M,state.matId),af=bi(F,mat.family);
+  var fo='<option value="auto">Auto: '+e(af.label)+'</option>'+F.map(function(f){return '<option value="'+f.id+'"'+(state.fam===f.id?' selected':'')+'>'+e(f.label)+'</option>';}).join('');
+  var ctx=currentMachine();
+  var constrained=(ctx.mac==='industrial'||ctx.mac==='semi')&&ctx.mc&&ctx.mc.id&&ctx.mc.id!=='none'&&ctx.mc.id!=='not-listed'&&ctx.mc.maxTex<900;
+  if(state.mode==='thread'){
+    var at=constrained?T.filter(function(t){return t.tex<=ctx.mc.maxTex;}):T;
+    if(!at.length) at=T;
+    if(!at.some(function(t){return t.id===state.thId;})) state.thId=at[0].id;
+    var tn=constrained?'Filtered to your machine\u2019s listed capacity.':'Choose the closest Tex size.';
+    document.getElementById('mf-col').innerHTML='<div class="fl">Thread size</div><select onchange="state.thId=this.value;render()">'+at.map(function(t){return '<option value="'+t.id+'"'+(state.thId===t.id?' selected':'')+'>'+e(t.label)+'</option>';}).join('')+'</select><div class="fs tc-sub">'+e(tn)+'</div>';
+    document.getElementById('mff-col').innerHTML='<div class="fl">Thread family</div><select onchange="state.fam=this.value;render()">'+fo+'</select><div class="fs tc-sub">Auto chooses based on material.</div>';
+  } else {
+    ensureNeedleAllowed();
+    var an=allowedNeedles();
+    var nn=constrained?'Filtered to the selected machine\u2019s needle range.':'Choose the size printed on the needle package.';
+    document.getElementById('mf-col').innerHTML='<div class="fl">Needle size</div><select onchange="state.ndId=this.value;render()">'+an.map(function(n){return '<option value="'+n.id+'"'+(state.ndId===n.id?' selected':'')+'>'+e(ndLabel(n))+'</option>';}).join('')+'</select><div class="fs tc-sub">&nbsp;</div>';
+    document.getElementById('mff-col').innerHTML='<div class="fl">Thread family</div><select onchange="state.fam=this.value;render()">'+fo+'</select><div class="fs tc-sub">Auto chooses based on material.</div>';
+  }
+}
+
+// ── Linkify point type names in a label string ────────────────────────────────
+function linkifyPoints(label){
+  var map=[
+    {re:/Microtex\/Sharp|Microtex|Sharp/gi,          id:'sharp'},
+    {re:/Jeans\/Denim|Jeans|Denim/gi,                id:'jeans'},
+    {re:/Topstitch/gi,                               id:'topstitch-dom'},
+    {re:/Ball Point|Ballpoint|Stretch\/Ball Point|Stretch/gi, id:'ballpoint'},
+    {re:/Universal/gi,                               id:'universal'},
+    {re:/Round point/gi,                             id:'round-ind'},
+    {re:/cutting point|leather point/gi,             id:'cutting-ind'},
+  ];
+  // Work on the label, replacing each matched phrase with a linked button
+  var result=e(label);
+  map.forEach(function(m){
+    result=result.replace(m.re,function(match){
+      return '<button class="point-link" data-npid="'+m.id+'" onclick="goToPointType(this.dataset.npid)">'+match+'</button>';
+    });
+  });
+  return result;
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function render(){
+  renderMachineSelector();
+  var mat=bi(M,state.matId),th=bi(T,state.thId),nd=bi(N,state.ndId);
+  var fid=state.fam==='auto'?mat.family:state.fam,fam=bi(F,fid);
+  var mac=document.getElementById('s-mac').value,mode=state.mode;
+  var mc=bi(MC,document.getElementById('s-mc')?document.getElementById('s-mc').value:'none');
+  var hasLim=(mac==='industrial'||mac==='semi')&&mc&&mc.id&&mc.id!=='none'&&mc.id!=='not-listed'&&mc.maxTex<900;
+  var tooHeavy=hasLim&&mode==='thread'&&th.tex>mc.maxTex;
+  var ndSmall=hasLim&&mode==='needle'&&needleUS(nd)<(mc.minNeedleUS||0);
+  var ndLarge=hasLim&&mode==='needle'&&needleUS(nd)>mc.maxNeedleUS;
+  var ndRangeHeavy=hasLim&&mode==='needle'&&nd.maxTex>mc.maxTex;
+  var bad=tooHeavy||ndSmall||ndLarge,caution=!bad&&ndRangeHeavy;
+  var nr=mac==='domestic'?th.dom:th.ind;
+  var heavy=mac==='domestic'&&(mode==='thread'?th.tex>=90:nd.maxTex>70);
+  var s1v;
+  if(bad) s1v='Exceeds selected machine';
+  else if(mode==='thread') s1v=nr==='not-rec'?'<span style="font-size:14px;font-family:Nunito,sans-serif;font-weight:800;color:#9b1c31">Not recommended for domestic</span>':e(pnr(nr));
+  else s1v=e(nd.thread);
+  var s1s='';
+  if(mac==='industrial'||mac==='semi'){
+    if(mc&&mc.id&&mc.id!=='none') s1s='<span style="display:inline-block;margin-top:4px;color:#4a1f96;font-weight:900">System: '+e(mc.system)+'</span>'+(bad?'<br><span style="color:#9b1c31;font-weight:900">Choose a smaller thread/needle or verify your setup.</span>':caution?'<br><span style="color:#6b4400;font-weight:900">Needle is allowed; stay within the machine limit.</span>':'');
+    else s1s='<span style="color:#8a70c0;font-weight:800">Select your machine to show its needle system.</span>';
+  }
+  var s2v=mode==='thread'?e(th.stitch):e(nd.stitch);
+  var ml=machineLimitMessage(mode,mac,mc,th,nd);
+  // Point suggestion — semi uses domestic needle system, so pointDom applies to domestic + semi
+  var ptObj=(mac==='industrial')?mat.pointInd:mat.pointDom;
+  var ptLink=linkifyPoints(ptObj.label);
+  // Confidence caveat
+  var caveatMap={
+    strong:'Point type per Schmetz needle guide and bag-making community practice. Thread family is well-established for this material.',
+    default:'Thread family is a general recommendation — not a hard requirement. Test on your actual material.',
+    soft:'Thread family for this material varies by specific product and construction. Treat this as a starting point and test before committing.'
+  };
+  var caveat=caveatMap[mat.familyConfidence||'default'];
+
+  document.getElementById('ra').innerHTML=
+    '<div class="card rc">'
+    +'<div class="ct">'+(mode==='thread'?'Recommended Starting Point':'Compatible Thread Range')+'</div>'
+    +'<div class="rg"><div class="bs'+(bad?' bad':caution?' caution':'')+'"><div class="bs-l">'+(mode==='thread'?'Needle Size':'Thread Range')+'</div><div class="bs-v">'+s1v+'</div><div class="bs-s">'+s1s+'</div></div>'
+    +'<div class="bs"><div class="bs-l">Stitch Length</div><div class="bs-v">'+s2v+' mm</div><div class="bs-s">Longer for bulky seams, vinyl, leather, topstitching.</div></div></div>'
+    +(ml?'<div class="warn">'+ml+'</div>':'')
+    +(heavy?'<div class="warn">Tex 90+ is walking-foot or industrial territory. Domestic machines vary — test carefully.</div>':'')
+    +'<div class="detail-block" style="margin-top:12px">'
+    +'<div class="detail-fam-title">For '+e(mat.label)+'</div>'
+    +'<div class="detail-mat-note">'+e(mat.note)+'</div>'
+    +'<div class="detail-point"><strong>Suggested point:</strong> '+ptLink+'</div>'
+    +(caveat?'<div class="detail-caveat">'+e(caveat)+'</div>':'')
+    +'<div style="border-top:1px solid #c7b8e8;padding-top:10px;margin-top:12px">'
+    +'<div class="detail-fam-title">'+e(fam.label)+'</div>'
+    +'<div class="detail-fam-body">'+e(fam.why)+'</div>'
+    +'<div class="detail-fam-title">When to use it</div>'
+    +'<div class="detail-fam-body">'+e(fam.use)+'</div>'
+    +'</div></div>'
+    +'<div class="info"><strong>Examples when shopping:</strong> '+e(fam.examples)+'<br><br>Brand examples are for orientation only.</div>'
+    +'</div>';
+}
+
+function renderTable(){
+  document.getElementById('rt').innerHTML=
+    '<thead><tr><th>Thread</th><th>Domestic needle</th><th>Industrial needle</th><th>Stitch (mm)</th><th>Bag-making use</th></tr></thead>'
+    +'<tbody>'+T.map(function(t){
+      var dc=t.dom==='not-rec'?'<em style="color:#9b1c31;font-style:normal;font-weight:700">Not recommended</em>':e(pnr(t.dom));
+      return '<tr><td class="m">'+e(t.label)+'</td><td>'+dc+'</td><td>'+e(pnr(t.ind))+'</td><td class="m">'+e(t.stitch)+'</td><td>'+e(t.bestFor)+'</td></tr>';
+    }).join('')+'</tbody>';
+}
+
+function toggleNP(el){
+  var item=el.parentElement,open=item.classList.contains('open');
+  item.classList.toggle('open',!open);el.textContent=open?'+ Learn more':'– Less';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function(){
+  // Material select with optgroups
+  var groups={};
+  M.forEach(function(m){if(!groups[m.grp]) groups[m.grp]=[];groups[m.grp].push(m);});
+  var grpOrder=["Natural Fibers","Technical Fabrics","Vinyls & Coated Synthetics","Cork","Leather","Straps & Specialty"];
+  var matHtml='';
+  grpOrder.forEach(function(g){
+    if(!groups[g]) return;
+    matHtml+='<optgroup label="'+e(g)+'">';
+    groups[g].forEach(function(m){matHtml+='<option value="'+m.id+'"'+(m.id==='canvas'?' selected':'')+'>'+e(m.label)+'</option>';});
+    matHtml+='</optgroup>';
+  });
+  document.getElementById('s-mat').innerHTML=matHtml;
+
+  // Needle point types — add id to each item for scroll targeting
+  var npHtml='';
+  ['Domestic','Industrial'].forEach(function(cat){
+    npHtml+='<div class="np-cat">'+cat+'</div>';
+    NP.filter(function(n){return n.cat===cat;}).forEach(function(n){
+      npHtml+='<div class="np-item" id="np-item-'+n.id+'">'
+        +'<div class="np-label">'+e(n.label)+'</div>'
+        +'<div class="np-tip">'+e(n.tip)+'</div>'
+        +'<div class="np-use"><strong>Use for:</strong> '+e(n.use)+'</div>'
+        +'<div class="np-detail">'+e(n.detail)+'</div>'
+        +(n.nerd?'<div class="np-nerd">'+e(n.nerd)+'</div>':'')
+        +'<div class="np-toggle" onclick="toggleNP(this)">+ Learn more</div>'
+        +'</div>';
+    });
+  });
+  document.getElementById('np-area').innerHTML=npHtml;
+
+  // Coatings
+  document.getElementById('nc-area').innerHTML=NC.map(function(c){
+    return '<div class="coat-item"><div class="coat-title">'+e(c.label)+'</div><div class="coat-quick">'+e(c.quick)+'</div><div class="coat-nerd">'+e(c.nerd)+'</div></div>';
+  }).join('');
+
+  // Thread families
+  document.getElementById('fa').innerHTML=F.map(function(f){
+    return '<details><summary>'+e(f.label)+'</summary>'
+      +'<div class="det-body">'+e(f.why)+'</div>'
+      +'<div class="det-body" style="margin-top:6px"><strong>Use for:</strong> '+e(f.use)+'</div>'
+      +(f.chem?'<div class="det-chem"><div class="det-chem-label">Chemistry &amp; Material Science</div>'+e(f.chem)+'</div>':'')
+      +(f.nerd?'<div class="det-nerd">'+e(f.nerd)+'</div>':'')
+      +'<div class="det-ex"><strong>Shopping examples:</strong> '+e(f.examples)+'</div>'
+      +'</details>';
+  }).join('');
+
+  buildQLPills();
+  renderMachineSelector();
+  rmf();render();renderTable();
+})();
+</script>
+</body>
+</html>
