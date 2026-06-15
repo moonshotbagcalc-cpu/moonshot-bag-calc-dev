@@ -6,12 +6,10 @@ import {
 } from "../curved-panel-core.js";
 import { isMetric, fmtCm } from "../utils/formatting.js";
 import { DEFAULT_SA } from "../utils/constants.js";
-import { T } from "../utils/theme.js";
 import {
   CP_TILE_W, CP_TILE_H,
   cpTilePlan, cpTileLabel, cpRowLabel, cpTestSquareSVG, cpRegistrationMarks,
 } from "../utils/print-utils.js";
-import { SecHeader } from "../components/SharedUI.jsx";
 import TrustBadge from "../components/TrustBadge.jsx";
 import PrintButton from "../components/PrintButton.jsx";
 import FracInput from "../components/FracInput.jsx";
@@ -24,9 +22,11 @@ import FracInput from "../components/FracInput.jsx";
 
 // ── Curved Panel theme tokens (Moonshot maroon palette) ───────────────────────
 const CP = {
-  maroon:"#8e1d3c", maroonDark:"#6f152e", rose:"#c2476b",
-  pinkBg:"#fdf4f6", pinkSoft:"#f7e3e9", pinkLine:"#ecccd6", ink:"#4a2230",
-  muted:"#9a6b7b", green:"#1d6b45",
+  // Curved Panel now lives in Bag Structures, so keep the legacy key names
+  // but use the MoonShot purple family for both the screen SVG and print output.
+  maroon:"#5a2da0", maroonDark:"#3c2068", rose:"#8f55d6",
+  pinkBg:"#faf7ff", pinkSoft:"#ece5f8", pinkLine:"#d9c7f1", ink:"#241550",
+  muted:"#7a608e", green:"#1d6b45",
   amberBg:"#fdf3e0", amberInk:"#8a5a10", amberLine:"#e8c98a",
 };
 
@@ -47,6 +47,7 @@ const C_CENTER = "#00bcd4";
 const C_PIECE_CENTER = "#b59ca5";
 const C_MARK   = CP.maroon;
 const C_NOTCH  = "#1565c0";
+const C_STAB   = "#b76cff";
 
 function cpPrintDoc(title, geom, spanW, spanH, detailRows, legendLine, allowRotate=true){
   const plan=cpTilePlan(spanW,spanH,allowRotate);
@@ -132,6 +133,76 @@ function cpTriangleV(px, py, inward){
   return `<polygon points="${px.toFixed(4)},${bT.toFixed(4)} ${px.toFixed(4)},${bB.toFixed(4)} ${apex.toFixed(4)},${py.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
 }
 
+function cpCleanClosedPts(pts){
+  const out=[];
+  for(const p of pts||[]){
+    if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    const last=out[out.length-1];
+    if(!last || Math.hypot(last.x-p.x,last.y-p.y)>1e-5) out.push({x:p.x,y:p.y,side:p.side});
+  }
+  if(out.length>2 && Math.hypot(out[0].x-out[out.length-1].x,out[0].y-out[out.length-1].y)<1e-5) out.pop();
+  return out;
+}
+
+function cpCentroid(pts){
+  if(!pts.length)return {x:0,y:0};
+  let x=0,y=0;
+  for(const p of pts){x+=p.x;y+=p.y;}
+  return {x:x/pts.length,y:y/pts.length};
+}
+
+function cpLineIntersect(a1,a2,b1,b2){
+  const x1=a1.x,y1=a1.y,x2=a2.x,y2=a2.y,x3=b1.x,y3=b1.y,x4=b2.x,y4=b2.y;
+  const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+  if(Math.abs(den)<1e-9)return null;
+  const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/den;
+  const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/den;
+  if(!Number.isFinite(px)||!Number.isFinite(py))return null;
+  return {x:px,y:py};
+}
+
+/* Approximate inset path used only for stabilizer guides/print pieces.
+   The true panel geometry still comes from curved-panel-core.js. */
+function cpInsetClosedPoints(pts, inset){
+  const p=cpCleanClosedPts(pts);
+  if(p.length<3 || !inset)return null;
+  const c=cpCentroid(p);
+  const segs=[];
+  for(let i=0;i<p.length;i++){
+    const a=p[i],b=p[(i+1)%p.length];
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+    let nx=-dy/len,ny=dx/len;
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    if((c.x-mx)*nx+(c.y-my)*ny<0){nx=-nx;ny=-ny;}
+    segs.push({a:{x:a.x+nx*inset,y:a.y+ny*inset},b:{x:b.x+nx*inset,y:b.y+ny*inset},nx,ny});
+  }
+  const out=[];
+  for(let i=0;i<p.length;i++){
+    const prev=segs[(i-1+p.length)%p.length],next=segs[i];
+    let q=cpLineIntersect(prev.a,prev.b,next.a,next.b);
+    if(!q || Math.hypot(q.x-p[i].x,q.y-p[i].y)>Math.max(2,inset*4)){
+      const nx=prev.nx+next.nx,ny=prev.ny+next.ny,nl=Math.hypot(nx,ny)||1;
+      q={x:p[i].x+(nx/nl)*inset,y:p[i].y+(ny/nl)*inset};
+    }
+    out.push(q);
+  }
+  return out;
+}
+
+function cpStabilizerPoints(m,p){
+  if(!p?.stabilizerOn || !(p.stabilizerInset>0) || !m?.cutPts?.length || !m?.cutBB)return null;
+  const maxInset=Math.max(0,Math.min(m.cutBB.w,m.cutBB.h)/2-0.08);
+  const inset=Math.min(p.stabilizerInset,maxInset);
+  return inset>0 ? cpInsetClosedPoints(m.cutPts,inset) : null;
+}
+
+function cpPtsBB(pts){
+  if(!pts?.length)return null;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const p of pts){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}
+  return {minX,minY,maxX,maxY,w:maxX-minX,h:maxY-minY};
+}
+
 /* Z-order in cpDrawStrip: notches → center line → sewline → landmarks → center triangles → cut rect */
 function cpDrawStrip(pc){
   const { x0, y0, cutL, w, sa } = pc;
@@ -193,6 +264,8 @@ function cpPrintPanel(m,p){
   const active=m.activeSew;
   let geom="";
   geom+=`<path d="${cpPtsToPath(shift(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
+  const stabPts=(!p.stabilizerSeparate ? cpStabilizerPoints(m,p) : null);
+  if(stabPts)geom+=`<path d="${cpPtsToPath(shift(stabPts),true)}" fill="none" stroke="${C_STAB}" stroke-width="0.026" stroke-dasharray="0.10 0.08"/>`;
   const midX=(m.frame[0].x+m.frame[1].x)/2-originX;
   geom+=`<line x1="${midX.toFixed(4)}" y1="${(m.cutBB.minY-originY-0.05).toFixed(4)}" x2="${midX.toFixed(4)}" y2="${(m.cutBB.maxY-originY+0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
   geom+=`<path d="${cpPtsToPath(shift(m.cutPts),true)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
@@ -212,6 +285,7 @@ function cpPrintPanel(m,p){
     ["Cut perimeter",cpFmt(m.cutPerim)+"  ("+cpFmtD(m.cutPerim)+")"],
     [open?"Three-sided sewline length":"Sewline perimeter",cpFmt(active.total)+"  ("+cpFmtD(active.total)+")"],
     ["Seam allowance",cpFmt(p.sa)],
+    ...(p.stabilizerOn ? [["Stabilizer inset",cpFmt(p.stabilizerInset)+(p.stabilizerSeparate?" · printed separately":" · guide shown on main panel")]] : []),
     ["Fullness / crown","Left "+cpFmt(m.crowns.hL)+" \u00B7 Right "+cpFmt(m.crowns.hR)+" \u00B7 Top "+cpFmt(m.crowns.hTop)+" \u00B7 Bottom "+cpFmt(m.crowns.hBot)+" \u00B7 feel: "+p.feel],
     ["Corner softness","top "+cpFmt(m.softness.ts)+" \u00B7 bottom "+cpFmt(m.softness.bs)+" (0 = crisp)"],
     ["Construction",open?"3-sided open top":"4-sided enclosed"],
@@ -220,7 +294,28 @@ function cpPrintPanel(m,p){
       :("Top "+cpFmt(r.top)+" \u00B7 Right "+cpFmt(r.right)+" \u00B7 Bottom "+cpFmt(r.bottom)+" \u00B7 Left "+cpFmt(r.left))]
   ];
   cpPrintDoc("Curved Panel \u2014 Main Panel",geom,spanW,spanH,detailRows,
-    "Maroon = cut line \u00B7 grey dashed = sewline \u00B7 cyan dashed = center fold line. \u25B2 = center/fold mark \u00B7 \u25A1 = side junction \u00B7 \u25C7 = side midpoint.");
+    "Purple = cut line \u00B7 grey dashed = sewline \u00B7 lavender dotted = stabilizer guide \u00B7 cyan dashed = center fold line. \u25B2 = center/fold mark \u00B7 \u25A1 = side junction \u00B7 \u25C7 = side midpoint.");
+}
+/* ---- PRINT: STABILIZER ---- */
+function cpPrintStabilizer(m,p){
+  if(!m.valid)return;
+  const pts=cpStabilizerPoints(m,p);
+  if(!pts?.length)return;
+  const bb=cpPtsBB(pts),PADIN=0.4;
+  const originX=bb.minX-PADIN,originY=bb.minY-PADIN;
+  const shift=qpts=>qpts.map(q=>({x:q.x-originX,y:q.y-originY,side:q.side}));
+  const spanW=bb.w+PADIN*2,spanH=bb.h+PADIN*2;
+  const midX=(m.frame[0].x+m.frame[1].x)/2-originX;
+  let geom="";
+  geom+=`<line x1="${midX.toFixed(4)}" y1="0.05" x2="${midX.toFixed(4)}" y2="${(spanH-0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
+  geom+=`<path d="${cpPtsToPath(shift(pts),true)}" fill="none" stroke="${C_STAB}" stroke-width="0.04"/>`;
+  const detailRows=[
+    ["Stabilizer size",cpFmt(bb.w)+" W × "+cpFmt(bb.h)+" H"],
+    ["Inset from panel cut line",cpFmt(p.stabilizerInset)],
+    ["Use with","Curved Panel — Main Panel"]
+  ];
+  cpPrintDoc("Curved Panel — Stabilizer",geom,spanW,spanH,detailRows,
+    "Lavender = stabilizer cut line · cyan dashed = center fold line. Print at 100% / Actual Size.");
 }
 
 /* ---- PRINT: SIDE PANELS ---- */
@@ -309,7 +404,9 @@ function cpPanelDiagramSVG(model,params){
     svg+=`<polygon points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${ax.toFixed(1)},${ay.toFixed(1)}" fill="${CP.maroon}"/>`;
     if(isEdge)svg+=`<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*11).toFixed(1)}" y2="${(py+md.ny*11).toFixed(1)}" stroke="${CP.maroon}" stroke-width="2"/>`;
   });
-  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="#fbecef" stroke="${CP.maroon}" stroke-width="3.5" stroke-linejoin="round" fill-opacity="0.5"/>`;
+  const stabPts=cpStabilizerPoints(model,params);
+  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="#f6edff" stroke="${CP.maroon}" stroke-width="3.5" stroke-linejoin="round" fill-opacity="0.48"/>`;
+  if(stabPts)svg+=`<path d="${cpPtsToPath(map(stabPts),true)}" fill="none" stroke="${C_STAB}" stroke-width="2" stroke-dasharray="4 5" opacity="0.95"/>`;
   return svg;
 }
 
@@ -427,20 +524,8 @@ function cpGussetPrintSpan(m){
   const pc=m.gussetPiece;
   return pc?{w:pc.cutWidth+.8,h:pc.cutLength+.8}:null;
 }
-function CpResultBand({model,params}){
-  const active=model.activeSew,open=params.topMode==="3side";
-  const cutRunText=`Top ${cpFmt(model.cutRuns.top)} · Right ${cpFmt(model.cutRuns.right)} · Bottom ${cpFmt(model.cutRuns.bottom)} · Left ${cpFmt(model.cutRuns.left)}`;
-  const sewnRunText=open?`Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)} · Top raw/open`:`Top ${cpFmt(active.runs.top)} · Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)}`;
-  return <div className="cp-resultBand">
-    <div className="cp-resultLine"><div className="cp-resultCell"><div className="rk">Panel Size</div><div className="rv">{cpFmt(model.cutBB.w)} W × {cpFmt(model.cutBB.h)} H</div></div><div className="cp-resultCell right"><div className="rk">Sewline</div><div className="rv">{cpFmt(active.bb.w)} W × {cpFmt(active.bb.h)} H</div></div></div>
-    <div className="cp-resultLine"><div className="cp-resultCell"><div className="rk">Cut Perimeter</div><div className="rv">{cpFmt(model.cutPerim)}</div></div><div className="cp-resultCell right"><div className="rk">{open?"Sewline Length":"Sewline Perimeter"}</div><div className="rv">{cpFmt(active.total)}</div></div></div>
-    <div className="cp-resultLine"><div className="cp-resultCell"><div className="rk">Side Lengths</div><div className="rv runs">{cutRunText}</div></div><div className="cp-resultCell right"><div className="rk">Sewn Side Lengths</div><div className="rv runs">{sewnRunText}</div></div></div>
-  </div>;
-}
-
 // ── CURVED PANEL PAGE — validated geometry + compact diagram-led layout ──────
 export default function CurvedPanelPage() {
-  const th=T.advanced;
   const [tWW,setTWW]=useState(0),[tWF,setTWF]=useState(0);
   const [bWW,setBWW]=useState(0),[bWF,setBWF]=useState(0);
   const [hWW,setHWW]=useState(0),[hWF,setHWF]=useState(0);
@@ -457,6 +542,9 @@ export default function CurvedPanelPage() {
   const [topMode,setTopMode]=useState("4side");
   const [sdW,setSdW]=useState(0),[sdF,setSdF]=useState(0);
   const [gwW,setGwW]=useState(0),[gwF,setGwF]=useState(0);
+  const [stabOn,setStabOn]=useState(false);
+  const [stabW,setStabW]=useState(0),[stabF,setStabF]=useState(0.625);
+  const [stabSeparate,setStabSeparate]=useState(false);
   const [decMode,setDecMode]=useState(false);
   const diagramRef=useRef(null);
   const floatDockRef=useRef(null);
@@ -487,6 +575,22 @@ export default function CurvedPanelPage() {
   });
   const [dockCollapsed,setDockCollapsed]=useState(true);
   const [canFloatDiag,setCanFloatDiag]=useState(()=>typeof window !== "undefined" ? window.innerWidth >= 900 : false);
+  const gussetPanRef=useRef(null);
+  const gussetDragRef=useRef(null);
+
+  function startGussetPan(e){
+    const el=gussetPanRef.current;
+    if(!el)return;
+    const pt=e.touches?e.touches[0]:e;
+    gussetDragRef.current={x:pt.clientX,scrollLeft:el.scrollLeft};
+  }
+  function moveGussetPan(e){
+    const d=gussetDragRef.current,el=gussetPanRef.current;
+    if(!d||!el)return;
+    const pt=e.touches?e.touches[0]:e;
+    el.scrollLeft=d.scrollLeft-(pt.clientX-d.x);
+  }
+  function endGussetPan(){ gussetDragRef.current=null; }
 
   const lf=Math.max(0,lfW+lfF),rf=matchingSides?lf:Math.max(0,rfW+rfF);
   const params={
@@ -494,7 +598,8 @@ export default function CurvedPanelPage() {
     sa:Math.max(0,saW+saF),topCrown:Math.max(0,tcW+tcF),botCrown:Math.max(0,bcW+bcF),
     leftFull:lf,rightFull:rf,matchingSides,feel,topMode,
     topSoft:Math.max(0,tsW+tsF),botSoft:Math.max(0,bsW+bsF),
-    sideDepth:Math.max(0,sdW+sdF),gussetW:Math.max(0,gwW+gwF)
+    sideDepth:Math.max(0,sdW+sdF),gussetW:Math.max(0,gwW+gwF),
+    stabilizerOn:stabOn,stabilizerInset:Math.max(0,stabW+stabF),stabilizerSeparate:stabSeparate
   };
   const ready=(tWW+tWF)>0&&(bWW+bWF)>0&&(hWW+hWF)>0;
   const model=buildCurvedPanelModel(params);
@@ -503,6 +608,11 @@ export default function CurvedPanelPage() {
   const panelPlan=cpTilePlan(model.cutBB.w+.8,model.cutBB.h+.8);
   const sideSpan=cpSidePrintSpan(model,params),sidePlan=sideSpan?cpTilePlan(sideSpan.w,sideSpan.h):null;
   const gusSpan=cpGussetPrintSpan(model),gusPlan=gusSpan?cpTilePlan(gusSpan.w,gusSpan.h):null;
+  const stabPts=cpStabilizerPoints(model,params),stabBB=cpPtsBB(stabPts);
+  const stabPlan=stabBB?cpTilePlan(stabBB.w+.8,stabBB.h+.8):null;
+  const active=model.activeSew,openTop=params.topMode==="3side";
+  const cutRunText=`Top ${cpFmt(model.cutRuns.top)} · Right ${cpFmt(model.cutRuns.right)} · Bottom ${cpFmt(model.cutRuns.bottom)} · Left ${cpFmt(model.cutRuns.left)}`;
+  const sewnRunText=openTop?`Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)} · Top raw/open`:`Top ${cpFmt(active.runs.top)} · Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)}`;
 
   function clampFloatSize(size){
     if (typeof window === "undefined") return size;
@@ -641,157 +751,204 @@ export default function CurvedPanelPage() {
   },[resizingFloat,dockSide]);
 
   return (
-    <div className="cp-wrap" style={{minHeight:"100vh",padding:"16px 16px 48px"}}>
-      <div style={{background:th.sec,borderRadius:14,boxShadow:"0 4px 18px rgba(122,26,46,0.10)"}}>
-        <SecHeader th={th} title="Curved Panel"
-          sub="Build a free-form bag panel with sharp or rounded corners and sides that can be straight or gently curved. Create matching rectangular side panels for an open-top or fully enclosed bag, or generate one continuous gusset for either construction style. When your design is complete, print the full-size pattern."/>
-        <div style={{padding:"12px 12px 18px"}}>
-          <div className="cp-topbar">
-            <div className="cp-hint" style={{margin:0}}>The live diagram and matching pattern pieces update as you shape the panel.</div>
-            {!isMetric()&&<label className="cp-decToggle"><input type="checkbox" checked={decMode} onChange={e=>setDecMode(e.target.checked)}/>Decimal input</label>}
+    <div className="cp-wrap cp-redesign">
+      <div className="cp-page-shell">
+
+        <div className="cp-hero">
+          <div className="cp-hero-icon" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <path d="M28 25 L84 25 C101 45 107 76 91 94 L36 94 C18 78 18 44 28 25 Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round"/>
+              <path d="M41 32 C32 50 31 75 41 88 M75 32 C86 51 87 75 76 88" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
+              <path d="M28 25 L41 32 H75 L84 25 M36 94 L41 88 H76 L91 94" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round"/>
+            </svg>
           </div>
-
-          <div className="cp-controlGrid">
-            <div className="cp-card cp-frameCard">
-              <div className="cp-controlSection">
-                <h2>Starting Frame</h2>
-                <div className="cp-row">
-                  <FracInput variant="cp" label="Top width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
-                  <FracInput variant="cp" label="Bottom width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
-                  <FracInput variant="cp" label="Panel height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
-                  <FracInput variant="cp" label="Seam allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
-                </div>
-                <p className="cp-hint">These are design-intent dimensions. Actual cut and sewline sizes appear below the diagram.</p>
-              </div>
-
-              <div className="cp-controlSection">
-                <h2>Edge Shape</h2>
-                <div className="cp-edgeFields">
-                  <FracInput variant="cp" label={matchingSides?"Left & right fullness":"Left fullness"} decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
-                  <FracInput variant="cp" label="Right fullness" decMode={decMode} ghost={matchingSides} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
-                  <FracInput variant="cp" label="Top crown" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
-                  <FracInput variant="cp" label="Bottom crown" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
-                </div>
-                <label className="cp-check"><input type="checkbox" checked={matchingSides} onChange={e=>setMatchingSides(e.target.checked)}/>Matching Sides</label>
-                <div style={{fontSize:12.5,fontWeight:800,margin:"5px 0 3px"}}>Curve feel</div>
-                <CpSeg value={feel} set={setFeel} options={[{id:"gentle",label:"Gentle"},{id:"balanced",label:"Balanced"},{id:"defined",label:"Defined"}]}/>
-                <p className="cp-hint">Fullness and crown set midpoint depth. Curve feel changes only how broadly each edge eases.</p>
-              </div>
-
-              <div className="cp-lowerControls">
-                <div className="cp-controlSection">
-                  <h2>Corners</h2>
-                  <div className="cp-row">
-                    <FracInput variant="cp" label="Top softness" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
-                    <FracInput variant="cp" label="Bottom softness" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
-                  </div>
-                  <p className="cp-hint">0 keeps the join crisp. Higher values soften only the corner transition.</p>
-                </div>
-
-                <div className="cp-controlSection">
-                  <h2>Construction</h2>
-                  <CpSeg value={topMode} set={setTopMode} options={[{id:"4side",label:"4-Sided Enclosed"},{id:"3side",label:"3-Sided Open Top"}]}/>
-                  <p className="cp-hint">Open top follows Right → Bottom → Left and carries each side seam to the raw top edge.</p>
-                </div>
-              </div>
-            </div>
+          <div className="cp-hero-copy">
+            <h1>Curved Panels</h1>
+            <p>
+              Build a free-form bag panel with sharp or rounded corners and sides that can be straight or gently curved.
+              Create matching rectangular side panels for an open-top or fully enclosed bag, or generate one continuous
+              gusset for either construction style. When your design is complete, print the full-size pattern.
+            </p>
           </div>
-
-          {!ready&&<div className="cp-card" style={{textAlign:"center",padding:"28px 16px"}}>
-            <div style={{fontSize:15,fontWeight:800,color:CP.rose}}>Enter top width, bottom width, and panel height to begin.</div>
-          </div>}
-
-          {ready&&<>
-            {model.notes.length>0&&<div className="cp-warn">Automatic geometry adjustments:<ul>{model.notes.map((n,i)=><li key={i}>{n}</li>)}</ul></div>}
-            <TrustBadge tone="cp" valid={model.valid}
-              okMessage="✓ Geometry verified: cut path and active sewline are non-crossing, correctly oriented, and contained."
-              lockLabel="Pattern output locked" errors={model.errors}/>
-
-            <div className="cp-card cp-diagramCard" ref={diagramRef}>
-              <svg viewBox="0 0 760 490" style={{width:"100%",height:"auto",display:"block"}} role="img" aria-label="Live curved panel diagram"
-                dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
-              <p className="cp-diagLegend">▲ Center marks &nbsp; □ Side junctions &nbsp; ◇ Side midpoints &nbsp; Solid = cut &nbsp; Dashed = sewline</p>
-              <p className={"cp-symline "+(model.symmetry?"yes":"no")}>Fold-friendly symmetry: {model.symmetry?"yes":"no"}</p>
-            </div>
-
-            <CpResultBand model={model} params={params}/>
-
-            {canFloatDiag && floatDiagOpen && dockSide && dockCollapsed && <button
-              className={"cp-dockTab "+dockSide}
-              style={{top:Math.max(86,Math.min(floatPos.y,typeof window!=="undefined"?window.innerHeight-210:120))}}
-              onClick={undockFloat} aria-label="Undock and open MoonShot Mission Control">
-              <span className="cp-liveDot" style={{background:!model.valid?"#c23b47":model.notes.length?"#d89b24":"#2f9a62"}}/>
-              Live Pattern Feed
-            </button>}
-
-            {canFloatDiag && floatDiagOpen && !(dockSide&&dockCollapsed) && <div
-              ref={floatDockRef}
-              className={"cp-floatDock"+(draggingFloat?" dragging":"")+(resizingFloat?" resizing":"")+(dockSide?" docked-"+dockSide:"")}
-              style={dockSide?{
-                [dockSide]:0,
-                top:Math.max(72,Math.min(floatPos.y,typeof window!=="undefined"?window.innerHeight-Math.min(floatSize.h,window.innerHeight-82)-10:86)),
-                width:floatSize.w,height:typeof window!=="undefined"?Math.min(floatSize.h,window.innerHeight-82):floatSize.h
-              }:{left:floatPos.x,top:floatPos.y,width:floatSize.w,height:floatSize.h}}>
-              <div className="cp-floatHead" onPointerDown={startFloatDrag}>
-                <div className="cp-missionBrand">
-                  <span className="cp-liveDot" style={{background:!model.valid?"#c23b47":model.notes.length?"#d89b24":"#2f9a62"}}/>
-                  <div className="cp-missionText">
-                    <div className="cp-missionTitle">MoonShot Mission Control</div>
-                    <div className="cp-missionFeed">Live Pattern Feed</div>
-                  </div>
-                </div>
-                <button className="cp-floatClose" onPointerDown={e=>e.stopPropagation()} onClick={closeFloatFeed} aria-label="Close live pattern feed" title="Close">×</button>
-              </div>
-              <div className="cp-floatNav">
-                <button onClick={()=>dockFloat("left")} aria-label="Dock and collapse live pattern feed left">← Dock Left</button>
-                <button onClick={resetFloatPosition} aria-label="Recenter live pattern feed">ReCenter</button>
-                <button onClick={()=>dockFloat("right")} aria-label="Dock and collapse live pattern feed right">Dock Right →</button>
-              </div>
-              <div className="cp-floatBody">
-                <svg viewBox="0 0 760 490" style={{width:"100%",height:"auto",display:"block"}} role="img" aria-label="MoonShot Mission Control live pattern feed"
-                  dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
-                <div className="cp-floatMeta">{cpFmt(model.cutBB.w)} W × {cpFmt(model.cutBB.h)} H cut · {cpFmt(params.sa)} seam allowance · {params.topMode==="3side"?"3-sided open top":"4-sided enclosed"}</div>
-              </div>
-              <div className={"cp-resizeHandle "+(dockSide==="right"?"left":"right")} onPointerDown={startFloatResize} aria-hidden="true"/>
-            </div>}
-
-            <div className="cp-card" style={{marginTop:8}}>
-              <h2>Matching Pieces</h2>
-              <div style={{marginBottom:7}}><CpSeg value={sgView} set={setSgView} options={[{id:"sides",label:"Side Panels"},{id:"gusset",label:"Gusset"}]}/></div>
-              {sgView==="sides"?<>
-                <div className="cp-row"><FracInput variant="cp" label="Finished side depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/></div>
-                <p className="cp-hint">Assumes a constant finished depth and two matching main panels.</p>
-                {hasDepth&&model.valid?<>
-                  <div dangerouslySetInnerHTML={{__html:sides.minis}}/><div dangerouslySetInnerHTML={{__html:sides.tables}}/>
-                </>:<p className="cp-hint">{model.valid?"Enter a finished side depth to generate the pieces.":"Correct the geometry above before side pieces are generated."}</p>}
-              </>:<>
-                <div className="cp-row"><FracInput variant="cp" label="Finished gusset width" decMode={decMode} whole={gwW} frac={gwF} onWhole={setGwW} onFrac={setGwF}/></div>
-                {hasGusset&&model.valid?<>
-                  <div dangerouslySetInnerHTML={{__html:gusset.minis}}/><div dangerouslySetInnerHTML={{__html:gusset.tables}}/>
-                </>:<p className="cp-hint">{model.valid?"Enter a finished gusset width to generate the strip.":"Correct the geometry above before the gusset is generated."}</p>}
-              </>}
-            </div>
-
-            <div className="cp-card">
-              <h2>Print Patterns</h2>
-              <div className="cp-printGrid">
-                <div className="cp-printCard">
-                  <div className="pt">Main Panel</div><div className="pm">Actual cut path, active sewline, match marks, dimensions, and test squares.</div>
-                  <PrintButton tone="cp" small label="Print Main Panel" meta={cpTileLabel(panelPlan)} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
-                </div>
-                <div className="cp-printCard">
-                  <div className="pt">Side Panels</div><div className="pm">Exact matching strips with raw-top orientation and suggested clip/notch marks.</div>
-                  <PrintButton tone="cp" small label="Print Side Panels" meta={sidePlan?cpTileLabel(sidePlan):"Add finished side depth"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
-                </div>
-                <div className="cp-printCard">
-                  <div className="pt">Gusset</div><div className="pm">One continuous strip with side zones, end allowances, match marks, and tiling.</div>
-                  <PrintButton tone="cp" small label="Print Gusset" meta={gusPlan?cpTileLabel(gusPlan):"Add finished gusset width"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
-                </div>
-              </div>
-            </div>
-          </>}
-
         </div>
+
+        {!ready&&<div className="cp-start-message">
+          Enter top width, bottom width, and panel height to begin.
+        </div>}
+
+        {ready&&<>
+          {model.notes.length>0&&<div className="cp-warn">Automatic geometry adjustments:<ul>{model.notes.map((n,i)=><li key={i}>{n}</li>)}</ul></div>}
+          <TrustBadge tone="cp" valid={model.valid}
+            okMessage="✓ Geometry verified: cut path and active sewline are non-crossing, correctly oriented, and contained."
+            lockLabel="Pattern output locked" errors={model.errors}/>
+        </>}
+
+        <section className="cp-layout-card">
+
+          <div className="cp-layout-left">
+            <div className="cp-controls-panel">
+
+              <section className="cp-control-section cp-control-section--dimensions">
+                <div className="cp-dim-layout">
+                  <div className="cp-sa-card">
+                    <div className="cp-decimal-slot">
+                      {!isMetric()&&<label className="cp-decToggle"><input type="checkbox" checked={decMode} onChange={e=>setDecMode(e.target.checked)}/>Decimal Input</label>}
+                    </div>
+                    <FracInput variant="cp" label="Seam Allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
+                  </div>
+                  <div className="cp-dim-main">
+                    <h2>Dimensions</h2>
+                    <div className="cp-dim-grid">
+                      <FracInput variant="cp" label="Top Width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
+                      <FracInput variant="cp" label="Bottom Width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
+                      <FracInput variant="cp" label="Panel Height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
+                    </div>
+                    <p className="cp-layout-hint">Actual cut and sewline sizes may change with edge shape.</p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="cp-control-columns">
+                <section className="cp-control-section cp-control-section--edge">
+                  <h2>Edge Shape</h2>
+                  <label className="cp-check"><input type="checkbox" checked={matchingSides} onChange={e=>setMatchingSides(e.target.checked)}/>Matching Sides</label>
+
+                  <div className="cp-edge-grid">
+                    <FracInput variant="cp" label={matchingSides?"Left & Right Fullness":"Left Fullness"} decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
+                    <FracInput variant="cp" label="Right Fullness" decMode={decMode} ghost={matchingSides} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
+                    <FracInput variant="cp" label="Top Crown" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
+                    <FracInput variant="cp" label="Bottom Crown" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
+                  </div>
+
+                  <div className="cp-seg-label">Curve Feel</div>
+                  <CpSeg value={feel} set={setFeel} options={[{id:"gentle",label:"Gentle"},{id:"balanced",label:"Balanced"},{id:"defined",label:"Defined"}]}/>
+                </section>
+
+                <section className="cp-control-section cp-control-section--corner">
+                  <h2>Corner Shape</h2>
+                  <div className="cp-corner-grid">
+                    <FracInput variant="cp" label="Top Softness" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
+                    <FracInput variant="cp" label="Bottom Softness" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
+                  </div>
+                </section>
+              </div>
+
+              <p className="cp-layout-hint cp-layout-hint--wide">
+                Fullness and crown set midpoint depth. Curve feel changes only how broadly each edge eases.
+              </p>
+
+              <section className="cp-control-section cp-control-section--construction">
+                <h2>Construction</h2>
+
+                <div className="cp-construction-grid">
+                  <div className="cp-construction-mode">
+                    <CpSeg value={topMode} set={setTopMode} options={[{id:"4side",label:"4-Sided Enclosed"},{id:"3side",label:"3-Sided Open Top"}]}/>
+                  </div>
+                  <div className="cp-construction-depth">
+                    {sgView==="sides"
+                      ? <FracInput variant="cp" label="Finished Side Depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/>
+                      : <FracInput variant="cp" label="Finished Gusset Width" decMode={decMode} whole={gwW} frac={gwF} onWhole={setGwW} onFrac={setGwF}/>
+                    }
+                  </div>
+                  <div className="cp-construction-piece">
+                    <CpSeg value={sgView} set={setSgView} options={[{id:"sides",label:"Side Panels"},{id:"gusset",label:"Gusset"}]}/>
+                  </div>
+                  <label className="cp-check cp-check--stabilizer"><input type="checkbox" checked={stabOn} onChange={e=>setStabOn(e.target.checked)}/>Stabilizer</label>
+                  <div className="cp-stabilizer-inset">
+                    <FracInput variant="cp" label="Stabilizer Inset" decMode={decMode} ghost={!stabOn} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/>
+                  </div>
+                  <label className={"cp-check cp-check--separate"+(!stabOn?" is-disabled":"")}>
+                    <input type="checkbox" disabled={!stabOn} checked={stabSeparate} onChange={e=>setStabSeparate(e.target.checked)}/>
+                    Print Separately
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            {ready&&<section className="cp-sides-panel">
+              <h2>{sgView==="sides" ? "Sides" : "Gusset"}</h2>
+              {sgView==="sides"
+                ?(hasDepth&&model.valid
+                  ?<div dangerouslySetInnerHTML={{__html:sides.minis}}/>
+                  :<p className="cp-layout-hint">{model.valid?"Enter a finished side depth to generate the pieces.":"Correct the geometry above before side pieces are generated."}</p>)
+                :(hasGusset&&model.valid
+                  ?<div ref={gussetPanRef} className="cp-gussetPan" onMouseDown={startGussetPan} onMouseMove={moveGussetPan} onMouseUp={endGussetPan} onMouseLeave={endGussetPan}
+                      onTouchStart={startGussetPan} onTouchMove={moveGussetPan} onTouchEnd={endGussetPan}>
+                      <div dangerouslySetInnerHTML={{__html:gusset.minis}}/>
+                    </div>
+                  :<p className="cp-layout-hint">{model.valid?"Enter a finished gusset width to generate the strip.":"Correct the geometry above before the gusset is generated."}</p>)}
+            </section>}
+          </div>
+
+          <div className="cp-layout-right">
+            <section className="cp-diagram-panel" ref={diagramRef}>
+              <h2>Front &amp; Back Panel</h2>
+              <div className="cp-live-diagram">
+                {ready?<svg viewBox="0 0 760 490" role="img" aria-label="Live curved panel diagram"
+                  dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
+                :<div className="cp-empty">Enter top width, bottom width, and panel height to see the diagram.</div>}
+              </div>
+
+              {ready&&<div className="cp-diagInfo">
+                <p className="cp-diagLegend">
+                  ▲ Center marks &nbsp; □ Side junctions &nbsp; ◇ Side midpoints &nbsp;
+                  Solid = cut &nbsp; Dashed = sewline{params.stabilizerOn ? "  Dotted = stabilizer" : ""}
+                </p>
+                <p className={"cp-symline "+(model.symmetry?"yes":"no")}>Fold-friendly symmetry: {model.symmetry?"yes":"no"}</p>
+                <p className="cp-side-lengths"><strong>Sides Lengths</strong> &nbsp; {cutRunText}</p>
+              </div>}
+            </section>
+
+            <section className="cp-measure-panel">
+              {!ready?<div className="cp-empty">Measurements will appear here once dimensions are entered.</div>:<>
+                <p className="cp-measure-note">Use Printed Pattern to Cut Two Exterior/Interior depending on design.</p>
+
+                <div className="cp-measure-group">
+                  <div className="cp-measure-head"><h3>Panel</h3><strong>Cut</strong><strong>Sewline</strong></div>
+                  <div className="cp-measure-row"><span>Width</span><strong>{cpFmt(model.cutBB.w)}</strong><em>{cpFmt(active.bb.w)}</em></div>
+                  <div className="cp-measure-row"><span>Height</span><strong>{cpFmt(model.cutBB.h)}</strong><em>{cpFmt(active.bb.h)}</em></div>
+                  <div className="cp-measure-row"><span>Perimeter</span><strong>{cpFmt(model.cutPerim)}</strong><em>{cpFmt(active.total)}</em></div>
+                  {params.stabilizerOn&&stabBB&&<div className="cp-measure-row cp-measure-row--stab"><span>Stabilizer</span><strong>{cpFmt(stabBB.w)} × {cpFmt(stabBB.h)}</strong><em>{cpFmt(params.stabilizerInset)} inset</em></div>}
+                </div>
+
+                {sgView==="sides"
+                  ?(hasDepth&&model.valid
+                    ?<div className="cp-piece-measures" dangerouslySetInnerHTML={{__html:sides.tables}}/>
+                    :<p className="cp-layout-hint">{model.valid?"Add finished side depth to show side-panel measurements.":"Fix geometry to show side-panel measurements."}</p>)
+                  :(hasGusset&&model.valid
+                    ?<div className="cp-piece-measures" dangerouslySetInnerHTML={{__html:gusset.tables}}/>
+                    :<p className="cp-layout-hint">{model.valid?"Add finished gusset width to show gusset measurements.":"Fix geometry to show gusset measurements."}</p>)}
+              </>}
+            </section>
+          </div>
+        </section>
+
+        {ready&&<section className="cp-print-section">
+          <h2>Print Patterns</h2>
+          <div className="cp-print-grid">
+            <article className="cp-print-card">
+              <h3>Main Panel</h3>
+              <p>Actual cut path, active sewline, match marks, dimensions, and test squares.</p>
+              <PrintButton tone="cp" small label="Print Main Panel" meta={cpTileLabel(panelPlan)} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
+            </article>
+            <article className="cp-print-card">
+              <h3>Side Panels</h3>
+              <p>Exact matching strips with raw-top orientation and suggested clip/notch marks.</p>
+              <PrintButton tone="cp" small label="Print Side Panels" meta={sidePlan?cpTileLabel(sidePlan):"Add finished side depth"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
+            </article>
+            <article className="cp-print-card">
+              <h3>Gusset</h3>
+              <p>One continuous strip with side zones, end allowances, match marks, and tiling.</p>
+              <PrintButton tone="cp" small label="Print Gusset" meta={gusPlan?cpTileLabel(gusPlan):"Add finished gusset width"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
+            </article>
+            {params.stabilizerOn&&<article className="cp-print-card cp-print-card--stab">
+              <h3>Stabilizer</h3>
+              <p>Inset stabilizer pattern based on the main panel cut path.</p>
+              <PrintButton tone="cp" small label="Print Stabilizer" meta={stabPlan?cpTileLabel(stabPlan):"Add stabilizer inset"} disabled={!model.valid||!stabPlan} onClick={()=>cpPrintStabilizer(model,params)}/>
+            </article>}
+          </div>
+        </section>}
+
       </div>
     </div>
   );
