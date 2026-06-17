@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "../utils/theme.js";
-import { SecHeader, Card, CardTitle, RRow, InfoBox, NoteBox, SubTabs, Divider, SABar } from "../components/SharedUI.jsx";
+import { Card, CardTitle, RRow, InfoBox, NoteBox, SubTabs, Divider, SABar } from "../components/SharedUI.jsx";
 import FracInput from "../components/FracInput.jsx";
 import { roundRectPerim, ellipsePerim } from "../utils/geometry.js";
 import { PI, DEFAULT_SA } from "../utils/constants.js";
@@ -706,13 +706,19 @@ export default function GussetPage() {
   const roundReady = roundPanelW > 0 && roundPanelH > 0;
 
   return (
-    <div style={{ minHeight:"100vh", padding:"16px 16px 48px" }}>
-      <SABar th={th} sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} />
-      <div style={{ background:th.sec, borderRadius:14, boxShadow:"0 4px 18px rgba(26,110,58,0.12)" }}>
-        <SecHeader th={th} title="Gusset Strip"
-          sub="Calculates the cut length and width of a gusset strip based on the panel shape and how the strip wraps around it." />
-        <div style={{ padding:"16px 16px 20px" }}>
-          <SubTabs th={th} active={mode} set={setMode}
+    <div className="tab-page" data-group="bag-structures">
+      <div className="tab-content-wrap">
+        <div className="tab-intro-card">
+          <div className="tab-intro-card-thumb" />
+          <div className="tab-intro-card-text">
+            <div className="tab-intro-card-title">Gusset Strip</div>
+            <div className="tab-intro-card-desc">Calculates the cut length and width of a gusset strip based on the panel shape and how the strip wraps around it. Works for 3-sided rectangular bags, 4-sided closed loops, and round or oval panels.</div>
+          </div>
+        </div>
+
+        <SABar th={th} sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} />
+
+        <SubTabs th={th} active={mode} set={setMode}
             tabs={[{id:"three",label:"3-Sided"},{id:"four",label:"4-Sided"},{id:"round",label:"Round / Oval"}]} />
 
           {mode==="three" && (
@@ -837,7 +843,6 @@ export default function GussetPage() {
               </div>
             )}
           </Card>
-        </div>
       </div>
     </div>
   );

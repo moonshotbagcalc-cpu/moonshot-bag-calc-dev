@@ -22,18 +22,6 @@ import {
   GHOST_OPACITY, GHOST_WEIGHT, GHOST_OFFSET,
   FILL_OPACITY_SCREEN, STRIP_PAD,
 } from "../diagramTokens.js";
-import {
-  cpStabilizerPoints, cpOffsetInwardMiter, cpInsetClosedPoints,
-  cpHasSelfCross, cpPtsBB, stabSVGElement,
-} from "../stabilizer.js";
-import {
-  cpSquareMark, cpDiamondMark, cpTriangleMark, cpPerpTick,
-  cpTriangleH, cpTriangleV,
-} from "../diagramMarks.js";
-import {
-  cpPrintDoc, cpPrintPanel, cpPrintStabilizer, cpPrintSides, cpPrintGusset,
-  cpDrawStrip, cpDrawTaperedStrip, cpPiecePrintWidth,
-} from "../printRenderers.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── CURVED PANEL — fair-curve calculator (replaces the old Advanced tab) ──────
@@ -58,12 +46,543 @@ function cpFmtD(v){ return isMetric() ? fmtCm(v) : cpFmtDec(v); }
    TILED PRINT ENGINE — 7" × 10" tiles, Letter and A4 safe at 100%.
    Kept as-is from the standalone prototype: pure DOM generation.
    ===================================================================== */
-/* Print functions (cpPrintDoc, cpPrintPanel, cpPrintStabilizer, cpPrintSides,
-   cpPrintGusset, cpDrawStrip, cpDrawTaperedStrip, cpPiecePrintWidth) relocated to
-   src/printRenderers.js (Pass 11) — imported at top of file. */
+/* Print colors — C_SEW, C_CENTER, C_STAB come from diagramTokens import */
+const C_CUT    = CP.maroon;
+const C_BORDER = "#000000";
+const C_PIECE_CENTER = C_CENTER;  // alias: was wrong pink, now correct cyan from diagramTokens
+const C_MARK   = CP.maroon;
+const C_NOTCH  = C_EASING;        // alias: was wrong blue, now correct easing dark-cyan
 
-/* C_PIECE_CENTER alias kept for screen diagram functions (cpGussetMapHTML uses it) */
-const C_PIECE_CENTER = C_CENTER;
+function cpPrintDoc(title, geom, spanW, spanH, detailRows, legendLine, allowRotate=true){
+  const plan=cpTilePlan(spanW,spanH,allowRotate);
+  let draw=geom;
+  if(plan.rotated)draw=`<g transform="translate(${spanH.toFixed(4)} 0) rotate(90)">${geom}</g>`;
+  let tiles="";
+  for(let r=0;r<plan.rows;r++){
+    for(let c=0;c<plan.cols;c++){
+      const vx=c*CP_TILE_W,vy=r*CP_TILE_H;
+      const label=cpRowLabel(r)+(c+1);
+      const isLast=r===plan.rows-1&&c===plan.cols-1;
+      let inner=draw;
+      inner+=`<rect x="${vx}" y="${vy}" width="${CP_TILE_W}" height="${CP_TILE_H}" fill="none" stroke="${C_BORDER}" stroke-width="0.025"/>`;
+      inner+=cpRegistrationMarks(vx,vy,CP_TILE_W,CP_TILE_H);
+      const nbLeft=c>0?cpRowLabel(r)+c:null;
+      const nbRight=c<plan.cols-1?cpRowLabel(r)+(c+2):null;
+      const nbUp=r>0?cpRowLabel(r-1)+(c+1):null;
+      const nbDown=r<plan.rows-1?cpRowLabel(r+1)+(c+1):null;
+      if(nbLeft)inner+=`<text x="${(vx+0.08).toFixed(3)}" y="${(vy+CP_TILE_H/2).toFixed(3)}" font-size="0.12" font-weight="700" font-family="Nunito,sans-serif" fill="#777">\u2190 ${nbLeft}</text>`;
+      if(nbRight)inner+=`<text x="${(vx+CP_TILE_W-0.08).toFixed(3)}" y="${(vy+CP_TILE_H/2).toFixed(3)}" font-size="0.12" font-weight="700" font-family="Nunito,sans-serif" fill="#777" text-anchor="end">${nbRight} \u2192</text>`;
+      if(nbUp)inner+=`<text x="${(vx+CP_TILE_W/2).toFixed(3)}" y="${(vy+0.15).toFixed(3)}" font-size="0.12" font-weight="700" font-family="Nunito,sans-serif" fill="#777" text-anchor="middle">\u2191 ${nbUp}</text>`;
+      if(nbDown)inner+=`<text x="${(vx+CP_TILE_W/2).toFixed(3)}" y="${(vy+CP_TILE_H-0.08).toFixed(3)}" font-size="0.12" font-weight="700" font-family="Nunito,sans-serif" fill="#777" text-anchor="middle">\u2193 ${nbDown}</text>`;
+      tiles+=`<div class="${isLast?"tile last":"tile"}"><div class="tlabel">${title} &mdash; ${label}</div>`+
+        `<svg width="${CP_TILE_W}in" height="${CP_TILE_H}in" viewBox="${vx} ${vy} ${CP_TILE_W} ${CP_TILE_H}" xmlns="http://www.w3.org/2000/svg">${inner}</svg></div>`;
+    }
+  }
+  const details=detailRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  const w=window.open("","_blank");
+  if(!w){window.alert("The print window was blocked. Allow pop-ups for this site, then try again.");return false;}
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    @page{margin:0.5in}
+    body{font-family:Nunito,system-ui,sans-serif;margin:0;color:#222}
+    .page{page-break-after:always}.tile{page-break-after:always;text-align:center}.tile.last{page-break-after:auto}
+    .tlabel{margin:0;padding:3pt 0 0;font-size:7pt;font-weight:700;text-align:center;line-height:1.2}.tile svg{display:block;margin:0 auto}
+    h1{font-size:15pt;margin:0 0 3pt;color:${CP.maroon}}h2{font-size:10pt;margin:0 0 8pt;color:#555}
+    table{border-collapse:collapse;width:100%;font-size:10pt}td{border:1px solid #ddd;padding:4pt 7pt}td:first-child{font-weight:700;width:38%}
+    .note{font-size:11pt;font-weight:800;color:#000;margin-top:9pt;line-height:1.5}.legend{font-size:7.5pt;color:#444;margin-top:5pt}
+  </style></head><body>
+    <div class="page"><h1>${title}</h1>
+      <h2>MoonShot Bag Calculator \u00B7 ${plan.pages} pattern page${plan.pages===1?"":"s"} \u00B7 ${plan.rows} row(s) \u00D7 ${plan.cols} column(s) \u00B7 7\u2033 \u00D7 9.68\u2033 printable tiles${plan.rotated?" \u00B7 auto-rotated to use fewer pages":""}</h2>
+      <p style="font-size:9pt;font-weight:700;color:#555;margin:0 0 2pt">Verify both test squares before cutting fabric:</p>
+      ${cpTestSquareSVG()}<table>${details}</table>
+      ${legendLine?`<p class="legend">${legendLine}</p>`:""}
+      <p class="note">Print at 100% or Actual Size. Turn off Fit to Page, scaling, and browser headers/footers. Verify both test squares. Assemble matching tile edges using the page labels and registration crosses.</p>
+    </div>${tiles}
+  </body></html>`);
+  w.document.close();
+  const fire=()=>{const ready=w.document.fonts&&w.document.fonts.ready?w.document.fonts.ready:Promise.resolve();ready.then(()=>setTimeout(()=>w.print(),80));};
+  if(w.document.readyState==="complete")fire();else w.addEventListener("load",fire,{once:true});
+  return true;
+}
+
+/* symbol helpers */
+function cpSquareMark(x, y){ const s = 0.055; return `<rect x="${(x-s).toFixed(4)}" y="${(y-s).toFixed(4)}" width="${(2*s).toFixed(4)}" height="${(2*s).toFixed(4)}" fill="none" stroke="${C_BORDER}" stroke-width="0.018" rx="0.01"/>`; }
+function cpDiamondMark(x, y){ const d = 0.07; return `<polygon points="${x},${y-d} ${x+d},${y} ${x},${y+d} ${x-d},${y}" fill="none" stroke="${C_SEW}" stroke-width="0.018"/>`; }
+
+/* Inward-pointing skinny triangle at point (px,py) on the cut line. */
+function cpTriangleMark(px, py, nx, ny, tang_x, tang_y, scale = 1){
+  const base = 0.16 * scale, height = 0.26 * scale;  // 2× — center fold/match marks; arc-blend marks at 50%
+  const b1x = px - tang_x * base/2, b1y = py - tang_y * base/2;
+  const b2x = px + tang_x * base/2, b2y = py + tang_y * base/2;
+  const apx = px + nx * height,     apy = py + ny * height;
+  return `<polygon points="${b1x.toFixed(4)},${b1y.toFixed(4)} ${b2x.toFixed(4)},${b2y.toFixed(4)} ${apx.toFixed(4)},${apy.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+}
+
+/* Perpendicular tick at point (px,py), direction inward (nx,ny). */
+function cpPerpTick(px, py, nx, ny){
+  const len = 0.14;
+  return `<line x1="${px.toFixed(4)}" y1="${py.toFixed(4)}" x2="${(px + nx*len).toFixed(4)}" y2="${(py + ny*len).toFixed(4)}" stroke="${C_MARK}" stroke-width="0.025"/>`;
+}
+
+/* Inward-pointing triangle on a HORIZONTAL strip edge. */
+function cpTriangleH(px, py, inward){
+  const base = 0.16, ht = 0.22;
+  const bL = px - base/2, bR = px + base/2;
+  const apex = py + inward * ht;
+  return `<polygon points="${bL.toFixed(4)},${py.toFixed(4)} ${bR.toFixed(4)},${py.toFixed(4)} ${px.toFixed(4)},${apex.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+}
+function cpTriangleV(px, py, inward){
+  const base = 0.16, ht = 0.22;
+  const bT = py - base/2, bB = py + base/2;
+  const apex = px + inward * ht;
+  return `<polygon points="${px.toFixed(4)},${bT.toFixed(4)} ${px.toFixed(4)},${bB.toFixed(4)} ${apex.toFixed(4)},${py.toFixed(4)}" fill="${C_MARK}" stroke="none"/>`;
+}
+
+function cpCleanClosedPts(pts){
+  const out=[];
+  for(const p of pts||[]){
+    if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    const last=out[out.length-1];
+    if(!last || Math.hypot(last.x-p.x,last.y-p.y)>1e-3) out.push({x:p.x,y:p.y,side:p.side});
+  }
+  if(out.length>2 && Math.hypot(out[0].x-out[out.length-1].x,out[0].y-out[out.length-1].y)<1e-3) out.pop();
+  return out;
+}
+
+function cpSimplifyCollinearClosedPts(pts){
+  const p=cpCleanClosedPts(pts);
+  if(p.length<4)return p;
+  const out=[];
+  const n=p.length;
+  for(let i=0;i<n;i++){
+    const a=p[(i-1+n)%n],b=p[i],c=p[(i+1)%n];
+    const abx=b.x-a.x,aby=b.y-a.y,bcx=c.x-b.x,bcy=c.y-b.y;
+    const ab=Math.hypot(abx,aby),bc=Math.hypot(bcx,bcy);
+    if(ab<1e-8||bc<1e-8)continue;
+    const cross=Math.abs(abx*bcy-aby*bcx)/(ab*bc);
+    const dot=(abx*bcx+aby*bcy)/(ab*bc);
+    // Dense straight-edge samples make the inset path collapse/backtrack at crisp corners.
+    // Drop only truly collinear same-direction points; curved samples are preserved.
+    if(cross<1e-7&&dot>0.999999)continue;
+    out.push(b);
+  }
+  return out.length>=3?out:p;
+}
+
+function cpCentroid(pts){
+  if(!pts.length)return {x:0,y:0};
+  let x=0,y=0;
+  for(const p of pts){x+=p.x;y+=p.y;}
+  return {x:x/pts.length,y:y/pts.length};
+}
+
+function cpLineIntersect(a1,a2,b1,b2){
+  const x1=a1.x,y1=a1.y,x2=a2.x,y2=a2.y,x3=b1.x,y3=b1.y,x4=b2.x,y4=b2.y;
+  const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+  if(Math.abs(den)<1e-9)return null;
+  const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/den;
+  const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/den;
+  if(!Number.isFinite(px)||!Number.isFinite(py))return null;
+  return {x:px,y:py};
+}
+
+/* Approximate inset path used only for stabilizer guides/print pieces.
+   The true panel geometry still comes from curved-panel-core.js. */
+function cpSegmentsIntersect(p1,p2,p3,p4){
+  const d1x=p2.x-p1.x,d1y=p2.y-p1.y,d2x=p4.x-p3.x,d2y=p4.y-p3.y;
+  const cross=d1x*d2y-d1y*d2x;
+  if(Math.abs(cross)<1e-10)return false;
+  const t=((p3.x-p1.x)*d2y-(p3.y-p1.y)*d2x)/cross;
+  const u=((p3.x-p1.x)*d1y-(p3.y-p1.y)*d1x)/cross;
+  return t>1e-9&&t<1-1e-9&&u>1e-9&&u<1-1e-9;
+}
+
+function cpDist(a,b){return Math.hypot((b?.x||0)-(a?.x||0),(b?.y||0)-(a?.y||0));}
+function cpUnit(x,y){const l=Math.hypot(x,y)||1e-9;return {x:x/l,y:y/l};}
+function cpCrossZ(d,p,o){return d.x*(p.y-o.y)-d.y*(p.x-o.x);}
+function cpLineDirIntersect(p1,d1,p2,d2){
+  const den=d1.x*d2.y-d1.y*d2.x;
+  if(Math.abs(den)<1e-9)return null;
+  const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
+  return {x:p1.x+d1.x*t,y:p1.y+d1.y*t};
+}
+function cpDedupePath(pts,closed=false){
+  const out=[];
+  for(const p of pts||[]){
+    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+    if(!out.length||cpDist(out[out.length-1],p)>1e-7)out.push({...p});
+  }
+  if(closed&&out.length>2&&cpDist(out[0],out[out.length-1])<1e-7)out.pop();
+  return out;
+}
+function cpOffsetOpenPath(pts,d){
+  const p=cpDedupePath(pts,false);
+  const n=p.length,out=[];
+  for(let i=0;i<n;i++){
+    const a=p[Math.max(0,i-1)],b=p[Math.min(n-1,i+1)];
+    const u=cpUnit(b.x-a.x,b.y-a.y);
+    out.push({x:p[i].x-u.y*d,y:p[i].y+u.x*d,side:p[i].side});
+  }
+  return out;
+}
+function cpJoinOffsetPair(A,B){
+  if(A.length<2||B.length<2)return;
+  const a0=A[A.length-1],b0=B[0];
+  const ta=cpUnit(a0.x-A[A.length-2].x,a0.y-A[A.length-2].y);
+  const tb=cpUnit(B[1].x-b0.x,B[1].y-b0.y);
+  const den=ta.x*tb.y-ta.y*tb.x;
+  if(Math.abs(den)<1e-5&&ta.x*tb.x+ta.y*tb.y>0.98){
+    const M={x:(a0.x+b0.x)/2,y:(a0.y+b0.y)/2};
+    A[A.length-1]={...M,side:A[A.length-1].side};
+    B[0]={...M,side:B[0].side};
+    return;
+  }
+  const X=cpLineDirIntersect(a0,ta,b0,tb);
+  if(!X)return;
+  const refA=Math.sign(cpCrossZ(tb,A[Math.floor(A.length/2)],b0))||1;
+  while(A.length>2&&Math.sign(cpCrossZ(tb,A[A.length-1],b0))!==refA)A.pop();
+  const refB=Math.sign(cpCrossZ(ta,B[Math.floor(B.length/2)],a0))||1;
+  while(B.length>2&&Math.sign(cpCrossZ(ta,B[0],a0))!==refB)B.shift();
+  if(cpDist(A[A.length-1],X)>1e-7)A.push({...X,side:A[A.length-1].side});
+  else A[A.length-1]={...X,side:A[A.length-1].side};
+  if(cpDist(B[0],X)>1e-7)B.unshift({...X,side:B[0].side});
+  else B[0]={...X,side:B[0].side};
+}
+function cpOffsetSidePaths(sidePaths,inset){
+  const out={};
+  for(const side of ["top","right","bottom","left"])out[side]=cpOffsetOpenPath(sidePaths[side]||[],inset).map(q=>({...q,side}));
+  cpJoinOffsetPair(out.top,out.right);
+  cpJoinOffsetPair(out.right,out.bottom);
+  cpJoinOffsetPair(out.bottom,out.left);
+  cpJoinOffsetPair(out.left,out.top);
+  for(const side of ["top","right","bottom","left"])out[side]=cpDedupePath(out[side],false).map(q=>({...q,side}));
+  return out;
+}
+function cpCombineSidePaths(sidePaths,closed=true){
+  const out=[];
+  for(const side of ["top","right","bottom","left"]){
+    const path=sidePaths[side]||[];
+    for(let i=0;i<path.length;i++){
+      if(out.length&&i===0&&cpDist(out[out.length-1],path[i])<1e-7)continue;
+      out.push({...path[i],side});
+    }
+  }
+  if(closed&&out.length>2&&cpDist(out[0],out[out.length-1])<1e-7)out.pop();
+  return out;
+}
+function cpHasSelfCross(pts, eps=0.01){
+  const n=pts?.length||0;
+  if(n<4)return false;
+  for(let i=0;i<n;i++){
+    const a=pts[i],b=pts[(i+1)%n];
+    if(cpDist(a,b)<eps)return true;
+    for(let j=i+2;j<n;j++){
+      if(i===0&&j===n-1)continue;
+      const c=pts[j],d=pts[(j+1)%n];
+      if(cpDist(c,d)<eps)continue;
+      if(!cpSegmentsIntersect(a,b,c,d))continue;
+      // If the hit is effectively at a shared/sampled corner, do not treat it as a failed stabilizer.
+      const near=Math.min(cpDist(a,c),cpDist(a,d),cpDist(b,c),cpDist(b,d));
+      if(near<eps*4)continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+function cpInsetClosedPoints(pts, inset){
+  const p=cpSimplifyCollinearClosedPts(pts);
+  if(p.length<3||!inset)return null;
+  function build(ins){
+    const c=cpCentroid(p),segs=[];
+    for(let i=0;i<p.length;i++){
+      const a=p[i],b=p[(i+1)%p.length];
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+      // skip segments shorter than 1/32" — degenerate, produces garbage normals
+      if(len<0.03125) continue;
+      let nx=-dy/len,ny=dx/len;
+      const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      if((c.x-mx)*nx+(c.y-my)*ny<0){nx=-nx;ny=-ny;}
+      segs.push({a:{x:a.x+nx*ins,y:a.y+ny*ins},b:{x:b.x+nx*ins,y:b.y+ny*ins},nx,ny,srcIdx:i});
+    }
+    if(segs.length<3) return null;
+    const out=[];
+    for(let i=0;i<segs.length;i++){
+      const prev=segs[(i-1+segs.length)%segs.length],next=segs[i];
+      const si=next.srcIdx;
+      let q=cpLineIntersect(prev.a,prev.b,next.a,next.b);
+      if(!q||Math.hypot(q.x-p[si].x,q.y-p[si].y)>Math.max(2,ins*4)){
+        const nx=prev.nx+next.nx,ny=prev.ny+next.ny,nl=Math.hypot(nx,ny)||1;
+        q={x:p[si].x+(nx/nl)*ins,y:p[si].y+(ny/nl)*ins};
+      }
+      out.push(q);
+    }
+    return out;
+  }
+  const hasCross=out=>!out||cpHasSelfCross(out,0.01);
+  const r=build(inset);
+  if(!hasCross(r))return r;
+  const r2=build(inset*0.8);
+  return hasCross(r2)?null:r2;
+}
+
+function cpStabilizerPoints(m,p){
+  if(!p?.stabilizerOn||!(p.stabilizerInset>0)||!m?.cutPts?.length||!m?.cutBB)return null;
+  const maxInset=Math.min(
+    p.stabilizerInset,
+    m.cutBB.w/2-0.125,
+    m.cutBB.h/2-0.125
+  );
+  const inset=Math.max(0,maxInset);
+  if(!(inset>0))return null;
+
+  // Prefer side-aware offsetting from the cut edge so crisp corners and rounded samples behave the same way.
+  let sidePts=null;
+  if(m.cutSides?.top&&m.cutSides?.right&&m.cutSides?.bottom&&m.cutSides?.left){
+    const sidePaths=cpOffsetSidePaths(m.cutSides,inset);
+    sidePts=cpCombineSidePaths(sidePaths,true);
+    if(sidePts.length>=3&&!cpHasSelfCross(sidePts,0.01))return sidePts;
+  }
+
+  const insetPts=cpInsetClosedPoints(m.cutPts,inset);
+  if(insetPts?.length)return insetPts;
+  return sidePts?.length>=3?sidePts:null;
+}
+
+function cpPtsBB(pts){
+  if(!pts?.length)return null;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const p of pts){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}
+  return {minX,minY,maxX,maxY,w:maxX-minX,h:maxY-minY};
+}
+
+/* Z-order in cpDrawStrip: notches → center line → sewline → landmarks → center triangles → cut rect */
+function cpDrawStrip(pc){
+  const { x0, y0, cutL, w, sa } = pc;
+  const sewStart = pc.flushStart ? x0 : x0 + sa;
+  const sx = pc.flushStart ? x0 : x0 + sa;
+  const ex = pc.flushEnd ? x0 + cutL : x0 + cutL - sa;
+  const midX = x0 + cutL/2;
+  const midY = y0 + w/2;
+  let g = "";
+
+  g += `<rect x="${x0}" y="${y0}" width="${cutL.toFixed(4)}" height="${w.toFixed(4)}" fill="#fbecef" fill-opacity="0.55" stroke="none"/>`;
+
+  if (pc.plan){
+    for (const mk of pc.plan.marks){
+      const tx = sewStart + mk.s;
+      const len = mk.kind === "clip" ? sa * 0.75 : sa * 0.55;
+      const wgt = mk.kind === "clip" ? 0.022 : 0.016;
+      g += `<line x1="${tx.toFixed(4)}" y1="${y0}" x2="${tx.toFixed(4)}" y2="${(y0+len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+      g += `<line x1="${tx.toFixed(4)}" y1="${(y0+w).toFixed(4)}" x2="${tx.toFixed(4)}" y2="${(y0+w-len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+    }
+  }
+
+  g += `<line x1="${midX.toFixed(4)}" y1="${y0}" x2="${midX.toFixed(4)}" y2="${(y0+w).toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.016" stroke-dasharray="0.18 0.12"/>`;
+  g += `<line x1="${x0}" y1="${midY.toFixed(4)}" x2="${(x0+cutL).toFixed(4)}" y2="${midY.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.016" stroke-dasharray="0.18 0.12"/>`;
+
+  let d = `M ${sx.toFixed(4)} ${(y0+sa).toFixed(4)} H ${ex.toFixed(4)} M ${sx.toFixed(4)} ${(y0+w-sa).toFixed(4)} H ${ex.toFixed(4)}`;
+  if (!pc.flushStart) d += ` M ${sx.toFixed(4)} ${(y0+sa).toFixed(4)} V ${(y0+w-sa).toFixed(4)}`;
+  if (!pc.flushEnd) d += ` M ${ex.toFixed(4)} ${(y0+sa).toFixed(4)} V ${(y0+w-sa).toFixed(4)}`;
+  g += `<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="0.02" stroke-dasharray="0.15 0.1"/>`;
+
+  if (pc.landmarks){
+    for (const L of pc.landmarks){
+      const tx = sewStart + L.s;
+      if (L.kind === "junction"){ g += cpSquareMark(tx, y0 + sa); g += cpSquareMark(tx, y0 + w - sa); }
+      else { g += cpDiamondMark(tx, y0 + sa); g += cpDiamondMark(tx, y0 + w - sa); }
+    }
+  }
+
+  g += cpTriangleH(midX, y0, +1);
+  g += cpTriangleH(midX, y0+w, -1);
+  g += cpTriangleV(x0, midY, +1);
+  g += cpTriangleV(x0+cutL, midY, -1);
+
+  g += `<rect x="${x0}" y="${y0}" width="${cutL.toFixed(4)}" height="${w.toFixed(4)}" fill="none" stroke="${C_CUT}" stroke-width="0.035"/>`;
+  if (pc.flushStart) g += `<text x="${(x0+0.08).toFixed(4)}" y="${(y0+w-0.08).toFixed(4)}" font-size="0.12" font-weight="800" font-family="Nunito,sans-serif" fill="${C_CUT}">RAW TOP</text>`;
+  if (pc.flushEnd) g += `<text x="${(x0+cutL-0.08).toFixed(4)}" y="${(y0+w-0.08).toFixed(4)}" font-size="0.12" font-weight="800" font-family="Nunito,sans-serif" fill="${C_CUT}" text-anchor="end">RAW TOP</text>`;
+  g += `<text x="${(x0 + 0.12).toFixed(4)}" y="${(y0 + w/2 + 0.07).toFixed(4)}" font-size="0.18" font-family="Nunito, sans-serif" fill="#333">${pc.label}</text>`;
+  return g;
+}
+
+/* ---- PRINT: MAIN PANEL ---- */
+function cpPrintPanel(m,p){
+  if(!m.valid)return;
+  const PADIN=0.4;
+  const originX=m.cutBB.minX-PADIN,originY=m.cutBB.minY-PADIN;
+  const spanW=m.cutBB.w+PADIN*2,spanH=m.cutBB.h+PADIN*2;
+  const shift=pts=>pts.map(q=>({x:q.x-originX,y:q.y-originY,side:q.side}));
+  const active=m.activeSew;
+  let geom="";
+  geom+=`<path d="${cpPtsToPath(shift(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
+  const stabPts=(!p.stabilizerSeparate ? cpStabilizerPoints(m,p) : null);
+  if(stabPts)geom+=`<path d="${cpPtsToPath(shift(stabPts),true)}" fill="none" stroke="${C_STAB}" stroke-width="0.026" stroke-dasharray="0.10 0.08"/>`;
+  const midX=(m.frame[0].x+m.frame[1].x)/2-originX;
+  geom+=`<line x1="${midX.toFixed(4)}" y1="${(m.cutBB.minY-originY-0.05).toFixed(4)}" x2="${midX.toFixed(4)}" y2="${(m.cutBB.maxY-originY+0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
+  geom+=`<path d="${cpPtsToPath(shift(m.cutPts),true)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
+  shift(active.junctions||[]).forEach(j=>geom+=cpSquareMark(j.x,j.y));
+  shift(active.midpoints||[]).forEach(mp=>geom+=cpDiamondMark(mp.x,mp.y));
+  const mds=cpMarkDetails(m.cutPts,m.marks,originX,originY);
+  mds.forEach((md,mi)=>{
+    const mark=m.marks[mi],isEdge=!mark||mark.kind!=="blend";
+    geom+=cpTriangleMark(md.x,md.y,md.nx,md.ny,md.tx,md.ty,isEdge?1:.5);
+    if(isEdge)geom+=cpPerpTick(md.x,md.y,md.nx,md.ny);
+  });
+  const open=p.topMode==="3side";
+  const r=active.runs;
+  const detailRows=[
+    ["Cut size",cpFmt(m.cutBB.w)+" W \u00D7 "+cpFmt(m.cutBB.h)+" H"],
+    [open?"Open sewline size":"Sewline size",cpFmt(active.bb.w)+" W \u00D7 "+cpFmt(active.bb.h)+" H"],
+    ["Cut perimeter",cpFmt(m.cutPerim)+"  ("+cpFmtD(m.cutPerim)+")"],
+    [open?"Three-sided sewline length":"Sewline perimeter",cpFmt(active.total)+"  ("+cpFmtD(active.total)+")"],
+    ["Seam allowance",cpFmt(p.sa)],
+    ...(p.stabilizerOn ? [["Stabilizer inset",cpFmt(p.stabilizerInset)+(p.stabilizerSeparate?" · printed separately":" · guide shown on main panel")]] : []),
+    ["Fullness / crown","Left "+cpFmt(m.crowns.hL)+" \u00B7 Right "+cpFmt(m.crowns.hR)+" \u00B7 Top "+cpFmt(m.crowns.hTop)+" \u00B7 Bottom "+cpFmt(m.crowns.hBot)+" \u00B7 feel: "+p.feel],
+    ["Corner softness","top "+cpFmt(m.softness.ts)+" \u00B7 bottom "+cpFmt(m.softness.bs)+" (0 = crisp)"],
+    ["Construction",open?"3-sided open top":"4-sided enclosed"],
+    ["Sewline side runs",open
+      ?("Right "+cpFmt(r.right)+" \u00B7 Bottom "+cpFmt(r.bottom)+" \u00B7 Left "+cpFmt(r.left)+" \u00B7 Top open")
+      :("Top "+cpFmt(r.top)+" \u00B7 Right "+cpFmt(r.right)+" \u00B7 Bottom "+cpFmt(r.bottom)+" \u00B7 Left "+cpFmt(r.left))]
+  ];
+  cpPrintDoc("Curved Panel \u2014 Main Panel",geom,spanW,spanH,detailRows,
+    "Purple = cut line \u00B7 grey dashed = sewline \u00B7 lavender dotted = stabilizer guide \u00B7 cyan dashed = center fold line. \u25B2 = center/fold mark \u00B7 \u25A1 = side junction \u00B7 \u25C7 = side midpoint.");
+}
+/* ---- PRINT: STABILIZER ---- */
+function cpPrintStabilizer(m,p){
+  if(!m.valid)return;
+  const pts=cpStabilizerPoints(m,p);
+  if(!pts?.length)return;
+  const bb=cpPtsBB(pts),PADIN=0.4;
+  const originX=bb.minX-PADIN,originY=bb.minY-PADIN;
+  const shift=qpts=>qpts.map(q=>({x:q.x-originX,y:q.y-originY,side:q.side}));
+  const spanW=bb.w+PADIN*2,spanH=bb.h+PADIN*2;
+  const midX=(m.frame[0].x+m.frame[1].x)/2-originX;
+  let geom="";
+  geom+=`<line x1="${midX.toFixed(4)}" y1="0.05" x2="${midX.toFixed(4)}" y2="${(spanH-0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
+  geom+=`<path d="${cpPtsToPath(shift(pts),true)}" fill="none" stroke="${C_STAB}" stroke-width="0.04"/>`;
+  const detailRows=[
+    ["Stabilizer size",cpFmt(bb.w)+" W × "+cpFmt(bb.h)+" H"],
+    ["Inset from panel cut line",cpFmt(p.stabilizerInset)],
+    ["Use with","Curved Panel — Main Panel"]
+  ];
+  cpPrintDoc("Curved Panel — Stabilizer",geom,spanW,spanH,detailRows,
+    "Lavender = stabilizer cut line · cyan dashed = center fold line. Print at 100% / Actual Size.");
+}
+
+/* ---- PRINT: SIDE PANELS ---- */
+function cpPiecePrintWidth(pc){
+  return pc.cutWidthTop!==undefined ? Math.max(pc.cutWidthTop, pc.cutWidthBottom) : pc.cutWidth;
+}
+
+function cpDrawTaperedStrip(pc){
+  const { x0, y0, cutL, sa } = pc;
+  const wTop=pc.cutWidthTop,wBot=pc.cutWidthBottom,maxW=Math.max(wTop,wBot);
+  const yC=y0+maxW/2,x1=x0+cutL;
+  const yTopAt=x=>{const t=cutL>1e-9?(x-x0)/cutL:0;return yC-(wTop+(wBot-wTop)*t)/2;};
+  const yBotAt=x=>{const t=cutL>1e-9?(x-x0)/cutL:0;return yC+(wTop+(wBot-wTop)*t)/2;};
+  const yTL=yTopAt(x0),yBL=yBotAt(x0),yTR=yTopAt(x1),yBR=yBotAt(x1);
+  const cutPts=`${x0.toFixed(4)},${yTL.toFixed(4)} ${x1.toFixed(4)},${yTR.toFixed(4)} ${x1.toFixed(4)},${yBR.toFixed(4)} ${x0.toFixed(4)},${yBL.toFixed(4)}`;
+  const sewStart=pc.flushStart?x0:x0+sa,sewEnd=pc.flushEnd?x1:x1-sa,midX=x0+cutL/2,midTop=yTopAt(midX),midBot=yBotAt(midX);
+  let g=`<polygon points="${cutPts}" fill="#fbecef" fill-opacity="0.55" stroke="none"/>`;
+  if(pc.plan){
+    for(const mk of pc.plan.marks){
+      const tx=sewStart+mk.s;
+      if(tx<x0-1e-9||tx>x1+1e-9)continue;
+      const len=mk.kind==="clip"?sa*.75:sa*.55,wgt=mk.kind==="clip"?.022:.016,yt=yTopAt(tx),yb=yBotAt(tx);
+      g+=`<line x1="${tx.toFixed(4)}" y1="${yt.toFixed(4)}" x2="${tx.toFixed(4)}" y2="${(yt+len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+      g+=`<line x1="${tx.toFixed(4)}" y1="${yb.toFixed(4)}" x2="${tx.toFixed(4)}" y2="${(yb-len).toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+    }
+  }
+  g+=`<line x1="${midX.toFixed(4)}" y1="${midTop.toFixed(4)}" x2="${midX.toFixed(4)}" y2="${midBot.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.016" stroke-dasharray="0.18 0.12"/>`;
+  g+=`<line x1="${x0.toFixed(4)}" y1="${yC.toFixed(4)}" x2="${x1.toFixed(4)}" y2="${yC.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.016" stroke-dasharray="0.18 0.12"/>`;
+  if(sewEnd>sewStart){
+    const stTop=yTopAt(sewStart)+sa,stBot=yBotAt(sewStart)-sa,enTop=yTopAt(sewEnd)+sa,enBot=yBotAt(sewEnd)-sa;
+    const sewPts=`${sewStart.toFixed(4)},${stTop.toFixed(4)} ${sewEnd.toFixed(4)},${enTop.toFixed(4)} ${sewEnd.toFixed(4)},${enBot.toFixed(4)} ${sewStart.toFixed(4)},${stBot.toFixed(4)}`;
+    g+=`<polygon points="${sewPts}" fill="none" stroke="${C_SEW}" stroke-width="0.02" stroke-dasharray="0.15 0.1"/>`;
+  }
+  if(pc.landmarks){
+    for(const L of pc.landmarks){
+      const tx=sewStart+L.s;
+      if(tx<x0-1e-9||tx>x1+1e-9)continue;
+      const yt=yTopAt(tx)+sa,yb=yBotAt(tx)-sa;
+      if(L.kind==="junction"){g+=cpSquareMark(tx,yt)+cpSquareMark(tx,yb);}else{g+=cpDiamondMark(tx,yt)+cpDiamondMark(tx,yb);}
+    }
+  }
+  g+=cpTriangleH(midX,midTop,+1)+cpTriangleH(midX,midBot,-1)+cpTriangleV(x0,yC,+1)+cpTriangleV(x1,yC,-1);
+  g+=`<polygon points="${cutPts}" fill="none" stroke="${C_CUT}" stroke-width="0.035" stroke-linejoin="round"/>`;
+  if(pc.flushStart)g+=`<text x="${(x0+0.08).toFixed(4)}" y="${(yBL-0.08).toFixed(4)}" font-size="0.12" font-weight="800" font-family="Nunito,sans-serif" fill="${C_CUT}">RAW TOP</text>`;
+  if(pc.flushEnd)g+=`<text x="${(x1-0.08).toFixed(4)}" y="${(yBR-0.08).toFixed(4)}" font-size="0.12" font-weight="800" font-family="Nunito,sans-serif" fill="${C_CUT}" text-anchor="end">RAW TOP</text>`;
+  g+=`<text x="${(x0+0.12).toFixed(4)}" y="${(yC+0.07).toFixed(4)}" font-size="0.18" font-family="Nunito, sans-serif" fill="#333">${pc.label}</text>`;
+  return g;
+}
+
+/* ---- PRINT: SIDE PANELS ---- */
+function cpPrintSides(m,p){
+  if(!m.valid||!m.displaySidePieces?.length)return;
+  const PADIN=.4,GAP=.55;
+  const pieces=m.displaySidePieces;
+  const isTapered=pieces.some(pc=>pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9);
+  let geom="",y=PADIN,maxL=0;
+  const detailRows=[
+    [isTapered?"Side depth / taper":"Strip width (all)",isTapered?`top ${cpFmt(p.depthTop)} · bottom ${cpFmt(p.depthBottom)} finished`:`${cpFmt(p.sideDepth+2*p.sa)} cut · ${cpFmt(p.sideDepth)} finished`],
+    ["Seam allowance",cpFmt(p.sa)]
+  ];
+  for(const pc of pieces){
+    const pieceW=cpPiecePrintWidth(pc);
+    const taper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
+    if(taper){
+      geom+=cpDrawTaperedStrip({x0:PADIN,y0:y,cutL:pc.cutLength,sa:p.sa,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,plan:pc.plan,landmarks:pc.landmarks,label:pc.label,cutWidthTop:pc.cutWidthTop,cutWidthBottom:pc.cutWidthBottom});
+      detailRows.push([pc.label,`cut ${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} bottom · sewline run ${cpFmt(pc.runLength)}`]);
+    }else{
+      geom+=cpDrawStrip({x0:PADIN,y0:y,cutL:pc.cutLength,w:pieceW,sa:p.sa,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,plan:pc.plan,landmarks:pc.landmarks,label:pc.label});
+      detailRows.push([pc.label,`cut ${cpFmt(pc.cutLength)} × ${cpFmt(pieceW)} · sewline run ${cpFmt(pc.runLength)}`]);
+    }
+    maxL=Math.max(maxL,pc.cutLength);y+=pieceW+GAP;
+  }
+  cpPrintDoc("Curved Panel \u2014 Side Panels",geom,maxL+PADIN*2,y-GAP+PADIN,detailRows,"Maroon = cut \u00B7 grey dashed = sewline \u00B7 cyan = piece midpoint. Blue marks are suggested clipping/notching positions; stop before the sewline. Tapered side pieces preserve the top and bottom depths shown in the cutting list.");
+}
+
+/* ---- PRINT: GUSSET ---- */
+function cpPrintGusset(m,p){
+  const pc=m.gussetPiece;
+  if(!m.valid||!pc)return;
+  const sa=p.sa,w=pc.cutWidth,cutL=pc.cutLength,run=pc.runLength,PADIN=.4;
+  const sy=PADIN+pc.startAllowance,ey=sy+run;
+  const midY=PADIN+cutL/2,midX=PADIN+w/2;
+  let geom=`<rect x="${PADIN}" y="${PADIN}" width="${w.toFixed(4)}" height="${cutL.toFixed(4)}" fill="#fbecef" fill-opacity="0.55" stroke="none"/>`;
+  for(const mk of pc.plan.marks){
+    const ty=sy+mk.s,len=mk.kind==="clip"?sa*.75:sa*.55,wgt=mk.kind==="clip"?.022:.016;
+    geom+=`<line x1="${PADIN}" y1="${ty.toFixed(4)}" x2="${(PADIN+len).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+    geom+=`<line x1="${(PADIN+w).toFixed(4)}" y1="${ty.toFixed(4)}" x2="${(PADIN+w-len).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_NOTCH}" stroke-width="${wgt}"/>`;
+  }
+  geom+=`<line x1="${midX.toFixed(4)}" y1="${PADIN}" x2="${midX.toFixed(4)}" y2="${(PADIN+cutL).toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.018" stroke-dasharray="0.22 0.14"/>`;
+  geom+=`<line x1="${PADIN}" y1="${midY.toFixed(4)}" x2="${(PADIN+w).toFixed(4)}" y2="${midY.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.018" stroke-dasharray="0.22 0.14"/>`;
+  let d=`M ${(PADIN+sa).toFixed(4)} ${sy.toFixed(4)} V ${ey.toFixed(4)} M ${(PADIN+w-sa).toFixed(4)} ${sy.toFixed(4)} V ${ey.toFixed(4)}`;
+  d+=` M ${(PADIN+sa).toFixed(4)} ${sy.toFixed(4)} H ${(PADIN+w-sa).toFixed(4)} M ${(PADIN+sa).toFixed(4)} ${ey.toFixed(4)} H ${(PADIN+w-sa).toFixed(4)}`;
+  geom+=`<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
+  for(const L of pc.landmarks){
+    const ty=sy+L.s;
+    if(L.kind==="junction"){geom+=cpSquareMark(PADIN+sa,ty)+cpSquareMark(PADIN+w-sa,ty);}
+    else{geom+=cpDiamondMark(PADIN+sa,ty)+cpDiamondMark(PADIN+w-sa,ty);}
+  }
+  let acc=0;
+  for(const z of pc.zones.slice(0,-1)){
+    acc+=z.length;
+    const ty=sy+acc;
+    geom+=`<line x1="${PADIN}" y1="${ty.toFixed(4)}" x2="${(PADIN+w).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.012" stroke-dasharray="0.08 0.08" opacity=".75"/>`;
+  }
+  geom+=cpTriangleH(midX,PADIN,+1)+cpTriangleH(midX,PADIN+cutL,-1);
+  geom+=cpTriangleV(PADIN,midY,+1)+cpTriangleV(PADIN+w,midY,-1);
+  geom+=`<rect x="${PADIN}" y="${PADIN}" width="${w.toFixed(4)}" height="${cutL.toFixed(4)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
+  const detailRows=[
+    ["Gusset strip","cut "+cpFmt(cutL)+" × "+cpFmt(w)+" · finished width "+cpFmt(pc.finishedWidth)],
+    ["Sewline run",cpFmt(run)],
+    ["Seam allowance",cpFmt(p.sa)],
+    ["Construction",pc.open?"3-sided open top":"4-sided enclosed"]
+  ];
+  cpPrintDoc("Curved Panel — Gusset",geom,w+PADIN*2,cutL+PADIN*2,detailRows,
+    "Maroon = cut · grey dashed = sewline/end allowance guides · pale dashed = horizontal and vertical centerlines. Triangles mark the midpoint of all four cut edges. Blue marks are suggested clipping/notching positions; stop before the sewline.");
+}
 
 /* =====================================================================
    ON-SCREEN DIAGRAM + PIECE RENDERERS (ported from prototype render())
@@ -95,7 +614,7 @@ function cpPanelDiagramSVG(model,params){
   });
   const stabPts=cpStabilizerPoints(model,params);
   svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="#f6edff" stroke="${CP.maroon}" stroke-width="3.5" stroke-linejoin="round" fill-opacity="0.48"/>`;
-  if(stabPts)svg+=stabSVGElement('path',`d="${cpPtsToPath(map(stabPts),true)}"`);
+  if(stabPts)svg+=`<path d="${cpPtsToPath(map(stabPts),true)}" fill="none" stroke="${C_STAB}" stroke-width="2" stroke-dasharray="4 5" opacity="0.95"/>`;
   return svg;
 }
 
@@ -184,7 +703,7 @@ function cpMiniStrip(cutL, cutW, label, dims, opts){
     const stPx=o.stabInset*scale;
     const stabX=x0+stPx,stabY=yTop+stPx,stabW=drawW-2*stPx,stabH=drawL-2*stPx;
     if(stabW>0&&stabH>0){
-      s+=stabSVGElement('rect',`x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}"`);
+      s+=`<rect x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}" fill="none" stroke="${C_STAB}" stroke-width="${W_STAB}" stroke-dasharray="${DASH_STAB}" stroke-linecap="round"/>`;
     }
   }
   if(o.topLabel){
@@ -223,132 +742,69 @@ function cpMiniTrapezoid(pc, opts){
   const leftMidX=(topLeft+bottomLeft)/2;
   const rightMidX=(topRight+bottomRight)/2;
   const saPx=(o.sa||0)*scale;
-  const marker=C_MIDPOINT;
-  const openTop=o.flushStart;
-
-  function offsetEdge(a,b,d){
-    const c=cpCentroid(cutPts);
-    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1e-9;
-    let nx=-dy/len,ny=dx/len;
-    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-    if((c.x-mx)*nx+(c.y-my)*ny<0){nx=-nx;ny=-ny;}
-    return {a:{x:a.x+nx*d,y:a.y+ny*d},b:{x:b.x+nx*d,y:b.y+ny*d}};
-  }
-  function lineFrom(seg){return {p:seg.a,d:{x:seg.b.x-seg.a.x,y:seg.b.y-seg.a.y}};}
-  function intersectLines(A,B){return cpLineDirIntersect(A.p,A.d,B.p,B.d);}
-
+  const STROKE=CP.maroon;
   let s=`<svg width="${svgW.toFixed(1)}" height="${svgH.toFixed(1)}" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" xmlns="http://www.w3.org/2000/svg" style="${cpMiniSvgStyle(svgW,svgH)}">`;
   if(o.ghost){
     const gPts=cutPts.map(p=>({x:p.x+10,y:p.y-10}));
     s+=`<polygon points="${cpSvgPts(gPts)}" fill="none" stroke="${CP.pinkLine}" stroke-width="1.5" opacity="0.5"/>`;
   }
   s+=`<polygon points="${cpSvgPts(cutPts)}" fill="#ede8f8" fill-opacity=".72" stroke="none"/>`;
-
-  let sewPts=null;
-  if(saPx>0){
-    if(openTop){
-      const topLine={p:cutPts[0],d:{x:cutPts[1].x-cutPts[0].x,y:cutPts[1].y-cutPts[0].y}};
-      const rightLine=lineFrom(offsetEdge(cutPts[1],cutPts[2],saPx));
-      const bottomLine=lineFrom(offsetEdge(cutPts[2],cutPts[3],saPx));
-      const leftLine=lineFrom(offsetEdge(cutPts[3],cutPts[0],saPx));
-      const L0=intersectLines(leftLine,topLine);
-      const L1=intersectLines(leftLine,bottomLine);
-      const R1=intersectLines(rightLine,bottomLine);
-      const R0=intersectLines(rightLine,topLine);
-      if(L0&&L1&&R1&&R0){
-        sewPts=[L0,L1,R1,R0];
-        s+=`<path d="M ${L0.x.toFixed(1)} ${L0.y.toFixed(1)} L ${L1.x.toFixed(1)} ${L1.y.toFixed(1)} L ${R1.x.toFixed(1)} ${R1.y.toFixed(1)} L ${R0.x.toFixed(1)} ${R0.y.toFixed(1)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
-      }
-    } else {
-      sewPts=cpInsetScreenPolygon(cutPts,saPx);
-      if(sewPts?.length){
-        s+=`<polygon points="${cpSvgPts(sewPts)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
-      }
-    }
+  const sewPts=saPx>0?cpInsetScreenPolygon(cutPts,saPx):null;
+  if(sewPts?.length){
+    s+=`<polygon points="${cpSvgPts(sewPts)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
   }
-
   s+=`<line x1="${midX.toFixed(1)}" y1="${yTop.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${yBottom.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
   s+=`<line x1="${leftMidX.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${rightMidX.toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
-  if(sewPts?.length){
-    const leftMid={x:(sewPts[0].x+sewPts[1].x)/2,y:(sewPts[0].y+sewPts[1].y)/2};
-    const rightMid={x:(sewPts[2].x+sewPts[3].x)/2,y:(sewPts[2].y+sewPts[3].y)/2};
-    s+=`<circle cx="${leftMid.x.toFixed(1)}" cy="${leftMid.y.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-    s+=`<circle cx="${rightMid.x.toFixed(1)}" cy="${rightMid.y.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-  }
-  const tb=TRIANGLE_BASE,th=TRIANGLE_HEIGHT;
-  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yTop.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yTop.toFixed(1)} ${midX.toFixed(1)},${(yTop+th).toFixed(1)}" fill="${marker}"/>`;
-  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yBottom.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yBottom.toFixed(1)} ${midX.toFixed(1)},${(yBottom-th).toFixed(1)}" fill="${marker}"/>`;
-  s+=`<polygon points="${leftMidX.toFixed(1)},${(midY-tb/2).toFixed(1)} ${leftMidX.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(leftMidX+th).toFixed(1)},${midY.toFixed(1)}" fill="${marker}"/>`;
-  s+=`<polygon points="${rightMidX.toFixed(1)},${(midY-tb/2).toFixed(1)} ${rightMidX.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(rightMidX-th).toFixed(1)},${midY.toFixed(1)}" fill="${marker}"/>`;
+  const tb=8,th=11;
+  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yTop.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yTop.toFixed(1)} ${midX.toFixed(1)},${(yTop+th).toFixed(1)}" fill="${STROKE}"/>`;
+  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yBottom.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yBottom.toFixed(1)} ${midX.toFixed(1)},${(yBottom-th).toFixed(1)}" fill="${STROKE}"/>`;
+  s+=`<polygon points="${leftMidX.toFixed(1)},${(midY-tb/2).toFixed(1)} ${leftMidX.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(leftMidX+th).toFixed(1)},${midY.toFixed(1)}" fill="${STROKE}"/>`;
+  s+=`<polygon points="${rightMidX.toFixed(1)},${(midY-tb/2).toFixed(1)} ${rightMidX.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(rightMidX-th).toFixed(1)},${midY.toFixed(1)}" fill="${STROKE}"/>`;
   if(o.stabInset>0){
     const stPx=o.stabInset*scale;
     const stabPts=cpInsetScreenPolygon(cutPts,stPx);
     if(stabPts?.length){
-      s+=stabSVGElement('polygon',`points="${cpSvgPts(stabPts)}"`);
+      s+=`<polygon points="${cpSvgPts(stabPts)}" fill="none" stroke="${C_STAB}" stroke-width="1.5" stroke-dasharray="4 5"/>`;
     }
   }
-  s+=`<polygon points="${cpSvgPts(cutPts)}" fill="none" stroke="${CP.maroon}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  s+=`<polygon points="${cpSvgPts(cutPts)}" fill="none" stroke="${STROKE}" stroke-width="2.5" stroke-linejoin="round"/>`;
   s+=`</svg>`;
   return cpMiniShell(s);
 }
 
-/* cpProw and cpPieceBlock relocated to src/measurementsTable.js (Pass 11) — imported below. */
-import { cpProw, cpPieceBlock } from "../measurementsTable.js";
-
-/* Sides minis + tables */
-function cpPiecePreviewTitle(pc){
-  if(pc.sides?.includes("left")&&pc.sides?.includes("right"))return "Sides";
-  if(pc.side==="right")return "Right side";
-  if(pc.side==="left")return "Left side";
-  if(pc.side==="top")return "Top";
-  if(pc.side==="bottom")return "Bottom";
-  return pc.label?.replace(/\s+—\s+CUT\s+\d+/i,"")||"Piece";
+/* Piece-table builders */
+function cpProw(label, cutVal, sewVal){
+  return `<div class="cp-prow"><div class="pl">${label}</div><div class="pc">${cutVal}</div><div class="ps">Sewline: ${sewVal}</div></div>`;
 }
-function cpPiecePreviewOrder(pc){
-  if(pc.sides?.includes("left")&&pc.sides?.includes("right"))return 0;
-  if(pc.side==="right")return 0;
-  if(pc.side==="left")return 1;
-  if(pc.side==="top")return 2;
-  if(pc.side==="bottom")return 3;
-  return 9;
+function cpPieceBlock(pill, rows, note){
+  return `<span class="cp-pill">${pill}</span>` + rows.join("") + (note ? `<p class="cp-pnote">${note}</p>` : "");
 }
-function cpPiecePreviewDims(pc){
-  if(pc.cutWidthTop!==undefined){
-    return `${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} bottom`;
-  }
-  return `${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidth)}`;
-}
+// cpStripRows retained for future use
+// function cpStripRows(cutL, sewL, cutW, sewW){ ... }
 
 /* Sides minis + tables */
 function cpSidesHTML(m,p){
-  const pieces=[...(m.displaySidePieces||[])].sort((a,b)=>cpPiecePreviewOrder(a)-cpPiecePreviewOrder(b));
+  const pieces=m.displaySidePieces||[];
   if(!pieces.length)return {minis:"",tables:""};
   const maxW=Math.max(...pieces.map(x=>x.cutWidthTop!==undefined?Math.max(x.cutWidthTop,x.cutWidthBottom):x.cutWidth));
   const maxL=Math.max(...pieces.map(x=>x.cutLength));
-  // Shared preview scale keeps all piece drawings readable without letting one SVG grow huge.
-  const fitScale=Math.min(170/Math.max(maxL,1e-9),96/Math.max(maxW,1e-9));
+  // vertical orientation: length = height axis, width/depth = horizontal axis
+  const fitScale=Math.min(180/Math.max(maxL,1e-9),108/Math.max(maxW,1e-9));
   const stabInset=(p.stabilizerOn&&p.stabilizerInset>0)?p.stabilizerInset:0;
-  const cards=[];
-  let tables="";
+  let minis="",tables="";
   for(const pc of pieces){
     const isTaper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
-    const svg=isTaper
-      ?cpMiniTrapezoid(pc,{ghost:pc.quantity===2,sa:p.sa,stabInset,fitScale,flushStart:pc.flushStart,flushEnd:pc.flushEnd})
-      :cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset});
-    cards.push({title:cpPiecePreviewTitle(pc),dims:cpPiecePreviewDims(pc),svg});
     if(isTaper){
+      minis+=cpMiniTrapezoid(pc,{ghost:pc.quantity===2,sa:p.sa,stabInset,fitScale});
       const widthRow=cpProw("Width — cut",`${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} btm`,`${cpFmt(pc.finishedWidthTop)} / ${cpFmt(pc.finishedWidthBottom)}`);
       tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),widthRow],"Tapered: top and bottom widths differ.");
     } else {
+      minis+=cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset});
       const note=pc.flushStart||pc.flushEnd?"Raw-top end is flush; the opposite end includes the joining seam allowance.":(pc.quantity===2?"Verified mirrored pair; one template can be used for both sides.":"");
       tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),cpProw("Width — cut",cpFmt(pc.cutWidth),cpFmt(pc.finishedWidth))],note);
     }
   }
-  const cols=`repeat(${cards.length}, minmax(112px, 1fr))`;
-  const heads=cards.map(c=>`<div class="cp-pieceHead" style="min-width:0;text-align:center"><div style="font-weight:900;color:${CP.ink};line-height:1.05">${c.title}</div><div style="font-size:12px;font-weight:800;color:${CP.muted};line-height:1.2;margin-top:3px">${c.dims}</div></div>`).join("");
-  const svgs=cards.map(c=>`<div class="cp-pieceSvg" style="min-width:0;display:flex;align-items:flex-start;justify-content:center">${c.svg}</div>`).join("");
-  const minis=`<div class="cp-pieceGrid" style="display:grid;grid-template-columns:${cols};column-gap:14px;row-gap:8px;align-items:start;width:100%;max-width:100%;overflow-x:auto;padding:4px 2px 0">${heads}${svgs}</div>`;
-  return {minis,tables};
+  return {minis:`<div class="cp-miniWrap" style="display:flex;flex-wrap:nowrap;align-items:flex-start;gap:14px;overflow-x:auto;justify-content:flex-start;width:100%">${minis}</div>`,tables};
 }
 
 function cpGussetMapHTML(pc, stabInset){
@@ -365,7 +821,7 @@ function cpGussetMapHTML(pc, stabInset){
     const stPx=stabInset*scale;
     const stabX=x0+stPx,stabY=y0+stPx,stabW=drawL-2*stPx,stabH=drawW-2*stPx;
     if(stabW>0&&stabH>0){
-      s+=stabSVGElement('rect',`x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}"`);
+      s+=`<rect x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}" fill="none" stroke="${C_STAB}" stroke-width="1.5" stroke-dasharray="4 5"/>`;
     }
   }
   let acc=0;for(let i=0;i<pc.zones.length;i++){const z=pc.zones[i],x1=sewStart+acc*scale,x2=x1+z.length*scale;if(i>0)s+=`<line x1="${x1.toFixed(1)}" y1="${y0}" x2="${x1.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${CP.maroon}" stroke-width="1.4" opacity=".65"/>`;if(x2-x1>54)s+=`<text x="${((x1+x2)/2).toFixed(1)}" y="${(midY+5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,sans-serif" fill="${CP.maroon}">${z.side.toUpperCase()}</text>`;acc+=z.length;}
@@ -625,6 +1081,9 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
               <div className="cp-diag-meta">
                 <p className="cp-diag-legend">
                   ▲ center · ○ midpoints · solid = cut · dashed = sewline{stabOn?" · dotted = stabilizer":""}
+                </p>
+                <p className={`cp-symline ${model.symmetry?"yes":"no"}`}>
+                  Fold-friendly symmetry: {model.symmetry?"yes":"no"}
                 </p>
               </div>
             )}

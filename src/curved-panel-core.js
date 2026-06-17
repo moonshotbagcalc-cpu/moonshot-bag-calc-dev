@@ -3,6 +3,7 @@
    Moonshot JSX later. All units are inches. SVG-style coords (y down).
    Winding is clockwise: top → right → bottom → left.
    ===================================================================== */
+import { offsetSidePaths } from './geometryOffset.js';
 
 const FEEL_ALPHA = { gentle: 0.32, balanced: 0.40, defined: 0.48 };
 const EDGE_SAMPLES = 160;
@@ -626,40 +627,8 @@ function sideLengths(sidePaths){
   return out;
 }
 
-function joinOffsetPair(A,B){
-  if (A.length<2||B.length<2) return;
-  const a0=A[A.length-1], b0=B[0];
-  const ta=unit(a0.x-A[A.length-2].x,a0.y-A[A.length-2].y);
-  const tb=unit(B[1].x-b0.x,B[1].y-b0.y);
-  const den=ta.x*tb.y-ta.y*tb.x;
-  if (Math.abs(den)<1e-5 && ta.x*tb.x+ta.y*tb.y>0.98){
-    const M={x:(a0.x+b0.x)/2,y:(a0.y+b0.y)/2};
-    A[A.length-1]={...M,side:A[A.length-1].side};
-    B[0]={...M,side:B[0].side};
-    return;
-  }
-  const X=lineIntersect(a0,ta,b0,tb);
-  if (!X) return;
-  const refA=Math.sign(crossZ(tb,A[Math.floor(A.length/2)],b0))||1;
-  while(A.length>2&&Math.sign(crossZ(tb,A[A.length-1],b0))!==refA)A.pop();
-  const refB=Math.sign(crossZ(ta,B[Math.floor(B.length/2)],a0))||1;
-  while(B.length>2&&Math.sign(crossZ(ta,B[0],a0))!==refB)B.shift();
-  if(dist(A[A.length-1],X)>1e-7)A.push({...X,side:A[A.length-1].side});
-  else A[A.length-1]={...X,side:A[A.length-1].side};
-  if(dist(B[0],X)>1e-7)B.unshift({...X,side:B[0].side});
-  else B[0]={...X,side:B[0].side};
-}
-
-function offsetSidePaths(cutSides,sa){
-  const out={};
-  for(const side of SIDE_ORDER)out[side]=offsetOpen(cutSides[side],sa);
-  joinOffsetPair(out.top,out.right);
-  joinOffsetPair(out.right,out.bottom);
-  joinOffsetPair(out.bottom,out.left);
-  joinOffsetPair(out.left,out.top);
-  for(const side of SIDE_ORDER)out[side]=dedupe(out[side],false).map(q=>({...q,side}));
-  return out;
-}
+/* joinOffsetPair and offsetSidePaths relocated to geometryOffset.js (Pass 11).
+   offsetSidePaths is imported at the top of this file. */
 
 function pathPointAt(pts, s){
   if (!pts.length) return null;

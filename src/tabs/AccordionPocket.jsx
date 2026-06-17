@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PI, DEFAULT_SA } from "../utils/constants.js";
 import { roundTo8th, smartRound, fmtInch } from "../utils/formatting.js";
 import { T } from "../utils/theme.js";
-import { SecHeader, Card, CardTitle, RRow, InfoBox, SubTabs, Divider, SABar } from "../components/SharedUI.jsx";
+import { Card, CardTitle, RRow, InfoBox, SubTabs, Divider, SABar } from "../components/SharedUI.jsx";
 import FracInput from "../components/FracInput.jsx";
 
 // ── Accordion SVG diagram ─────────────────────────────────────────────────────
@@ -358,15 +358,19 @@ export default function AccordionPocketPage() {
   }
 
   return (
-    <div style={{minHeight:"100vh", padding:"16px 16px 80px"}}>
-      <SABar sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} th={th}/>
+    <div className="tab-page" data-group="trim-pockets">
+      <div className="tab-content-wrap" style={{paddingBottom:80}}>
+        <div className="tab-intro-card">
+          <div className="tab-intro-card-thumb" />
+          <div className="tab-intro-card-text">
+            <div className="tab-intro-card-title">Accordion Pocket</div>
+            <div className="tab-intro-card-desc">An open-bottomed accordion-fold pocket that expands to fit its contents and collapses flat when empty — ideal for water bottles, sunglass cases, or anything that benefits from a self-adjusting fit.</div>
+          </div>
+        </div>
 
-      <div style={{background:th.sec, borderRadius:14, boxShadow:"0 4px 18px rgba(26,74,122,0.12)"}}>
-        <SecHeader th={th}
-          title="Accordion Pocket Calculator"
-          sub="An open-bottomed accordion-fold pocket that expands to fit its contents and collapses flat when empty — ideal for water bottles, sunglass cases, or anything that benefits from a self-adjusting fit."/>
+        <SABar sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} th={th}/>
 
-        <div style={{padding:"16px 16px 20px"}}>
+        <div>
 
           {/* Explainer */}
           <InfoBox th={th}>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "../utils/theme.js";
-import { SecHeader, Card, CardTitle, RRow, InfoBox, NoteBox, SubTabs, SABar } from "../components/SharedUI.jsx";
+import { Card, CardTitle, RRow, InfoBox, NoteBox, SubTabs, SABar } from "../components/SharedUI.jsx";
 import FracInput from "../components/FracInput.jsx";
 import { roundRectPerim } from "../utils/geometry.js";
 import { PI, DEFAULT_SA, CORDS } from "../utils/constants.js";
@@ -88,12 +88,17 @@ export default function PipingPage() {
   const vinylPresets=[{l:'1/32"',v:1/32},{l:'1/16"',v:1/16},{l:'3/32"',v:3/32}];
 
   return (
-    <div style={{ minHeight:"100vh", padding:"16px 16px 48px" }}>
-      <SABar th={th} sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} />
-      <div style={{ background:th.sec, borderRadius:14, boxShadow:"0 4px 18px rgba(142,26,158,0.12)" }}>
-        <SecHeader th={th} title="Piping"
-          sub="Calculates piping cord length and fabric/vinyl strip dimensions. Cord length accounts for the cord curving inside the sewline." />
-        <div style={{ padding:"16px 16px 20px" }}>
+    <div className="tab-page" data-group="trim-pockets">
+      <div className="tab-content-wrap">
+        <div className="tab-intro-card">
+          <div className="tab-intro-card-thumb" />
+          <div className="tab-intro-card-text">
+            <div className="tab-intro-card-title">Piping</div>
+            <div className="tab-intro-card-desc">Calculates piping cord length and fabric/vinyl strip dimensions for rectangular, oval, and 3-sided panels. Cord length accounts for the cord curving inside the sewline, with both geometric and snug-fit values.</div>
+          </div>
+        </div>
+
+        <SABar th={th} sa={sa} setSa={setSa} cSa={cSa} setCsa={setCsa} />
 
           <Card th={th}>
             <CardTitle th={th}>Piping Cord Size</CardTitle>
@@ -286,7 +291,6 @@ export default function PipingPage() {
               </NoteBox>
             )}
           </Card>
-        </div>
       </div>
     </div>
   );

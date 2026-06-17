@@ -1110,7 +1110,7 @@ Instructions:
 6. Apply --sp- color family to accent elements.
 7. Confirm build and review in browser.
 
-### Pass 10 -- Tapered Sides Architecture Fix + UI Cleanup
+### Pass 10 -- Tapered Sides Architecture Fix + UI Cleanup (done)
 
 Prerequisite: current build confirmed passing.
 
@@ -1201,29 +1201,10 @@ To:
 Confirm visually that the bar no longer slides behind or overlaps the nav bar when
 scrolling.
 
----
-
-#### 4. Remove measurement captions under diagrams
-
-All text appearing below or outside the SVG diagram box that describes piece name,
-cut dimensions, or sewline dimensions must be removed entirely.
-
-This supersedes any earlier instruction to show a "quiet caption below the diagram."
-That decision is reversed. The cutting list is the authoritative place for all
-measurements. Nothing should repeat that information under a diagram.
-
-Apply this to all diagram locations:
-- Main panel diagram
-- Side strip diagrams
-- Gusset diagram
-- Any other Tier 1 diagram that currently shows a caption beneath it
-
-Do not remove the legend (the mark key below the diagram). Remove only the
-dimensional text.
 
 ---
 
-#### 5. Cutting list — standalone card, improved readability
+#### 4. Cutting list — standalone card, improved readability
 
 The cutting list is a primary work surface. A person stands at a cutting table and reads
 from it. It must be readable at a glance and visually prominent.
@@ -1278,7 +1259,242 @@ from it. It must be readable at a glance and visually prominent.
 - [ ] Piece name is larger and legible; measurements are adjacent, not separated
 - [ ] npm run build passes with no new errors
 
-### Pass 11 -- Remaining Tabs
+### Pass 11 — Module Extraction (Stabilizer, Measurements, Diagram Marks, Print) + Formatting Punch List
+
+**Status: CURRENT — do not begin Pass 12 until this pass is confirmed**
+Prerequisite: Pass 10 confirmed, and the CurvedPanel.side-grid-stab-fix.jsx patch
+(miter-offset stabilizer fix) visually confirmed correct on the main panel with
+mixed corner types before extraction begins.
+
+---
+
+## Ground rule for this entire pass
+
+This is a RELOCATION pass, not a rewrite. The goal is to move existing, working
+logic out of CurvedPanel.jsx into dedicated module files — not to improve,
+simplify, or change behavior while moving it. Visual output before and after
+each extraction must be identical. If you notice something that looks like a
+bug or improvement opportunity while extracting, do NOT fix it inline — note it
+and ask, then keep moving.
+
+After each of the four extractions below, confirm `npm run build` passes AND do
+a visual check before moving to the next extraction. Do not batch all four
+extractions before the first visual check.
+
+---
+
+## Extraction 1 — Stabilizer module
+
+Create a dedicated module (suggest `src/stabilizer.js`, but follow existing
+project file-organization conventions if there's an established pattern).
+
+**Before moving anything, investigate this first:** The cut line and sewline
+already render correctly on the main panel with mixed corner types (one crisp,
+one rounded) — no self-crossing, no looping, confirmed visually. The
+stabilizer line is the only one that still loops over itself in this case.
+This strongly suggests the sewline/SA offset uses a correct curve-aware offset
+algorithm that the stabilizer is NOT using — instead the stabilizer maintains
+its own separate algorithm (`cpOffsetInwardMiter` → side-aware fallback →
+`cpInsetClosedPoints`), which still produces self-crossing results in this
+case.
+
+Find the function that produces the sewline offset for the main panel model
+(likely inside `curved-panel-core.js`, possibly producing `model.activeSew` or
+similar). Report back: what is it called, and can it be called generically
+with an arbitrary offset distance (not just SA) to produce the stabilizer
+path? If yes, the stabilizer module should call THIS function with the
+stabilizer inset distance, rather than maintaining a separate offset
+algorithm. This likely fixes the self-crossing/looping bug directly, since
+it reuses curve math already proven correct, instead of patching a second,
+inferior implementation.
+
+**If reusing this function requires adding an export to
+`curved-panel-core.js`** (exposing an existing internal function without
+changing its behavior) — STOP and ask before doing so. That file is normally
+off-limits and needs explicit authorization for even a non-behavioral change
+like an export.
+
+Only fall back to keeping/improving `cpOffsetInwardMiter` and the existing
+fallback chain if the shared sewline-offset function genuinely cannot be
+reused for the stabilizer's case — explain why before falling back.
+
+Move into the new module:
+- `cpStabilizerPoints()`, `cpOffsetInwardMiter()`, `cpInsetClosedPoints()`,
+  `cpOffsetSidePaths()`, `cpCombineSidePaths()`, `cpHasSelfCross()`
+- Any stabilizer-specific drawing logic currently duplicated inside
+  `cpMiniStrip`, `cpMiniTrapezoid`, `cpGussetMapHTML`, and `cpPanelDiagramSVG`.
+  Before extracting, identify whether these four functions each have their own
+  separate stabilizer-offset/draw logic (e.g. via `cpInsetScreenPolygon` calls)
+  or whether they already share code. Report back what you find, then unify
+  into ONE shared stabilizer draw function that all four diagram functions
+  call, rather than leaving four separate implementations.
+- Stabilizer-specific cutting list row generation logic (Cut 2 for panels,
+  matches parent quantity for strips/gusset).
+
+Do not move generic geometry helpers (`cpDist`, `cpUnit`, `cpCentroid`,
+`cpSegmentsIntersect`, `cpLineIntersect`, `cpLineDirIntersect`,
+`cpDedupePath`, `cpSimplifyCollinearClosedPts`) into this module if they are
+used by non-stabilizer code elsewhere in the file — those belong in a shared
+geometry utility module instead, or stay where they are if extracting them
+risks touching curved-panel-core.js usage. Flag this rather than guessing.
+
+---
+
+## Extraction 2 — Measurements / dimensions table module
+
+Create a dedicated module (suggest `src/measurementsTable.js`).
+
+Move into it:
+- `cpProw()`, `cpPieceBlock()`, and the table-assembly logic currently used
+  for side pieces in `cpSidesHTML()`.
+- Before extracting, check whether the main panel and gusset measurement
+  tables already reuse `cpProw`/`cpPieceBlock`, or whether they have their
+  own separate, duplicate row-building code. If duplicated, unify into the
+  same shared table-builder so panel, strip, and gusset measurement tables
+  all go through one function. Report what you find before unifying.
+
+---
+
+## Extraction 3 — Shared diagram mark primitives module
+
+Create a dedicated module (suggest `src/diagramMarks.js`). This module should
+import color/style constants from `diagramTokens.js` (created in the prior
+Diagram Standard pass) rather than hardcoding values.
+
+Move into it the draw functions for every universal mark currently built as
+inline SVG string fragments inside `cpPanelDiagramSVG`, `cpMiniStrip`,
+`cpMiniTrapezoid`, and `cpGussetMapHTML`:
+- Cut line
+- Sewline
+- Center / crosshair lines
+- Fold lines
+- Corner junction marks (open square)
+- Midpoint marks (open circle)
+- Center match triangles
+- Easing marks (clip/notch ticks)
+- Stabilizer line styling (the visual stroke/dash itself — the offset
+  geometry stays in the stabilizer module from Extraction 1; this module
+  only owns how the stabilizer line is drawn once points exist)
+
+Each of the four diagram functions should call these shared primitives
+instead of building inline SVG markup for these marks. Before extracting,
+list every place each mark type is currently drawn so nothing is missed.
+
+---
+
+## Extraction 4 — Print functions module
+
+Create a dedicated module (suggest `src/printRenderers.js`).
+
+Move into it:
+- `cpPrintSides()`, `cpDrawTaperedStrip()`, and the print-rendering functions
+  for the main panel, gusset, and stabilizer (find and report the exact
+  function names — they were not all directly confirmed before this pass).
+- Any print-specific layout/document assembly logic (the print window/document
+  construction), if it currently lives inline in CurvedPanel.jsx.
+
+Do not move the print BAR (the row of buttons triggering these functions) —
+that UI already lives in its own section. This extraction is for the
+rendering logic the buttons call, not the buttons themselves.
+
+---
+
+## After all four extractions
+
+- [ ] `npm run build` passes
+- [ ] Stabilizer renders identically to before extraction on: main panel
+      (mixed corners), side strips, tapered strips, gusset
+- [ ] Measurement tables render identically for panel, strip, gusset
+- [ ] All diagram marks (cut line, sewline, center lines, fold lines, corner
+      junctions, midpoints, center triangles, easing ticks) render identically
+      across all four diagram functions
+- [ ] All print outputs (panel, sides, gusset, stabilizer) render identically
+      to before extraction
+- [ ] No duplicate implementations remain — each mark/table/stabilizer/print
+      concern has exactly ONE implementation, called from multiple places
+- [ ] CurvedPanel.jsx is meaningfully shorter and now mostly contains state,
+      layout/cascade UI, and calls into the new modules
+
+---
+
+## Layout fix — side piece preview sizing
+
+Root cause confirmed (no further investigation needed — go straight to the
+fix): the grid container (`cp-pieceGrid`) is correctly set up with
+`grid-template-columns: repeat(3, minmax(112px, 1fr))` and `column-gap: 14px`
+— so each column CAN stretch to fill available width. But the diagram inside
+each column is hardcoded small regardless of that available width:
+
+- `.cp-mini` wrapper has an inline `max-width:170px`
+- the `<svg>` itself has an inline style with `max-width:165px;max-height:230px`
+
+Because the diagram is capped at ~165px while its grid column is often 400px+
+wide on desktop, and the diagram is centered within that column
+(`justify-content:center` on `.cp-pieceSvg`), all the unused column width
+shows up as blank space flanking a small diagram — that's the ~150px gap
+illusion. The `column-gap` value was never the problem.
+
+**Fix:** Remove the hardcoded `max-width:170px` cap on `.cp-mini` and the
+`max-width:165px` / `max-height:230px` caps on the SVG style attribute.
+Replace with sizing driven by the actual `fitScale` calculation so the
+diagram scales up to fill its available column width (minus reasonable
+internal padding), instead of being capped at a fixed pixel ceiling
+regardless of how much room it has.
+
+Target: visible gap between diagram edges should be no more than 30–50px on
+a standard desktop width. Diagrams should be as large as their column allows
+without touching or overlapping each other.
+
+This is layout/sizing only — no geometry math involved, low risk. Confirm
+visually at the standard desktop width and at a narrower width to make sure
+nothing overlaps or breaks at smaller viewports.
+
+---
+
+## After all four extractions
+
+- [ ] `npm run build` passes
+- [ ] Stabilizer renders identically to before extraction on: main panel
+      (mixed corners), side strips, tapered strips, gusset
+- [ ] Measurement tables render identically for panel, strip, gusset
+- [ ] All diagram marks (cut line, sewline, center lines, fold lines, corner
+      junctions, midpoints, center triangles, easing ticks) render identically
+      across all four diagram functions
+- [ ] All print outputs (panel, sides, gusset, stabilizer) render identically
+      to before extraction
+- [ ] No duplicate implementations remain — each mark/table/stabilizer/print
+      concern has exactly ONE implementation, called from multiple places
+- [ ] CurvedPanel.jsx is meaningfully shorter and now mostly contains state,
+      layout/cascade UI, and calls into the new modules
+
+---
+
+## Formatting punch list (separate, lower-risk — do after extractions are confirmed)
+
+This work is pure CSS/layout and does not require confirm-after-every-step
+discipline. Make all changes below, then do one full visual pass at the end.
+
+- add 20 pixel padding on left and right of main calculator cards between browser edge. At mobile size, only 5 pixels padding
+- make <div class="cp-stage-num optional">5</div> the active state (<div class="cp-stage-num active">5</div>) when Stabilizer/Interfacing checkbox is checked
+- increase the size of <div class="ms-tagline">Houston, we have the math.</div> by 30% for browser window size
+- increase sub tab text size by 20% for browser and tablet size windows as long as the type stays within tab borders with 10 pixels spacing on the left and right.
+- Make Seam Allowance (SA) in cp-mission-sa-label white. Increase font size by 20% when title bar allows.
+- Reword "How the curve eases, not the depth." in Edge Shape to say, "Curve easing amount."
+- Remove from Side depth: Side panels and bottom strip each use their depth edge. and Depth drives gusset width — no separate input needed.
+- remove "zone map" feature from gusset diagrams.
+
+---
+
+## Confirm before closing this pass
+
+- [ ] All four extractions confirmed per their checklists above
+- [ ] Formatting punch list items confirmed visually
+- [ ] `npm run build` passes with no new errors
+- [ ] git commit + push to backup before closing the session
+
+---
+
+### Pass 12 -- Remaining Tabs
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
@@ -1288,7 +1504,10 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
 - Always confirm npm run build passes after each change before moving on.
 - One pass at a time. Do not begin the next pass until current is confirmed.
-- Do not modify curved-panel-core.js or boxed-corner-core.js unless asked.
+- Do not modify curved-panel-core.js or boxed-corner-core.js unless
+  explicitly authorized for a specific change. (Exception granted June 17,
+  2026: shared curve-offset function relocated to src/geometryOffset.js,
+  core updated to import it — see Pass 11.)
 - Do not edit App(backup).jsx or root BottlePocketPage.jsx.
 - Do not add features or make improvements outside current pass scope.
   Flag them as notes for later instead.
@@ -1300,8 +1519,6 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
 - Token prefix rename -- --bc- serves Trim & Pockets (was Bottoms);
   --tp- serves Basic Bags (was Trims & Pockets). Low priority rename pass needed.
-
-- Intro card thumbnail SVGs -- designer-authored outline SVGs. Do not generate.
 
 - SVG diagram design system -- shared diagram-standards.js with conventions
   for line types, weights, colors, notch symbols, dimension callouts, etc.
