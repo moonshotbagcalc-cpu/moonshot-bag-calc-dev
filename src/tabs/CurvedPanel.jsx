@@ -65,6 +65,40 @@ function cpFmtD(v){ return isMetric() ? fmtCm(v) : cpFmtDec(v); }
 /* C_PIECE_CENTER alias kept for screen diagram functions (cpGussetMapHTML uses it) */
 const C_PIECE_CENTER = C_CENTER;
 
+/* ── Geometry helpers used by screen diagram rendering (stay in this file) ─── */
+function cpCentroid(pts){
+  if(!pts.length)return {x:0,y:0};
+  let x=0,y=0;
+  for(const p of pts){x+=p.x;y+=p.y;}
+  return {x:x/pts.length,y:y/pts.length};
+}
+function cpLineIntersect(a1,a2,b1,b2){
+  const x1=a1.x,y1=a1.y,x2=a2.x,y2=a2.y,x3=b1.x,y3=b1.y,x4=b2.x,y4=b2.y;
+  const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+  if(Math.abs(den)<1e-9)return null;
+  const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/den;
+  const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/den;
+  if(!Number.isFinite(px)||!Number.isFinite(py))return null;
+  return {x:px,y:py};
+}
+function cpDist(a,b){return Math.hypot((b?.x||0)-(a?.x||0),(b?.y||0)-(a?.y||0));}
+function cpUnit(x,y){const l=Math.hypot(x,y)||1e-9;return {x:x/l,y:y/l};}
+function cpLineDirIntersect(p1,d1,p2,d2){
+  const den=d1.x*d2.y-d1.y*d2.x;
+  if(Math.abs(den)<1e-9)return null;
+  const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
+  return {x:p1.x+d1.x*t,y:p1.y+d1.y*t};
+}
+function cpDedupePath(pts,closed=false){
+  const out=[];
+  for(const p of pts||[]){
+    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+    if(!out.length||cpDist(out[out.length-1],p)>1e-7)out.push({...p});
+  }
+  if(closed&&out.length>2&&cpDist(out[0],out[out.length-1])<1e-7)out.pop();
+  return out;
+}
+
 /* =====================================================================
    ON-SCREEN DIAGRAM + PIECE RENDERERS (ported from prototype render())
    ===================================================================== */
