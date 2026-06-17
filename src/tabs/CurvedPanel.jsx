@@ -1,18 +1,26 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import {
   buildCurvedPanelModel,
   fmtIn as cpFmtIn, fmtDec as cpFmtDec, ptsToPath as cpPtsToPath,
   markDetails as cpMarkDetails,
 } from "../curved-panel-core.js";
-import { isMetric, fmtCm } from "../utils/formatting.js";
+import { isMetric, fmtCm, setCurrentUnit } from "../utils/formatting.js";
 import { DEFAULT_SA } from "../utils/constants.js";
 import {
   CP_TILE_W, CP_TILE_H,
   cpTilePlan, cpTileLabel, cpRowLabel, cpTestSquareSVG, cpRegistrationMarks,
 } from "../utils/print-utils.js";
-import TrustBadge from "../components/TrustBadge.jsx";
 import PrintButton from "../components/PrintButton.jsx";
 import FracInput from "../components/FracInput.jsx";
+import {
+  CAT_BAG_STRUCTURES,
+  C_SEW, C_CENTER, C_STAB, C_MIDPOINT,
+  W_CUT, W_SEW, W_STAB, W_CENTER, W_MIDPOINT,
+  DASH_SEW, DASH_STAB, DASH_CENTER,
+  MIDPOINT_R,
+  GHOST_OPACITY, GHOST_WEIGHT, GHOST_OFFSET,
+  FILL_OPACITY_SCREEN, STRIP_PAD,
+} from "../diagramTokens.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── CURVED PANEL — fair-curve calculator (replaces the old Advanced tab) ──────
@@ -20,12 +28,10 @@ import FracInput from "../components/FracInput.jsx";
 // standalone curved-panel-prototype.html). This section is UI + print only.
 // ══════════════════════════════════════════════════════════════════════════════
 
-// ── Curved Panel theme tokens (Moonshot maroon palette) ───────────────────────
+// ── Curved Panel theme tokens (purple family) ─────────────────────────────────
 const CP = {
-  // Curved Panel now lives in Bag Structures, so keep the legacy key names
-  // but use the MoonShot purple family for both the screen SVG and print output.
   maroon:"#5a2da0", maroonDark:"#3c2068", rose:"#8f55d6",
-  pinkBg:"#faf7ff", pinkSoft:"#ece5f8", pinkLine:"#d9c7f1", ink:"#241550",
+  pinkBg:"#f4f0fd", pinkSoft:"#ede8f8", pinkLine:"#c4b0e8", ink:"#241550",
   muted:"#7a608e", green:"#1d6b45",
   amberBg:"#fdf3e0", amberInk:"#8a5a10", amberLine:"#e8c98a",
 };
@@ -138,9 +144,9 @@ function cpCleanClosedPts(pts){
   for(const p of pts||[]){
     if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     const last=out[out.length-1];
-    if(!last || Math.hypot(last.x-p.x,last.y-p.y)>1e-5) out.push({x:p.x,y:p.y,side:p.side});
+    if(!last || Math.hypot(last.x-p.x,last.y-p.y)>1e-3) out.push({x:p.x,y:p.y,side:p.side});
   }
-  if(out.length>2 && Math.hypot(out[0].x-out[out.length-1].x,out[0].y-out[out.length-1].y)<1e-5) out.pop();
+  if(out.length>2 && Math.hypot(out[0].x-out[out.length-1].x,out[0].y-out[out.length-1].y)<1e-3) out.pop();
   return out;
 }
 
@@ -163,37 +169,70 @@ function cpLineIntersect(a1,a2,b1,b2){
 
 /* Approximate inset path used only for stabilizer guides/print pieces.
    The true panel geometry still comes from curved-panel-core.js. */
+function cpSegmentsIntersect(p1,p2,p3,p4){
+  const d1x=p2.x-p1.x,d1y=p2.y-p1.y,d2x=p4.x-p3.x,d2y=p4.y-p3.y;
+  const cross=d1x*d2y-d1y*d2x;
+  if(Math.abs(cross)<1e-10)return false;
+  const t=((p3.x-p1.x)*d2y-(p3.y-p1.y)*d2x)/cross;
+  const u=((p3.x-p1.x)*d1y-(p3.y-p1.y)*d1x)/cross;
+  return t>1e-9&&t<1-1e-9&&u>1e-9&&u<1-1e-9;
+}
+
 function cpInsetClosedPoints(pts, inset){
   const p=cpCleanClosedPts(pts);
-  if(p.length<3 || !inset)return null;
-  const c=cpCentroid(p);
-  const segs=[];
-  for(let i=0;i<p.length;i++){
-    const a=p[i],b=p[(i+1)%p.length];
-    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
-    let nx=-dy/len,ny=dx/len;
-    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-    if((c.x-mx)*nx+(c.y-my)*ny<0){nx=-nx;ny=-ny;}
-    segs.push({a:{x:a.x+nx*inset,y:a.y+ny*inset},b:{x:b.x+nx*inset,y:b.y+ny*inset},nx,ny});
-  }
-  const out=[];
-  for(let i=0;i<p.length;i++){
-    const prev=segs[(i-1+p.length)%p.length],next=segs[i];
-    let q=cpLineIntersect(prev.a,prev.b,next.a,next.b);
-    if(!q || Math.hypot(q.x-p[i].x,q.y-p[i].y)>Math.max(2,inset*4)){
-      const nx=prev.nx+next.nx,ny=prev.ny+next.ny,nl=Math.hypot(nx,ny)||1;
-      q={x:p[i].x+(nx/nl)*inset,y:p[i].y+(ny/nl)*inset};
+  if(p.length<3||!inset)return null;
+  function build(ins){
+    const c=cpCentroid(p),segs=[];
+    for(let i=0;i<p.length;i++){
+      const a=p[i],b=p[(i+1)%p.length];
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+      // skip segments shorter than 1/32" — degenerate, produces garbage normals
+      if(len<0.03125) continue;
+      let nx=-dy/len,ny=dx/len;
+      const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      if((c.x-mx)*nx+(c.y-my)*ny<0){nx=-nx;ny=-ny;}
+      segs.push({a:{x:a.x+nx*ins,y:a.y+ny*ins},b:{x:b.x+nx*ins,y:b.y+ny*ins},nx,ny,srcIdx:i});
     }
-    out.push(q);
+    if(segs.length<3) return null;
+    const out=[];
+    for(let i=0;i<segs.length;i++){
+      const prev=segs[(i-1+segs.length)%segs.length],next=segs[i];
+      const si=next.srcIdx;
+      let q=cpLineIntersect(prev.a,prev.b,next.a,next.b);
+      if(!q||Math.hypot(q.x-p[si].x,q.y-p[si].y)>Math.max(2,ins*4)){
+        const nx=prev.nx+next.nx,ny=prev.ny+next.ny,nl=Math.hypot(nx,ny)||1;
+        q={x:p[si].x+(nx/nl)*ins,y:p[si].y+(ny/nl)*ins};
+      }
+      out.push(q);
+    }
+    return out;
   }
-  return out;
+  function hasCross(out){
+    if(!out) return true;
+    const n=out.length;
+    for(let i=0;i<n;i++){
+      for(let j=i+2;j<n;j++){
+        if(i===0&&j===n-1)continue;
+        if(cpSegmentsIntersect(out[i],out[(i+1)%n],out[j],out[(j+1)%n]))return true;
+      }
+    }
+    return false;
+  }
+  const r=build(inset);
+  if(!hasCross(r))return r;
+  const r2=build(inset*0.8);
+  return hasCross(r2)?null:r2;
 }
 
 function cpStabilizerPoints(m,p){
-  if(!p?.stabilizerOn || !(p.stabilizerInset>0) || !m?.cutPts?.length || !m?.cutBB)return null;
-  const maxInset=Math.max(0,Math.min(m.cutBB.w,m.cutBB.h)/2-0.08);
-  const inset=Math.min(p.stabilizerInset,maxInset);
-  return inset>0 ? cpInsetClosedPoints(m.cutPts,inset) : null;
+  if(!p?.stabilizerOn||!(p.stabilizerInset>0)||!m?.cutPts?.length||!m?.cutBB)return null;
+  const maxInset=Math.min(
+    p.stabilizerInset,
+    m.cutBB.w/2-p.sa-0.125,
+    m.cutBB.h/2-p.sa-0.125
+  );
+  const inset=Math.max(0,maxInset);
+  return inset>0?cpInsetClosedPoints(m.cutPts,inset):null;
 }
 
 function cpPtsBB(pts){
@@ -206,7 +245,6 @@ function cpPtsBB(pts){
 /* Z-order in cpDrawStrip: notches → center line → sewline → landmarks → center triangles → cut rect */
 function cpDrawStrip(pc){
   const { x0, y0, cutL, w, sa } = pc;
-  const runLen = pc.runLen !== undefined ? pc.runLen : (cutL - (pc.flushStart ? sa : 2*sa));
   const sewStart = pc.flushStart ? x0 : x0 + sa;
   const sx = pc.flushStart ? x0 : x0 + sa;
   const ex = pc.flushEnd ? x0 + cutL : x0 + cutL - sa;
@@ -383,9 +421,10 @@ function cpPrintGusset(m,p){
 
 /* Main panel diagram — returns inner SVG markup for a 760×520 viewBox. */
 function cpPanelDiagramSVG(model,params){
-  const VW=760,VH=490,PAD=28,bb=model.cutBB;
-  const scale=Math.min((VW-PAD*2)/bb.w,(VH-PAD*2)/bb.h);
-  const ox=(VW-bb.w*scale)/2-bb.minX*scale,oy=(VH-bb.h*scale)/2-bb.minY*scale;
+  const VW=760,VH=490,PAD_X=28,PAD_TOP=28,PAD_BOT=48,bb=model.cutBB;
+  const scale=Math.min((VW-PAD_X*2)/bb.w,(VH-PAD_TOP-PAD_BOT)/bb.h);
+  const ox=(VW-bb.w*scale)/2-bb.minX*scale;
+  const oy=PAD_TOP+(VH-PAD_TOP-PAD_BOT-bb.h*scale)/2-bb.minY*scale;
   const X=v=>v*scale+ox,Y=v=>v*scale+oy,map=pts=>pts.map(p=>({x:X(p.x),y:Y(p.y)}));
   const active=model.activeSew;
   let svg="";
@@ -420,8 +459,8 @@ function cpMiniStrip(cutL, cutW, label, dims, opts){
   const saPx=(o.sa||0)*scale,sx=o.flushStart?x0:x0+saPx,ex=o.flushEnd?x0+displayL:x0+displayL-saPx;
   const midX=x0+displayL/2,midY=y0+displayW/2,STROKE=CP.maroon;
   let s=`<svg viewBox="0 0 ${VBW} ${svgH.toFixed(1)}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`;
-  if(o.ghost){const go=7;s+=`<rect x="${(x0+go).toFixed(1)}" y="${(y0-go).toFixed(1)}" width="${displayL.toFixed(1)}" height="${displayW.toFixed(1)}" fill="#fdf0f2" stroke="${CP.pinkLine}" stroke-width="1.5"/>`;}
-  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${displayL.toFixed(1)}" height="${displayW.toFixed(1)}" fill="#fbecef" fill-opacity=".72" stroke="none"/>`;
+  if(o.ghost){const go=7;s+=`<rect x="${(x0+go).toFixed(1)}" y="${(y0-go).toFixed(1)}" width="${displayL.toFixed(1)}" height="${displayW.toFixed(1)}" fill="#f0ebff" stroke="${CP.pinkLine}" stroke-width="1.5"/>`;}
+  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${displayL.toFixed(1)}" height="${displayW.toFixed(1)}" fill="#ede8f8" fill-opacity=".72" stroke="none"/>`;
   if(o.plan&&o.plan.marks.length){for(const mk of o.plan.marks){const tx=x0+(o.flushStart?0:saPx)+mk.s*scale,tl=mk.kind==="clip"?saPx*.8:saPx*.6,wg=mk.kind==="clip"?1.3:.9;s+=`<line x1="${tx.toFixed(1)}" y1="${y0}" x2="${tx.toFixed(1)}" y2="${(y0+tl).toFixed(1)}" stroke="#1565c0" stroke-width="${wg}" opacity=".7"/>`;s+=`<line x1="${tx.toFixed(1)}" y1="${(y0+displayW).toFixed(1)}" x2="${tx.toFixed(1)}" y2="${(y0+displayW-tl).toFixed(1)}" stroke="#1565c0" stroke-width="${wg}" opacity=".7"/>`;}}
   s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+displayW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
   s+=`<line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+displayL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
@@ -433,8 +472,117 @@ function cpMiniStrip(cutL, cutW, label, dims, opts){
   s+=`<polygon points="${(x0+displayL).toFixed(1)},${(midY-tb/2).toFixed(1)} ${(x0+displayL).toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+displayL-th).toFixed(1)},${midY.toFixed(1)}" fill="${STROKE}"/>`;
   s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${displayL.toFixed(1)}" height="${displayW.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="2.2"/>`;
   if(o.topLabel){const tx=o.flushStart?x0+13:x0+displayL-13;s+=`<text x="${tx.toFixed(1)}" y="${midY.toFixed(1)}" font-size="12" font-weight="800" font-family="Nunito,sans-serif" fill="${STROKE}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90,${tx.toFixed(1)},${midY.toFixed(1)})">TOP</text>`;}
+  if(o.stabInset>0){
+    const stPx=o.stabInset*scale;
+    // inset from all four sides of the sewline rect (not just width edges)
+    const stabX=sx+stPx,stabRight=ex-stPx;
+    const stabY=y0+saPx+stPx,stabBottom=y0+displayW-saPx-stPx;
+    const stabW=Math.max(0,stabRight-stabX),stabH=Math.max(0,stabBottom-stabY);
+    if(stabW>0&&stabH>0){
+      s+=`<rect x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}" fill="none" stroke="${C_STAB}" stroke-width="1.5" stroke-dasharray="4 5"/>`;
+    }
+  }
   s+=`</svg>`;
-  return `<div class="cp-mini">${s}<div class="mlabel">${label}</div><div class="mdims">${dims}</div></div>`;
+  return `<div class="cp-mini">${s}</div>`;
+}
+
+/* Trapezoid mini diagram for tapered left/right pieces.
+   Vertical orientation: length = height, depth = width.
+   Wider end is always at the bottom regardless of which side is physically "top". */
+function cpMiniTrapezoid(pc, opts){
+  const o=opts||{};
+  const PAD=22;
+  // enforce wider-end-at-bottom invariant
+  const depthTop    = Math.min(pc.cutWidthTop, pc.cutWidthBottom);
+  const depthBottom = Math.max(pc.cutWidthTop, pc.cutWidthBottom);
+  const cutLength   = pc.cutLength;
+
+  // scale to fit within a vertical drawing area (length = height axis)
+  const MAX_H=190, MAX_W=120;
+  const scale = Math.min(MAX_H/Math.max(cutLength,1e-9), MAX_W/Math.max(depthBottom,1e-9));
+
+  const drawLength      = cutLength   * scale;
+  const drawDepthTop    = depthTop    * scale;
+  const drawDepthBottom = depthBottom * scale;
+
+  // viewBox sized exactly to content + padding
+  const svgW = drawDepthBottom + 2*PAD;
+  const svgH = drawLength      + 2*PAD;
+
+  const x0          = PAD;
+  const topRight    = PAD + drawDepthTop;
+  const bottomRight = PAD + drawDepthBottom;
+  const yTop        = PAD;
+  const yBottom     = PAD + drawLength;
+
+  const saPx = (o.sa||0)*scale;
+  const STROKE = CP.maroon;
+
+  const points = [
+    `${x0},${yTop}`,
+    `${topRight.toFixed(1)},${yTop}`,
+    `${bottomRight.toFixed(1)},${yBottom.toFixed(1)}`,
+    `${x0},${yBottom.toFixed(1)}`
+  ].join(' ');
+
+  let s=`<svg viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`;
+
+  // ghost — matching trapezoid polygon, offset 6px right+down
+  if(o.ghost){
+    const gPts=[
+      `${x0+6},${yTop-6}`,
+      `${(topRight+6).toFixed(1)},${yTop-6}`,
+      `${(bottomRight+6).toFixed(1)},${(yBottom-6).toFixed(1)}`,
+      `${x0+6},${(yBottom-6).toFixed(1)}`
+    ].join(' ');
+    s+=`<polygon points="${gPts}" fill="none" stroke="${CP.pinkLine}" stroke-width="1.5" opacity="0.5"/>`;
+  }
+
+  // fill
+  s+=`<polygon points="${points}" fill="#ede8f8" fill-opacity=".72" stroke="none"/>`;
+
+  // sewline — inset trapezoid
+  if(saPx>0 && drawLength>2*saPx){
+    const sewPoints=[
+      `${(x0+saPx).toFixed(1)},${(yTop+saPx).toFixed(1)}`,
+      `${(topRight-saPx).toFixed(1)},${(yTop+saPx).toFixed(1)}`,
+      `${(bottomRight-saPx).toFixed(1)},${(yBottom-saPx).toFixed(1)}`,
+      `${(x0+saPx).toFixed(1)},${(yBottom-saPx).toFixed(1)}`
+    ].join(' ');
+    s+=`<polygon points="${sewPoints}" fill="none" stroke="#808080" stroke-width="1.5" stroke-dasharray="9 7"/>`;
+  }
+
+  // center crosshair — vertical through trapezoid midpoint, horizontal at mid-height
+  const midX = x0 + (drawDepthTop+drawDepthBottom)/4;
+  const midY = yTop + drawLength/2;
+  s+=`<line x1="${midX.toFixed(1)}" y1="${yTop}" x2="${midX.toFixed(1)}" y2="${yBottom.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
+  s+=`<line x1="${x0}" y1="${midY.toFixed(1)}" x2="${bottomRight.toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
+
+  // center match triangles
+  const tb=8,th=11;
+  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yTop} ${(midX+tb/2).toFixed(1)},${yTop} ${midX.toFixed(1)},${(yTop+th).toFixed(1)}" fill="${STROKE}"/>`;
+  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yBottom.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yBottom.toFixed(1)} ${midX.toFixed(1)},${(yBottom-th).toFixed(1)}" fill="${STROKE}"/>`;
+  s+=`<polygon points="${x0},${(midY-tb/2).toFixed(1)} ${x0},${(midY+tb/2).toFixed(1)} ${(x0+th).toFixed(1)},${midY.toFixed(1)}" fill="${STROKE}"/>`;
+  // right-edge marker at the angled mid-edge interpolated position
+  const rEdgeMidX = x0 + (drawDepthTop+drawDepthBottom)/2;
+  s+=`<polygon points="${rEdgeMidX.toFixed(1)},${(midY-tb/2).toFixed(1)} ${rEdgeMidX.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(rEdgeMidX-th).toFixed(1)},${midY.toFixed(1)}" fill="${STROKE}"/>`;
+
+  // stabilizer rect — inset from all four sides of the sewline trapezoid
+  // width uses narrower sewline end so it stays within the tapered area
+  if(o.stabInset>0 && saPx>0){
+    const stPx=o.stabInset*scale;
+    const sewW=drawDepthTop-2*saPx;
+    const stabW=Math.max(0,sewW-2*stPx);
+    const stabLen=Math.max(0,drawLength-2*saPx-2*stPx);  // inset from length ends too
+    if(stabW>0&&stabLen>0){
+      s+=`<rect x="${(x0+saPx).toFixed(1)}" y="${(yTop+saPx+stPx).toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabLen.toFixed(1)}" fill="none" stroke="${C_STAB}" stroke-width="1.5" stroke-dasharray="4 5"/>`;
+    }
+  }
+
+  // cut line — topmost layer
+  s+=`<polygon points="${points}" fill="none" stroke="${STROKE}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  s+=`</svg>`;
+  return `<div class="cp-mini">${s}</div>`;
 }
 
 /* Piece-table builders */
@@ -444,30 +592,34 @@ function cpProw(label, cutVal, sewVal){
 function cpPieceBlock(pill, rows, note){
   return `<span class="cp-pill">${pill}</span>` + rows.join("") + (note ? `<p class="cp-pnote">${note}</p>` : "");
 }
-function cpStripRows(cutL, sewL, cutW, sewW){
-  return [
-    cpProw("Length — cut", cpFmt(cutL), cpFmt(sewL)),
-    cpProw("Width — cut", cpFmt(cutW), cpFmt(sewW)),
-    cpProw("Cut perimeter", cpFmt(2*(cutL+cutW)), cpFmt(2*(sewL+sewW)))
-  ];
-}
+// cpStripRows retained for future use
+// function cpStripRows(cutL, sewL, cutW, sewW){ ... }
 
 /* Sides minis + tables */
 function cpSidesHTML(m,p){
   const pieces=m.displaySidePieces||[];
   if(!pieces.length)return {minis:"",tables:""};
-  const maxL=Math.max(...pieces.map(x=>x.cutLength)),maxW=Math.max(...pieces.map(x=>x.cutWidth));
+  const maxW=Math.max(...pieces.map(x=>x.cutWidthTop!==undefined?Math.max(x.cutWidthTop,x.cutWidthBottom):x.cutWidth));
+  const maxL=Math.max(...pieces.map(x=>x.cutLength));
   const fitScale=Math.min((760-56)/Math.max(maxL,1e-9),190/Math.max(maxW,1e-9));
+  const stabInset=(p.stabilizerOn&&p.stabilizerInset>0)?p.stabilizerInset:0;
   let minis="",tables="";
   for(const pc of pieces){
-    minis+=cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,cpFmt(pc.cutLength)+" L × "+cpFmt(pc.cutWidth)+" D",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale});
-    const note=pc.flushStart||pc.flushEnd?"Raw-top end is flush; the opposite end includes the joining seam allowance.":(pc.quantity===2?"Verified mirrored pair; one template can be used for both sides.":"");
-    tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),cpProw("Width — cut",cpFmt(pc.cutWidth),cpFmt(pc.finishedWidth))],note);
+    const isTaper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
+    if(isTaper){
+      minis+=cpMiniTrapezoid(pc,{ghost:pc.quantity===2,sa:p.sa,stabInset});
+      const widthRow=cpProw("Width — cut",`${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} btm`,`${cpFmt(pc.finishedWidthTop)} / ${cpFmt(pc.finishedWidthBottom)}`);
+      tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),widthRow],"Tapered: top and bottom widths differ.");
+    } else {
+      minis+=cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset});
+      const note=pc.flushStart||pc.flushEnd?"Raw-top end is flush; the opposite end includes the joining seam allowance.":(pc.quantity===2?"Verified mirrored pair; one template can be used for both sides.":"");
+      tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),cpProw("Width — cut",cpFmt(pc.cutWidth),cpFmt(pc.finishedWidth))],note);
+    }
   }
   return {minis:`<div class="cp-miniWrap">${minis}</div>`,tables};
 }
 
-function cpGussetMapHTML(pc){
+function cpGussetMapHTML(pc, stabInset){
   if(!pc)return "";
   const VW=760,PADX=28,PADY=34,MAX_DRAW_H=210;
   const scale=Math.min((VW-2*PADX)/Math.max(pc.cutLength,1e-9),MAX_DRAW_H/Math.max(pc.cutWidth,1e-9));
@@ -477,6 +629,13 @@ function cpGussetMapHTML(pc){
   s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="#fbecef" fill-opacity=".75" stroke="none"/>`;
   s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/><line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+drawL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
   if(saPx>0&&drawW>2*saPx){const yTop=y0+saPx,yBot=y0+drawW-saPx,d=`M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yBot.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)} M ${sewEnd.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)}`;s+=`<path d="${d}" fill="none" stroke="#8f8f8f" stroke-width="1.5" stroke-dasharray="7 5"/>`;}
+  if(stabInset>0){
+    const stPx=stabInset*scale,sewH=drawW-2*saPx;
+    const stabH=Math.max(0,sewH-2*stPx);
+    if(stabH>0){
+      s+=`<rect x="${sewStart.toFixed(1)}" y="${(y0+saPx+stPx).toFixed(1)}" width="${(sewEnd-sewStart).toFixed(1)}" height="${stabH.toFixed(1)}" fill="none" stroke="${C_STAB}" stroke-width="1.5" stroke-dasharray="4 5"/>`;
+    }
+  }
   let acc=0;for(let i=0;i<pc.zones.length;i++){const z=pc.zones[i],x1=sewStart+acc*scale,x2=x1+z.length*scale;if(i>0)s+=`<line x1="${x1.toFixed(1)}" y1="${y0}" x2="${x1.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${CP.maroon}" stroke-width="1.4" opacity=".65"/>`;if(x2-x1>54)s+=`<text x="${((x1+x2)/2).toFixed(1)}" y="${(midY+5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,sans-serif" fill="${CP.maroon}">${z.side.toUpperCase()}</text>`;acc+=z.length;}
   const tb=8,th=11;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${y0} ${(midX+tb/2).toFixed(1)},${y0} ${midX.toFixed(1)},${(y0+th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(midX-tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${(midX+tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${midX.toFixed(1)},${(y0+drawW-th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${x0.toFixed(1)},${(midY-tb/2).toFixed(1)} ${x0.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(x0+drawL).toFixed(1)},${(midY-tb/2).toFixed(1)} ${(x0+drawL).toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+drawL-th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/>`;
@@ -486,10 +645,11 @@ function cpGussetMapHTML(pc){
 }
 
 /* Gusset mini + table */
-function cpGussetHTML(m,p){
+function cpGussetHTML(m, p){
   const pc=m.gussetPiece;
   if(!pc)return {minis:"",tables:""};
-  const minis=`<div class="cp-miniWrap">${cpGussetMapHTML(pc)}<div class="cp-mini"><div class="mlabel">${pc.label}</div><div class="mdims">${cpFmt(pc.cutLength)} L \u00D7 ${cpFmt(pc.cutWidth)} W</div></div></div>`;
+  const stabInset=(p?.stabilizerOn&&p?.stabilizerInset>0)?p.stabilizerInset:0;
+  const minis=`<div class="cp-miniWrap">${cpGussetMapHTML(pc,stabInset)}</div>`;
   let rows=[
     cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),
     cpProw("Width — cut",cpFmt(pc.cutWidth),cpFmt(pc.finishedWidth))
@@ -498,458 +658,687 @@ function cpGussetHTML(m,p){
   return {minis,tables};
 }
 
-/* Stat card HTML */
-function cpStat(k, v, d){
-  return `<div class="cp-stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+// cpStat retained for future use
+// function cpStat(k, v, d){ ... }
+
+/* ── Hyphen-fraction format for cutting list ──────────────────────────────── */
+function cpFmtHyphen(v){
+  if(isMetric())return fmtCm(v);
+  if(!v||v<=0)return "—";
+  const r=Math.round(v*8)/8,w=Math.floor(r),fr=Math.round((r-w)*8)/8;
+  const wh=fr>=1?w+1:w,fv=fr>=1?0:fr;
+  const FM={0:"",0.125:"1/8",0.25:"1/4",0.375:"3/8",0.5:"1/2",0.625:"5/8",0.75:"3/4",0.875:"7/8"};
+  const fs=FM[fv]??"";
+  if(wh===0&&fs)return `${fs}"`;
+  if(!fs)return `${wh}"`;
+  return `${wh}-${fs}"`;
 }
 
-/* ── Small React helpers for this page ──────────────────────────────── */
-function CpSeg({ options, value, set }){
-  return (
-    <div className="cp-seg">
-      {options.map(o => (
-        <button key={o.id} className={value===o.id ? "on" : ""} onClick={()=>set(o.id)}>{o.label}</button>
+/* ── Small React helpers ──────────────────────────────────────────────────── */
+function PillToggle({options,value,onChange}){
+  return(
+    <div className="cp-pill-toggle">
+      {options.map(o=>(
+        <button key={o.v} className={value===o.v?"active":""} onClick={()=>onChange(o.v)}>{o.label}</button>
       ))}
     </div>
   );
 }
 
-function cpSidePrintSpan(m,p){
+function StageSeg({options,value,set}){
+  return(
+    <div className="cp-stage-seg">
+      {options.map(o=>(
+        <button key={String(o.v)} className={`${value===o.v?"on":""}${o.disabled?" seg-disabled":""}`} disabled={!!o.disabled} onClick={()=>!o.disabled&&set(o.v)}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function StageHeader({num,title,summary,open,onToggle,optional}){
+  const nc=optional?"optional":(open?"active":"neutral");
+  return(
+    <div className="cp-stage-header" onClick={onToggle}>
+      <div className={`cp-stage-num ${nc}`}>{num}</div>
+      <div className="cp-stage-title">{title}</div>
+      {!open&&summary&&<div className="cp-stage-summary">{summary}</div>}
+      <div className="cp-stage-chevron" style={{transform:open?"rotate(180deg)":"rotate(0deg)"}}>▼</div>
+    </div>
+  );
+}
+
+function cpSidePrintSpan(m){
   const pcs=m.displaySidePieces||[];
   if(!pcs.length)return null;
   const gap=.55,pad=.4;
-  return {w:Math.max(...pcs.map(x=>x.cutLength))+pad*2,h:pcs.reduce((a,x)=>a+x.cutWidth,0)+gap*(pcs.length-1)+pad*2};
+  return{w:Math.max(...pcs.map(x=>x.cutLength))+pad*2,h:pcs.reduce((a,x)=>a+x.cutWidth,0)+gap*(pcs.length-1)+pad*2};
 }
 function cpGussetPrintSpan(m){
   const pc=m.gussetPiece;
   return pc?{w:pc.cutWidth+.8,h:pc.cutLength+.8}:null;
 }
-// ── CURVED PANEL PAGE — validated geometry + compact diagram-led layout ──────
-export default function CurvedPanelPage() {
+
+// ── CURVED PANEL PAGE ─────────────────────────────────────────────────────────
+export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}){
+  // Dimensions
   const [tWW,setTWW]=useState(0),[tWF,setTWF]=useState(0);
   const [bWW,setBWW]=useState(0),[bWF,setBWF]=useState(0);
   const [hWW,setHWW]=useState(0),[hWF,setHWF]=useState(0);
+  // SA + input modes
   const [saW,setSaW]=useState(0),[saF,setSaF]=useState(DEFAULT_SA);
+  const [decMode,setDecMode]=useState(false);
+  // Edge shape
   const [lfW,setLfW]=useState(0),[lfF,setLfF]=useState(0);
   const [rfW,setRfW]=useState(0),[rfF,setRfF]=useState(0);
   const [tcW,setTcW]=useState(0),[tcF,setTcF]=useState(0);
   const [bcW,setBcW]=useState(0),[bcF,setBcF]=useState(0);
   const [matchingSides,setMatchingSides]=useState(true);
   const [feel,setFeel]=useState("gentle");
+  // Corner rounding
   const [tsW,setTsW]=useState(0),[tsF,setTsF]=useState(0);
   const [bsW,setBsW]=useState(0),[bsF,setBsF]=useState(0);
-  const [sgView,setSgView]=useState("sides");
+  // Construction
   const [topMode,setTopMode]=useState("4side");
+  const [pieceStyle,setPieceStyle]=useState("sides");
   const [sdW,setSdW]=useState(0),[sdF,setSdF]=useState(0);
-  const [gwW,setGwW]=useState(0),[gwF,setGwF]=useState(0);
+  const [sideTaper,setSideTaper]=useState(false);
+  const [dtW,setDtW]=useState(0),[dtF,setDtF]=useState(0);
+  const [dbW,setDbW]=useState(0),[dbF,setDbF]=useState(0);
+  // Stabilizer
   const [stabOn,setStabOn]=useState(false);
   const [stabW,setStabW]=useState(0),[stabF,setStabF]=useState(0.625);
   const [stabSeparate,setStabSeparate]=useState(false);
-  const [decMode,setDecMode]=useState(false);
-  const diagramRef=useRef(null);
-  const floatDockRef=useRef(null);
-  const dragRef=useRef(null);
-  const resizeRef=useRef(null);
-  const [draggingFloat,setDraggingFloat]=useState(false);
-  const [resizingFloat,setResizingFloat]=useState(false);
-  const [floatDiagOpen,setFloatDiagOpen]=useState(true);
-  const [floatPos,setFloatPos]=useState(()=>{
-    if (typeof window === "undefined") return {x:18,y:86};
-    try {
-      const saved=JSON.parse(window.sessionStorage.getItem("cpFloatDiagramPosition")||"null");
-      if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)) return saved;
-    } catch {}
-    return {x:Math.max(18,window.innerWidth-358),y:86};
-  });
-  const [floatSize,setFloatSize]=useState(()=>{
-    if (typeof window === "undefined") return {w:340,h:355};
-    try {
-      const saved=JSON.parse(window.sessionStorage.getItem("cpFloatDiagramSize")||"null");
-      if(saved&&Number.isFinite(saved.w)&&Number.isFinite(saved.h)) return saved;
-    } catch {}
-    return {w:340,h:355};
-  });
-  const [dockSide,setDockSide]=useState(()=>{
-    if (typeof window === "undefined") return "right";
-    try { const v=window.sessionStorage.getItem("cpFloatDiagramDock"); return v==="left"||v==="right"?v:"right"; } catch { return "right"; }
-  });
-  const [dockCollapsed,setDockCollapsed]=useState(true);
-  const [canFloatDiag,setCanFloatDiag]=useState(()=>typeof window !== "undefined" ? window.innerWidth >= 900 : false);
-  const gussetPanRef=useRef(null);
-  const gussetDragRef=useRef(null);
+  // UI state
+  const [stageOpen,setStageOpen]=useState([true,true,true,true,false]);
+  const [checkedRows,setCheckedRows]=useState({});
 
-  function startGussetPan(e){
-    const el=gussetPanRef.current;
-    if(!el)return;
-    const pt=e.touches?e.touches[0]:e;
-    gussetDragRef.current={x:pt.clientX,scrollLeft:el.scrollLeft};
-  }
-  function moveGussetPan(e){
-    const d=gussetDragRef.current,el=gussetPanRef.current;
-    if(!d||!el)return;
-    const pt=e.touches?e.touches[0]:e;
-    el.scrollLeft=d.scrollLeft-(pt.clientX-d.x);
-  }
-  function endGussetPan(){ gussetDragRef.current=null; }
+  // Derived values
+  const lf=Math.max(0,lfW+lfF);
+  const rf=matchingSides?lf:Math.max(0,rfW+rfF);
+  const sa=Math.max(0,saW+saF);
+  const sideDepth=Math.max(0,sdW+sdF);
+  const depthTop=sideTaper?Math.max(2*sa,dtW+dtF):sideDepth;
+  const depthBottom=sideTaper?Math.max(2*sa,dbW+dbF):sideDepth;
 
-  const lf=Math.max(0,lfW+lfF),rf=matchingSides?lf:Math.max(0,rfW+rfF);
   const params={
     topW:Math.max(1,tWW+tWF),botW:Math.max(1,bWW+bWF),height:Math.max(1,hWW+hWF),
-    sa:Math.max(0,saW+saF),topCrown:Math.max(0,tcW+tcF),botCrown:Math.max(0,bcW+bcF),
+    sa,topCrown:Math.max(0,tcW+tcF),botCrown:Math.max(0,bcW+bcF),
     leftFull:lf,rightFull:rf,matchingSides,feel,topMode,
     topSoft:Math.max(0,tsW+tsF),botSoft:Math.max(0,bsW+bsF),
-    sideDepth:Math.max(0,sdW+sdF),gussetW:Math.max(0,gwW+gwF),
-    stabilizerOn:stabOn,stabilizerInset:Math.max(0,stabW+stabF),stabilizerSeparate:stabSeparate
+    sideDepth,
+    stabilizerOn:stabOn,stabilizerInset:Math.max(0,stabW+stabF),stabilizerSeparate:stabSeparate,
+    sideTaper,depthTop,depthBottom,
   };
+
   const ready=(tWW+tWF)>0&&(bWW+bWF)>0&&(hWW+hWF)>0;
   const model=buildCurvedPanelModel(params);
+  const hasDepth=sideDepth>0,hasGusset=pieceStyle==="gusset"&&sideDepth>0;
   const sides=cpSidesHTML(model,params),gusset=cpGussetHTML(model,params);
-  const hasDepth=params.sideDepth>0,hasGusset=params.gussetW>0;
-  const panelPlan=cpTilePlan(model.cutBB.w+.8,model.cutBB.h+.8);
-  const sideSpan=cpSidePrintSpan(model,params),sidePlan=sideSpan?cpTilePlan(sideSpan.w,sideSpan.h):null;
+  const active=model.activeSew;
+
+  const panelPlan=ready&&model.valid?cpTilePlan(model.cutBB.w+.8,model.cutBB.h+.8):null;
+  const sideSpan=cpSidePrintSpan(model),sidePlan=sideSpan?cpTilePlan(sideSpan.w,sideSpan.h):null;
   const gusSpan=cpGussetPrintSpan(model),gusPlan=gusSpan?cpTilePlan(gusSpan.w,gusSpan.h):null;
   const stabPts=cpStabilizerPoints(model,params),stabBB=cpPtsBB(stabPts);
   const stabPlan=stabBB?cpTilePlan(stabBB.w+.8,stabBB.h+.8):null;
-  const active=model.activeSew,openTop=params.topMode==="3side";
-  const cutRunText=`Top ${cpFmt(model.cutRuns.top)} · Right ${cpFmt(model.cutRuns.right)} · Bottom ${cpFmt(model.cutRuns.bottom)} · Left ${cpFmt(model.cutRuns.left)}`;
-  const sewnRunText=openTop?`Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)} · Top raw/open`:`Top ${cpFmt(active.runs.top)} · Right ${cpFmt(active.runs.right)} · Bottom ${cpFmt(active.runs.bottom)} · Left ${cpFmt(active.runs.left)}`;
 
-  function clampFloatSize(size){
-    if (typeof window === "undefined") return size;
-    return {
-      w:Math.max(280,Math.min(size.w,Math.min(620,window.innerWidth-20))),
-      h:Math.max(250,Math.min(size.h,Math.min(720,window.innerHeight-20)))
-    };
+  const taperAngle=sideTaper&&model.valid&&model.activeSew.runs.left
+    ?Math.atan(Math.abs(depthBottom-depthTop)/model.activeSew.runs.left)*(180/Math.PI):0;
+
+  // Dynamic title
+  const panelTitle=pieceStyle==="gusset"
+    ?"Front & back panel — gusset"
+    :topMode==="4side"
+    ?"Front & back panel — fully enclosed"
+    :"Front & back panel — sides & bottom";
+
+  // Stage summaries
+  const s1sum=ready?`${cpFmt(params.topW)} / ${cpFmt(params.botW)} / ${cpFmt(params.height)}`:"";
+  const s2sum=lf>0||(tcW+tcF)>0?`side ${cpFmt(lf)}, top ${cpFmt(tcW+tcF)}`:"";
+  const s3sum=(tsW+tsF)>0||(bsW+bsF)>0?`top ${cpFmt(tsW+tsF)}, btm ${cpFmt(bsW+bsF)}`:"";
+  const s4sum=`${topMode==="3side"?"Open":"Enclosed"} · ${pieceStyle==="gusset"?"gusset":"sides"} · depth ${sideTaper?`${cpFmt(depthTop)}/${cpFmt(depthBottom)}`:cpFmt(sideDepth)}`;
+
+  // Cutting list row keys
+  const sideKeys=pieceStyle==="sides"&&hasDepth&&model.valid&&model.displaySidePieces
+    ?model.displaySidePieces.flatMap(pc=>{const rk=pc.label.toLowerCase().replace(/[\s&]+/g,"-");return stabOn?[rk,"stab-"+rk]:[rk];}):[];
+  const gussetKeys=pieceStyle==="gusset"&&hasGusset&&model.valid&&model.gussetPiece
+    ?(stabOn?["gusset","stab-gusset"]:["gusset"]):[];
+  const allRowKeys=["panel",...(stabOn?["stab"]:[]),...sideKeys,...gussetKeys];
+  const checkedCount=allRowKeys.filter(k=>checkedRows[k]).length;
+
+  function toggleStage(i){setStageOpen(prev=>prev.map((v,idx)=>idx===i?!v:v));}
+  function toggleRow(k){setCheckedRows(prev=>({...prev,[k]:!prev[k]}));}
+  function handleUnitToggle(mod){
+    setCurrentUnit(mod);
+    setUnitMode(mod);
   }
 
-  function clampFloatPosition(pos,size=floatSize){
-    if (typeof window === "undefined") return pos;
-    const safe=clampFloatSize(size),pad=10;
-    return {
-      x:Math.max(pad,Math.min(pos.x,window.innerWidth-safe.w-pad)),
-      y:Math.max(pad,Math.min(pos.y,window.innerHeight-safe.h-pad))
-    };
-  }
+  const cuttingMeta=ready
+    ?`Curved panel · ${cpFmt(params.topW)} × ${cpFmt(params.height)} · SA ${cpFmt(sa)}`
+    :"Curved panel";
 
-  function resetFloatPosition(){
-    if (typeof window === "undefined") return;
-    const size=clampFloatSize({w:340,h:355});
-    setFloatSize(size);
-    setDockSide(null);
-    setDockCollapsed(false);
-    setFloatDiagOpen(true);
-    setFloatPos(clampFloatPosition({x:window.innerWidth-size.w-18,y:86},size));
-  }
+  return(
+    <div className="cp-new-shell">
 
-  function closeFloatFeed(){
-    const side=dockSide||"right";
-    setDockSide(side);
-    setDockCollapsed(true);
-    setFloatDiagOpen(true);
-  }
+      {/* Title bar */}
+      <div className="cp-title-bar">
+        <h2>{panelTitle}</h2>
+        <p>Design your front panel. Side and bottom pieces are calculated from it automatically. Use when your bag has a shaped front face with separate side and bottom strips.</p>
+      </div>
 
-  function dockFloat(side){
-    setDockSide(side);
-    setDockCollapsed(true);
-    setFloatDiagOpen(true);
-  }
+      {/* Mission-critical bar */}
+      <div className="cp-mission-bar">
+        <span className="cp-mission-sa-label">Seam&nbsp;Allowance <span className="cp-mission-sa-abbr">(SA)</span></span>
+        <div className="cp-mission-sa-wrap">
+          <FracInput variant="cp" label="" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
+        </div>
+        <div className="cp-mission-toggles">
+          {!isMetric()&&(
+            <PillToggle
+              options={[{v:false,label:"Fractions"},{v:true,label:"Decimal"}]}
+              value={decMode}
+              onChange={setDecMode}
+            />
+          )}
+          <PillToggle
+            options={[{v:"imperial",label:"Imperial"},{v:"metric",label:"Metric"}]}
+            value={unitMode}
+            onChange={handleUnitToggle}
+          />
+        </div>
+      </div>
 
-  function undockFloat(){
-    if (typeof window === "undefined") return;
-    setFloatDiagOpen(true);
-    const rect=floatDockRef.current?.getBoundingClientRect();
-    const size=clampFloatSize({w:rect?.width||floatSize.w,h:rect?.height||floatSize.h});
-    setFloatSize(size);
-    setDockSide(null);
-    setDockCollapsed(false);
-    setFloatPos(clampFloatPosition({x:Math.max(12,(window.innerWidth-size.w)/2),y:Math.max(74,rect?.top||86)},size));
-  }
+      {/* Body: two columns */}
+      <div className="cp-body">
 
+        {/* LEFT COLUMN: sticky diagram + measurements */}
+        <div className="cp-left-col">
 
-  function startFloatDrag(e){
-    if(e.button!==undefined&&e.button!==0)return;
-    if(e.target.closest("button"))return;
-    if(dockSide)return;
-    const rect=floatDockRef.current?.getBoundingClientRect();
-    if(!rect)return;
-    dragRef.current={dx:e.clientX-rect.left,dy:e.clientY-rect.top,lastX:e.clientX,lastY:e.clientY};
-    setDraggingFloat(true);
-    e.preventDefault();
-  }
-
-  function startFloatResize(e){
-    if(e.button!==undefined&&e.button!==0)return;
-    const rect=floatDockRef.current?.getBoundingClientRect();
-    if(!rect)return;
-    resizeRef.current={startX:e.clientX,startY:e.clientY,w:rect.width,h:rect.height,side:dockSide};
-    setResizingFloat(true);
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-
-  useEffect(()=>{
-    const onResize=()=>{
-      setCanFloatDiag(window.innerWidth >= 900);
-      setFloatSize(size=>clampFloatSize(size));
-      if(!dockSide)setFloatPos(pos=>clampFloatPosition(pos));
-    };
-    onResize();
-    window.addEventListener("resize",onResize);
-    return ()=>window.removeEventListener("resize",onResize);
-  },[dockSide]);
-
-  useEffect(()=>{ try { window.sessionStorage.setItem("cpFloatDiagramOpen", floatDiagOpen ? "1" : "0"); } catch {} },[floatDiagOpen]);
-  useEffect(()=>{ try { window.sessionStorage.setItem("cpFloatDiagramPosition",JSON.stringify(floatPos)); } catch {} },[floatPos]);
-  useEffect(()=>{ try { window.sessionStorage.setItem("cpFloatDiagramSize",JSON.stringify(floatSize)); } catch {} },[floatSize]);
-  useEffect(()=>{ try { if(dockSide)window.sessionStorage.setItem("cpFloatDiagramDock",dockSide); else window.sessionStorage.removeItem("cpFloatDiagramDock"); } catch {} },[dockSide]);
-  useEffect(()=>{ try { window.sessionStorage.setItem("cpFloatDiagramCollapsed",dockCollapsed ? "1" : "0"); } catch {} },[dockCollapsed]);
-
-  useEffect(()=>{
-    if(!draggingFloat)return;
-    const move=e=>{
-      const d=dragRef.current;
-      if(!d)return;
-      d.lastX=e.clientX; d.lastY=e.clientY;
-      setFloatPos(clampFloatPosition({x:e.clientX-d.dx,y:e.clientY-d.dy}));
-    };
-    const stop=()=>{
-      const d=dragRef.current;
-      if(d&&d.lastX<=34)dockFloat("left");
-      else if(d&&d.lastX>=window.innerWidth-34)dockFloat("right");
-      dragRef.current=null;setDraggingFloat(false);
-    };
-    window.addEventListener("pointermove",move);
-    window.addEventListener("pointerup",stop,{once:true});
-    window.addEventListener("pointercancel",stop,{once:true});
-    return ()=>{
-      window.removeEventListener("pointermove",move);
-      window.removeEventListener("pointerup",stop);
-      window.removeEventListener("pointercancel",stop);
-    };
-  },[draggingFloat,floatSize]);
-
-  useEffect(()=>{
-    if(!resizingFloat)return;
-    const move=e=>{
-      const r=resizeRef.current;
-      if(!r)return;
-      const dx=r.side==="right"?r.startX-e.clientX:e.clientX-r.startX;
-      const next=clampFloatSize({w:r.w+dx,h:r.h+(e.clientY-r.startY)});
-      setFloatSize(next);
-      if(!r.side)setFloatPos(pos=>clampFloatPosition(pos,next));
-    };
-    const stop=()=>{resizeRef.current=null;setResizingFloat(false);};
-    window.addEventListener("pointermove",move);
-    window.addEventListener("pointerup",stop,{once:true});
-    window.addEventListener("pointercancel",stop,{once:true});
-    return ()=>{
-      window.removeEventListener("pointermove",move);
-      window.removeEventListener("pointerup",stop);
-      window.removeEventListener("pointercancel",stop);
-    };
-  },[resizingFloat,dockSide]);
-
-  return (
-    <div className="cp-wrap cp-redesign">
-      <div className="cp-page-shell">
-
-        <div className="cp-hero">
-          <div className="cp-hero-icon" aria-hidden="true">
-            <svg viewBox="0 0 120 120">
-              <path d="M28 25 L84 25 C101 45 107 76 91 94 L36 94 C18 78 18 44 28 25 Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round"/>
-              <path d="M41 32 C32 50 31 75 41 88 M75 32 C86 51 87 75 76 88" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-              <path d="M28 25 L41 32 H75 L84 25 M36 94 L41 88 H76 L91 94" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round"/>
-            </svg>
+          {/* Panel diagram */}
+          <div className="cp-left-panel-diag">
+            <div className="cp-left-section-label">Front &amp; back panel</div>
+            <div className="cp-left-diag-wrap">
+              {ready&&model.valid
+                ?<svg viewBox="0 0 760 490" style={{width:"100%",height:"auto",display:"block"}}
+                    dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
+                :<div className="cp-diag-placeholder">
+                  {ready?"Fix geometry to see the diagram.":"Enter top width, bottom width, and height to begin."}
+                </div>
+              }
+              {/* Geometry status overlay — pinned to bottom of diagram box */}
+              {ready&&model.valid&&model.errors.length===0&&(
+                <div className="cp-diag-status cp-diag-status--ok">✓ Geometry verified</div>
+              )}
+              {ready&&(!model.valid||model.errors.length>0)&&(
+                <div className="cp-diag-status cp-diag-status--warn">
+                  <span>⚠ Pattern output locked</span>
+                  {model.errors.length>0&&(
+                    <span className="cp-diag-status-errors">
+                      {model.errors.join(" · ")}
+                    </span>
+                  )}
+                  {model.notes.length>0&&(
+                    <span className="cp-diag-status-notes">
+                      {model.notes.join(" · ")}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            {ready&&model.valid&&(
+              <div className="cp-diag-meta">
+                <p className="cp-diag-legend">
+                  ▲ center · ○ midpoints · solid = cut · dashed = sewline{stabOn?" · dotted = stabilizer":""}
+                </p>
+                <p className={`cp-symline ${model.symmetry?"yes":"no"}`}>
+                  Fold-friendly symmetry: {model.symmetry?"yes":"no"}
+                </p>
+              </div>
+            )}
           </div>
-          <div className="cp-hero-copy">
-            <h1>Curved Panels</h1>
-            <p>
-              Build a free-form bag panel with sharp or rounded corners and sides that can be straight or gently curved.
-              Create matching rectangular side panels for an open-top or fully enclosed bag, or generate one continuous
-              gusset for either construction style. When your design is complete, print the full-size pattern.
-            </p>
+
+          {/* Sides / Gusset diagram */}
+          <div className="cp-left-sg-diag">
+            <div className="cp-left-section-label">Side pieces</div>
+            {pieceStyle==="sides"?(
+              <>
+                {ready&&model.valid&&hasDepth
+                  ?<div className="cp-left-sides-thumbs" dangerouslySetInnerHTML={{__html:sides.minis}}/>
+                  :<div className="cp-diag-placeholder">
+                    {ready&&model.valid?"Enter a finished side depth in Stage 4 to preview pieces.":"Complete panel dimensions first."}
+                  </div>
+                }
+                <p className="cp-diag-legend" style={{marginTop:6}}>Ghost = cut 2 · bottom width may differ from sides</p>
+              </>
+            ):(
+              <>
+                {ready&&model.valid&&hasGusset
+                  ?<div className="cp-left-gusset-wrap" dangerouslySetInnerHTML={{__html:gusset.minis}}/>
+                  :<div className="cp-diag-placeholder">
+                    {ready&&model.valid?"Enter a depth in Stage 4 to preview the gusset strip.":"Complete panel dimensions first."}
+                  </div>
+                }
+                <p className="cp-diag-legend" style={{marginTop:6}}>Zone map · end allowances shown at each end</p>
+              </>
+            )}
+          </div>
+
+          {/* Measurements table */}
+          <div className="cp-left-measures">
+            <div className="cp-left-section-label">Measurements</div>
+            {ready&&model.valid?(
+              <table className="cp-meas-table">
+                <thead>
+                  <tr>
+                    <th>Piece</th>
+                    <th>Cut L</th>
+                    <th>Cut W</th>
+                    <th>Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div className="cp-meas-piece">Panel</div>
+                      <div className="cp-meas-sewline">sewline: {cpFmtHyphen(active.bb.w)} × {cpFmtHyphen(active.bb.h)}</div>
+                    </td>
+                    <td className="cp-meas-cut">{cpFmtHyphen(model.cutBB.w)}</td>
+                    <td className="cp-meas-cut">{cpFmtHyphen(model.cutBB.h)}</td>
+                    <td><span className="cp-meas-badge cut2">Cut 2</span></td>
+                  </tr>
+                  {stabOn&&stabBB&&(
+                    <tr className="cp-meas-row-stab">
+                      <td><div className="cp-meas-piece">Stabilizer</div></td>
+                      <td className="cp-meas-cut">{cpFmtHyphen(stabBB.w)}</td>
+                      <td className="cp-meas-cut">{cpFmtHyphen(stabBB.h)}</td>
+                      <td><span className="cp-meas-badge cut2">Cut 2</span></td>
+                    </tr>
+                  )}
+                  {pieceStyle==="sides"&&hasDepth&&(model.displaySidePieces||[]).map((pc,i)=>{
+                    const taper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
+                    return(
+                    <tr key={i}>
+                      <td>
+                        <div className="cp-meas-piece">{pc.label}</div>
+                        {taper
+                          ?<div className="cp-meas-sewline">sewline: {cpFmtHyphen(pc.runLength)} × {cpFmtHyphen(pc.finishedWidthTop)}–{cpFmtHyphen(pc.finishedWidthBottom)}</div>
+                          :<div className="cp-meas-sewline">sewline: {cpFmtHyphen(pc.runLength)} × {cpFmtHyphen(pc.finishedWidth)}</div>
+                        }
+                      </td>
+                      <td className="cp-meas-cut">{cpFmtHyphen(pc.cutLength)}</td>
+                      <td className="cp-meas-cut">
+                        {taper
+                          ?<>{cpFmtHyphen(pc.cutWidthTop)}<br/><span style={{fontSize:10,color:"var(--sp-muted)"}}>–{cpFmtHyphen(pc.cutWidthBottom)}</span></>
+                          :cpFmtHyphen(pc.cutWidth)
+                        }
+                      </td>
+                      <td>
+                        {pc.quantity===2
+                          ?<span className="cp-meas-badge cut2">Cut 2</span>
+                          :pc.label.includes("Right")
+                          ?<span className="cp-meas-badge mirror">Mirror</span>
+                          :<span className="cp-meas-badge cut1">Cut 1</span>
+                        }
+                      </td>
+                    </tr>
+                  );})}
+                  {pieceStyle==="gusset"&&hasGusset&&model.gussetPiece&&(
+                    <tr>
+                      <td>
+                        <div className="cp-meas-piece">Gusset</div>
+                        <div className="cp-meas-sewline">sewline: {cpFmtHyphen(model.gussetPiece.runLength)} × {cpFmtHyphen(model.gussetPiece.finishedWidth)}</div>
+                      </td>
+                      <td className="cp-meas-cut">{cpFmtHyphen(model.gussetPiece.cutLength)}</td>
+                      <td className="cp-meas-cut">{cpFmtHyphen(model.gussetPiece.cutWidth)}</td>
+                      <td><span className="cp-meas-badge cut1">Cut 1</span></td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ):(
+              <div className="cp-diag-placeholder" style={{minHeight:80}}>
+                {ready?"Fix geometry to see measurements.":"Enter dimensions to see measurements."}
+              </div>
+            )}
+          </div>
+
+        </div>{/* end left col */}
+
+        {/* RIGHT COLUMN: cascade stages */}
+        <div className="cp-right-col">
+          <div className="cp-stages">
+
+            {/* Stage 1: Dimensions */}
+            <div className="cp-stage">
+              <StageHeader num={1} title="Dimensions" summary={s1sum} open={stageOpen[0]} onToggle={()=>toggleStage(0)}/>
+              {stageOpen[0]&&(
+                <div className="cp-stage-body">
+                  <div className="cp-row3">
+                    <FracInput variant="cp" label="Top width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
+                    <FracInput variant="cp" label="Bottom width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
+                    <FracInput variant="cp" label="Height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
+                  </div>
+                  <p className="cp-stage-hint">Design intent — actual cut sizes shown in measurements.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Stage 2: Edge shape */}
+            <div className="cp-stage">
+              <StageHeader num={2} title="Edge shape" summary={s2sum} open={stageOpen[1]} onToggle={()=>toggleStage(1)}/>
+              {stageOpen[1]&&(
+                <div className="cp-stage-body">
+                  <label className="cp-check" style={{marginBottom:10,display:"inline-flex",alignItems:"center",gap:6}}>
+                    <input type="checkbox" checked={matchingSides} onChange={e=>setMatchingSides(e.target.checked)}/>
+                    Matching sides
+                  </label>
+                  {matchingSides?(
+                    <FracInput variant="cp" label="Side curve" decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
+                  ):(
+                    <div className="cp-row2" style={{marginBottom:4}}>
+                      <FracInput variant="cp" label="Left curve" decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
+                      <FracInput variant="cp" label="Right curve" decMode={decMode} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
+                    </div>
+                  )}
+                  <div className="cp-arc-feel-row">
+                    <div className="cp-arc-block">
+                      <div className="cp-arc-block-row">
+                        <div className="cp-arc-row-label">▲ Top curve</div>
+                        <FracInput variant="cp" label="" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
+                      </div>
+                      <div className="cp-arc-block-row">
+                        <div className="cp-arc-row-label">▼ Bottom curve</div>
+                        <FracInput variant="cp" label="" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
+                      </div>
+                    </div>
+                    <div className="cp-feel-block">
+                      <div className="cp-feel-label">Curve feel</div>
+                      <div className="cp-feel-btns">
+                        {["gentle","balanced","defined"].map(f=>(
+                          <button key={f} className={feel===f?"on":""} onClick={()=>setFeel(f)}>
+                            {f.charAt(0).toUpperCase()+f.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="cp-stage-hint">How the curve eases, not the depth.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stage 3: Corner rounding */}
+            <div className="cp-stage">
+              <StageHeader num={3} title="Corner rounding" summary={s3sum} open={stageOpen[2]} onToggle={()=>toggleStage(2)}/>
+              {stageOpen[2]&&(
+                <div className="cp-stage-body">
+                  <div className="cp-row2">
+                    <FracInput variant="cp" label="Top corners" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
+                    <FracInput variant="cp" label="Bottom corners" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
+                  </div>
+                  <p className="cp-stage-hint">0 = crisp corner. Value = how far back the blend begins.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Stage 4: Side depth & opening */}
+            <div className="cp-stage">
+              <StageHeader num={4} title="Side depth & opening" summary={s4sum} open={stageOpen[3]} onToggle={()=>toggleStage(3)}/>
+              {stageOpen[3]&&(
+                <div className="cp-stage-body">
+                  <div className="cp-stage-input-group">
+                    <div className="cp-stage-input-label">Top opening</div>
+                    <StageSeg options={[{v:"3side",label:"Open"},{v:"4side",label:"Enclosed"}]} value={topMode} set={setTopMode}/>
+                  </div>
+                  <div className="cp-stage-input-group">
+                    <div className="cp-stage-input-label">Piece style</div>
+                    <StageSeg
+                      options={[{v:"sides",label:"Side panels"},{v:"gusset",label:"Gusset",disabled:sideTaper}]}
+                      value={pieceStyle}
+                      set={setPieceStyle}
+                    />
+                    {sideTaper&&<p className="cp-stage-hint" style={{marginTop:5,color:"var(--sp-muted)"}}>Tapered gussets aren't supported yet.</p>}
+                  </div>
+                  <div className="cp-stage-input-group">
+                    <div className="cp-stage-input-label">Side profile</div>
+                    <StageSeg options={[{v:false,label:"Straight"},{v:true,label:"Tapered"}]} value={sideTaper} set={v=>{setSideTaper(v);if(v&&pieceStyle==="gusset")setPieceStyle("sides");}}/>
+                  </div>
+                  <div style={{marginTop:8}}>
+                    {!sideTaper?(
+                      <FracInput variant="cp" label="Finished depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/>
+                    ):(
+                      <div className="cp-row2">
+                        <FracInput variant="cp" label="Depth at top" decMode={decMode} whole={dtW} frac={dtF} onWhole={setDtW} onFrac={setDtF}/>
+                        <FracInput variant="cp" label="Depth at bottom" decMode={decMode} whole={dbW} frac={dbF} onWhole={setDbW} onFrac={setDbF}/>
+                      </div>
+                    )}
+                    {sideTaper&&taperAngle>30&&(
+                      <div className="cp-taper-warn">Steep taper — consider reducing the depth difference.</div>
+                    )}
+                    <p className="cp-stage-hint">{pieceStyle==="gusset"?"Depth drives gusset width — no separate input needed.":"Side panels and bottom strip each use their depth edge."}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stage 5: Stabilizer (optional) */}
+            <div className="cp-stage">
+              <StageHeader num={5} title="Stabilizer" summary={stabOn?`Inset ${cpFmt(params.stabilizerInset)}`:"Off"} open={stageOpen[4]} onToggle={()=>toggleStage(4)} optional={true}/>
+              {stageOpen[4]&&(
+                <div className="cp-stage-body">
+                  <label className="cp-check" style={{marginBottom:10}}>
+                    <input type="checkbox" checked={stabOn} onChange={e=>setStabOn(e.target.checked)}/>
+                    Stabilizer / interfacing
+                  </label>
+                  <div style={{opacity:stabOn?1:0.35,pointerEvents:stabOn?"auto":"none"}}>
+                    <FracInput variant="cp" label="Inset" decMode={decMode} ghost={!stabOn} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/>
+                    <div className="cp-stage-input-label" style={{margin:"8px 0 5px"}}>Print</div>
+                    <StageSeg
+                      options={[{v:false,label:"With panel"},{v:true,label:"Separately"}]}
+                      value={stabSeparate}
+                      set={setStabSeparate}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>{/* end right col */}
+
+      </div>{/* end body */}
+
+      {/* Cutting list */}
+      <div className="cp-cutting-list">
+        <div className="cp-cutting-header">
+          <h2>Cutting list</h2>
+          <div className="cp-cutting-header-right">
+            <span className="cp-cutting-meta">{cuttingMeta}</span>
           </div>
         </div>
 
-        {!ready&&<div className="cp-start-message">
-          Enter top width, bottom width, and panel height to begin.
-        </div>}
+        {/* Column headers */}
+        <div className="cp-cutting-col-headers">
+          <span className="cp-col-cb"/>
+          <span className="cp-col-name">Piece</span>
+          <span className="cp-col-dim">Cut Length</span>
+          <span className="cp-col-dim">Cut Width</span>
+          <span className="cp-col-qty">Quantity</span>
+        </div>
 
-        {ready&&<>
-          {model.notes.length>0&&<div className="cp-warn">Automatic geometry adjustments:<ul>{model.notes.map((n,i)=><li key={i}>{n}</li>)}</ul></div>}
-          <TrustBadge tone="cp" valid={model.valid}
-            okMessage="✓ Geometry verified: cut path and active sewline are non-crossing, correctly oriented, and contained."
-            lockLabel="Pattern output locked" errors={model.errors}/>
-        </>}
+        <div className="cp-cutting-body">
+          {/* Main panels group */}
+          <div className="cp-group-header">Main panels</div>
 
-        <section className="cp-layout-card">
-
-          <div className="cp-layout-left">
-            <div className="cp-controls-panel">
-
-              <section className="cp-control-section cp-control-section--dimensions">
-                <div className="cp-dim-layout">
-                  <div className="cp-sa-card">
-                    <div className="cp-decimal-slot">
-                      {!isMetric()&&<label className="cp-decToggle"><input type="checkbox" checked={decMode} onChange={e=>setDecMode(e.target.checked)}/>Decimal Input</label>}
-                    </div>
-                    <FracInput variant="cp" label="Seam Allowance" decMode={decMode} whole={saW} frac={saF} onWhole={setSaW} onFrac={setSaF}/>
-                  </div>
-                  <div className="cp-dim-main">
-                    <h2>Dimensions</h2>
-                    <div className="cp-dim-grid">
-                      <FracInput variant="cp" label="Top Width" decMode={decMode} whole={tWW} frac={tWF} onWhole={setTWW} onFrac={setTWF}/>
-                      <FracInput variant="cp" label="Bottom Width" decMode={decMode} whole={bWW} frac={bWF} onWhole={setBWW} onFrac={setBWF}/>
-                      <FracInput variant="cp" label="Panel Height" decMode={decMode} whole={hWW} frac={hWF} onWhole={setHWW} onFrac={setHWF}/>
-                    </div>
-                    <p className="cp-layout-hint">Actual cut and sewline sizes may change with edge shape.</p>
-                  </div>
-                </div>
-              </section>
-
-              <div className="cp-control-columns">
-                <section className="cp-control-section cp-control-section--edge">
-                  <h2>Edge Shape</h2>
-                  <label className="cp-check"><input type="checkbox" checked={matchingSides} onChange={e=>setMatchingSides(e.target.checked)}/>Matching Sides</label>
-
-                  <div className="cp-edge-grid">
-                    <FracInput variant="cp" label={matchingSides?"Left & Right Fullness":"Left Fullness"} decMode={decMode} whole={lfW} frac={lfF} onWhole={setLfW} onFrac={setLfF}/>
-                    <FracInput variant="cp" label="Right Fullness" decMode={decMode} ghost={matchingSides} whole={rfW} frac={rfF} onWhole={setRfW} onFrac={setRfF}/>
-                    <FracInput variant="cp" label="Top Crown" decMode={decMode} whole={tcW} frac={tcF} onWhole={setTcW} onFrac={setTcF}/>
-                    <FracInput variant="cp" label="Bottom Crown" decMode={decMode} whole={bcW} frac={bcF} onWhole={setBcW} onFrac={setBcF}/>
-                  </div>
-
-                  <div className="cp-seg-label">Curve Feel</div>
-                  <CpSeg value={feel} set={setFeel} options={[{id:"gentle",label:"Gentle"},{id:"balanced",label:"Balanced"},{id:"defined",label:"Defined"}]}/>
-                </section>
-
-                <section className="cp-control-section cp-control-section--corner">
-                  <h2>Corner Shape</h2>
-                  <div className="cp-corner-grid">
-                    <FracInput variant="cp" label="Top Softness" decMode={decMode} whole={tsW} frac={tsF} onWhole={setTsW} onFrac={setTsF}/>
-                    <FracInput variant="cp" label="Bottom Softness" decMode={decMode} whole={bsW} frac={bsF} onWhole={setBsW} onFrac={setBsF}/>
-                  </div>
-                </section>
-              </div>
-
-              <p className="cp-layout-hint cp-layout-hint--wide">
-                Fullness and crown set midpoint depth. Curve feel changes only how broadly each edge eases.
-              </p>
-
-              <section className="cp-control-section cp-control-section--construction">
-                <h2>Construction</h2>
-
-                <div className="cp-construction-grid">
-                  <div className="cp-construction-mode">
-                    <CpSeg value={topMode} set={setTopMode} options={[{id:"4side",label:"4-Sided Enclosed"},{id:"3side",label:"3-Sided Open Top"}]}/>
-                  </div>
-                  <div className="cp-construction-depth">
-                    {sgView==="sides"
-                      ? <FracInput variant="cp" label="Finished Side Depth" decMode={decMode} whole={sdW} frac={sdF} onWhole={setSdW} onFrac={setSdF}/>
-                      : <FracInput variant="cp" label="Finished Gusset Width" decMode={decMode} whole={gwW} frac={gwF} onWhole={setGwW} onFrac={setGwF}/>
-                    }
-                  </div>
-                  <div className="cp-construction-piece">
-                    <CpSeg value={sgView} set={setSgView} options={[{id:"sides",label:"Side Panels"},{id:"gusset",label:"Gusset"}]}/>
-                  </div>
-                  <label className="cp-check cp-check--stabilizer"><input type="checkbox" checked={stabOn} onChange={e=>setStabOn(e.target.checked)}/>Stabilizer</label>
-                  <div className="cp-stabilizer-inset">
-                    <FracInput variant="cp" label="Stabilizer Inset" decMode={decMode} ghost={!stabOn} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/>
-                  </div>
-                  <label className={"cp-check cp-check--separate"+(!stabOn?" is-disabled":"")}>
-                    <input type="checkbox" disabled={!stabOn} checked={stabSeparate} onChange={e=>setStabSeparate(e.target.checked)}/>
-                    Print Separately
-                  </label>
-                </div>
-              </section>
+          {/* Panel row */}
+          <div className={`cp-cutting-row ${checkedRows.panel?"checked":""}`}>
+            <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.panel} onChange={()=>toggleRow("panel")}/></div>
+            <div className="cp-row-name">
+              Front &amp; back
+              {ready&&model.valid&&<div className="cp-row-sewsub">{`sewline: ${cpFmtHyphen(active.bb.w)} × ${cpFmtHyphen(active.bb.h)}`}</div>}
             </div>
+            <div className="cp-row-cut">{ready&&model.valid?cpFmtHyphen(model.cutBB.w):"—"}</div>
+            <div className="cp-row-cut">{ready&&model.valid?cpFmtHyphen(model.cutBB.h):"—"}</div>
+            <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
+          </div>
 
-            {ready&&<section className="cp-sides-panel">
-              <h2>{sgView==="sides" ? "Sides" : "Gusset"}</h2>
-              {sgView==="sides"
-                ?(hasDepth&&model.valid
-                  ?<div dangerouslySetInnerHTML={{__html:sides.minis}}/>
-                  :<p className="cp-layout-hint">{model.valid?"Enter a finished side depth to generate the pieces.":"Correct the geometry above before side pieces are generated."}</p>)
-                :(hasGusset&&model.valid
-                  ?<div ref={gussetPanRef} className="cp-gussetPan" onMouseDown={startGussetPan} onMouseMove={moveGussetPan} onMouseUp={endGussetPan} onMouseLeave={endGussetPan}
-                      onTouchStart={startGussetPan} onTouchMove={moveGussetPan} onTouchEnd={endGussetPan}>
-                      <div dangerouslySetInnerHTML={{__html:gusset.minis}}/>
+          {/* Stabilizer row */}
+          {stabOn&&(
+            <div className={`cp-cutting-row stab-row ${checkedRows.stab?"checked":""}`}>
+              <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.stab} onChange={()=>toggleRow("stab")}/></div>
+              <div className="cp-row-name">Stabilizer</div>
+              <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.w):"—"}</div>
+              <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.h):"—"}</div>
+              <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
+            </div>
+          )}
+
+          {/* Side/gusset group */}
+          <div className="cp-group-header">Side &amp; bottom strips</div>
+
+          {pieceStyle==="sides"?(
+            ready&&model.valid&&hasDepth&&(model.displaySidePieces||[]).flatMap((pc,i)=>{
+              const rk=pc.label.toLowerCase().replace(/[\s&]+/g,"-");
+              const isMirror=pc.label.toLowerCase().includes("right")&&pc.quantity===1;
+              const taper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
+              const pieceRow=(
+                <div key={i} className={`cp-cutting-row ${checkedRows[rk]?"checked":""}`}>
+                  <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[rk]} onChange={()=>toggleRow(rk)}/></div>
+                  <div className="cp-row-name">
+                    {pc.label}
+                    <div className="cp-row-sewsub">
+                      {taper
+                        ?`sewline: ${cpFmtHyphen(pc.runLength)} × ${cpFmtHyphen(pc.finishedWidthTop)}–${cpFmtHyphen(pc.finishedWidthBottom)}`
+                        :`sewline: ${cpFmtHyphen(pc.runLength)} × ${cpFmtHyphen(pc.finishedWidth)}`
+                      }
                     </div>
-                  :<p className="cp-layout-hint">{model.valid?"Enter a finished gusset width to generate the strip.":"Correct the geometry above before the gusset is generated."}</p>)}
-            </section>}
-          </div>
-
-          <div className="cp-layout-right">
-            <section className="cp-diagram-panel" ref={diagramRef}>
-              <h2>Front &amp; Back Panel</h2>
-              <div className="cp-live-diagram">
-                {ready?<svg viewBox="0 0 760 490" role="img" aria-label="Live curved panel diagram"
-                  dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
-                :<div className="cp-empty">Enter top width, bottom width, and panel height to see the diagram.</div>}
-              </div>
-
-              {ready&&<div className="cp-diagInfo">
-                <p className="cp-diagLegend">
-                  ▲ Center marks &nbsp; □ Side junctions &nbsp; ◇ Side midpoints &nbsp;
-                  Solid = cut &nbsp; Dashed = sewline{params.stabilizerOn ? "  Dotted = stabilizer" : ""}
-                </p>
-                <p className={"cp-symline "+(model.symmetry?"yes":"no")}>Fold-friendly symmetry: {model.symmetry?"yes":"no"}</p>
-                <p className="cp-side-lengths"><strong>Sides Lengths</strong> &nbsp; {cutRunText}</p>
-              </div>}
-            </section>
-
-            <section className="cp-measure-panel">
-              {!ready?<div className="cp-empty">Measurements will appear here once dimensions are entered.</div>:<>
-                <p className="cp-measure-note">Use Printed Pattern to Cut Two Exterior/Interior depending on design.</p>
-
-                <div className="cp-measure-group">
-                  <div className="cp-measure-head"><h3>Panel</h3><strong>Cut</strong><strong>Sewline</strong></div>
-                  <div className="cp-measure-row"><span>Width</span><strong>{cpFmt(model.cutBB.w)}</strong><em>{cpFmt(active.bb.w)}</em></div>
-                  <div className="cp-measure-row"><span>Height</span><strong>{cpFmt(model.cutBB.h)}</strong><em>{cpFmt(active.bb.h)}</em></div>
-                  <div className="cp-measure-row"><span>Perimeter</span><strong>{cpFmt(model.cutPerim)}</strong><em>{cpFmt(active.total)}</em></div>
-                  {params.stabilizerOn&&stabBB&&<div className="cp-measure-row cp-measure-row--stab"><span>Stabilizer</span><strong>{cpFmt(stabBB.w)} × {cpFmt(stabBB.h)}</strong><em>{cpFmt(params.stabilizerInset)} inset</em></div>}
+                  </div>
+                  <div className="cp-row-cut">{cpFmtHyphen(pc.cutLength)}</div>
+                  <div className="cp-row-cut">
+                    {taper?`${cpFmtHyphen(pc.cutWidthTop)}–${cpFmtHyphen(pc.cutWidthBottom)}`:cpFmtHyphen(pc.cutWidth)}
+                  </div>
+                  <div className="cp-row-qty">
+                    {isMirror?<span className="cp-row-badge mirror">Mirror</span>
+                    :pc.quantity===2?<span className="cp-row-badge cut2">Cut 2</span>
+                    :<span className="cp-row-badge cut1">Cut 1</span>}
+                  </div>
                 </div>
+              );
+              if(!stabOn)return[pieceRow];
+              const srk="stab-"+rk;
+              const stabCutW=taper
+                ?`${cpFmtHyphen(Math.max(0,pc.cutWidthTop-2*params.stabilizerInset))}–${cpFmtHyphen(Math.max(0,pc.cutWidthBottom-2*params.stabilizerInset))}`
+                :cpFmtHyphen(Math.max(0,pc.cutWidth-2*params.stabilizerInset));
+              const stabRow=(
+                <div key={"s"+i} className={`cp-cutting-row stab-row ${checkedRows[srk]?"checked":""}`}>
+                  <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[srk]} onChange={()=>toggleRow(srk)}/></div>
+                  <div className="cp-row-name">Stabilizer</div>
+                  <div className="cp-row-cut">{cpFmtHyphen(pc.cutLength)}</div>
+                  <div className="cp-row-cut">{stabCutW}</div>
+                  <div className="cp-row-qty">
+                    {isMirror?<span className="cp-row-badge mirror">Mirror</span>
+                    :pc.quantity===2?<span className="cp-row-badge cut2">Cut 2</span>
+                    :<span className="cp-row-badge cut1">Cut 1</span>}
+                  </div>
+                </div>
+              );
+              return[pieceRow,stabRow];
+            })
+          ):(
+            ready&&model.valid&&hasGusset&&model.gussetPiece&&[
+              <div key="gusset" className={`cp-cutting-row ${checkedRows.gusset?"checked":""}`}>
+                <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.gusset} onChange={()=>toggleRow("gusset")}/></div>
+                <div className="cp-row-name">
+                  Gusset
+                  <div className="cp-row-sewsub">sewline: {cpFmtHyphen(model.gussetPiece.runLength)} × {cpFmtHyphen(model.gussetPiece.finishedWidth)}</div>
+                </div>
+                <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutLength)}</div>
+                <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutWidth)}</div>
+                <div className="cp-row-qty"><span className="cp-row-badge cut1">Cut 1</span></div>
+              </div>,
+              stabOn&&(
+                <div key="stab-gusset" className={`cp-cutting-row stab-row ${checkedRows["stab-gusset"]?"checked":""}`}>
+                  <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows["stab-gusset"]} onChange={()=>toggleRow("stab-gusset")}/></div>
+                  <div className="cp-row-name">Stabilizer</div>
+                  <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutLength)}</div>
+                  <div className="cp-row-cut">{cpFmtHyphen(Math.max(0,model.gussetPiece.cutWidth-2*params.stabilizerInset))}</div>
+                  <div className="cp-row-qty"><span className="cp-row-badge cut1">Cut 1</span></div>
+                </div>
+              ),
+            ]
+          )}
 
-                {sgView==="sides"
-                  ?(hasDepth&&model.valid
-                    ?<div className="cp-piece-measures" dangerouslySetInnerHTML={{__html:sides.tables}}/>
-                    :<p className="cp-layout-hint">{model.valid?"Add finished side depth to show side-panel measurements.":"Fix geometry to show side-panel measurements."}</p>)
-                  :(hasGusset&&model.valid
-                    ?<div className="cp-piece-measures" dangerouslySetInnerHTML={{__html:gusset.tables}}/>
-                    :<p className="cp-layout-hint">{model.valid?"Add finished gusset width to show gusset measurements.":"Fix geometry to show gusset measurements."}</p>)}
-              </>}
-            </section>
+          {/* Placeholder when no depth/gusset yet */}
+          {ready&&model.valid&&pieceStyle==="sides"&&!hasDepth&&(
+            <div className="cp-cutting-row" style={{opacity:0.5}}>
+              <div className="cp-row-cb"/>
+              <div className="cp-row-name" style={{color:"var(--sp-muted)",fontWeight:600,fontSize:13}}>Enter a finished side depth in Stage 4</div>
+            </div>
+          )}
+          {ready&&model.valid&&pieceStyle==="gusset"&&!hasGusset&&(
+            <div className="cp-cutting-row" style={{opacity:0.5}}>
+              <div className="cp-row-cb"/>
+              <div className="cp-row-name" style={{color:"var(--sp-muted)",fontWeight:600,fontSize:13}}>Enter a finished depth in Stage 4</div>
+            </div>
+          )}
+
+          {/* Lining disclaimer */}
+          <p className="cp-lining-note">
+            Lining: cut pieces to match exterior dimensions. Sew at a slightly larger SA, tapering to your chosen SA where lining meets exterior. Finish with bind or birth method.
+          </p>
+        </div>
+
+        {/* Cutting list footer — progress only */}
+        <div className="cp-cutting-footer">
+          <div className="cp-progress-wrap">
+            <div className="cp-progress-bar">
+              <div className="cp-progress-fill" style={{width:allRowKeys.length?`${(checkedCount/allRowKeys.length)*100}%`:"0%"}}/>
+            </div>
+            <span className="cp-progress-text">{checkedCount} of {allRowKeys.length} cut</span>
           </div>
-        </section>
-
-        {ready&&<section className="cp-print-section">
-          <h2>Print Patterns</h2>
-          <div className="cp-print-grid">
-            <article className="cp-print-card">
-              <h3>Main Panel</h3>
-              <p>Actual cut path, active sewline, match marks, dimensions, and test squares.</p>
-              <PrintButton tone="cp" small label="Print Main Panel" meta={cpTileLabel(panelPlan)} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
-            </article>
-            <article className="cp-print-card">
-              <h3>Side Panels</h3>
-              <p>Exact matching strips with raw-top orientation and suggested clip/notch marks.</p>
-              <PrintButton tone="cp" small label="Print Side Panels" meta={sidePlan?cpTileLabel(sidePlan):"Add finished side depth"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
-            </article>
-            <article className="cp-print-card">
-              <h3>Gusset</h3>
-              <p>One continuous strip with side zones, end allowances, match marks, and tiling.</p>
-              <PrintButton tone="cp" small label="Print Gusset" meta={gusPlan?cpTileLabel(gusPlan):"Add finished gusset width"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
-            </article>
-            {params.stabilizerOn&&<article className="cp-print-card cp-print-card--stab">
-              <h3>Stabilizer</h3>
-              <p>Inset stabilizer pattern based on the main panel cut path.</p>
-              <PrintButton tone="cp" small label="Print Stabilizer" meta={stabPlan?cpTileLabel(stabPlan):"Add stabilizer inset"} disabled={!model.valid||!stabPlan} onClick={()=>cpPrintStabilizer(model,params)}/>
-            </article>}
-          </div>
-        </section>}
-
+        </div>
       </div>
+
+      {/* Print bar */}
+      {ready&&(
+        <div className="cp-print-bar">
+          <div className="cp-print-bar-title">Print patterns</div>
+          <div className="cp-print-grid-new">
+            <div className="cp-print-card-new">
+              <div className="cp-print-card-title">Main panel</div>
+              <div className="cp-print-card-meta">{panelPlan?cpTileLabel(panelPlan):"Add dimensions"}</div>
+              <PrintButton tone="cp" small label="Print main panel" meta={panelPlan?cpTileLabel(panelPlan):"—"} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
+            </div>
+            {pieceStyle==="sides"&&(
+              <div className="cp-print-card-new">
+                <div className="cp-print-card-title">Sides &amp; bottom</div>
+                <div className="cp-print-card-meta">{sidePlan?cpTileLabel(sidePlan):"Add finished side depth"}</div>
+                <PrintButton tone="cp" small label="Print sides & bottom" meta={sidePlan?cpTileLabel(sidePlan):"—"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
+              </div>
+            )}
+            {pieceStyle==="gusset"&&(
+              <div className="cp-print-card-new">
+                <div className="cp-print-card-title">Gusset</div>
+                <div className="cp-print-card-meta">{gusPlan?cpTileLabel(gusPlan):"Add a depth in Stage 4"}</div>
+                <PrintButton tone="cp" small label="Print gusset" meta={gusPlan?cpTileLabel(gusPlan):"—"} disabled={!model.valid||!hasGusset||!gusPlan} onClick={()=>cpPrintGusset(model,params)}/>
+              </div>
+            )}
+            {stabOn&&(
+              <div className="cp-print-card-new">
+                <div className="cp-print-card-title">Stabilizer</div>
+                <div className="cp-print-card-meta">{stabPlan?cpTileLabel(stabPlan):"Add stabilizer inset"}</div>
+                <PrintButton tone="cp" small label="Print stabilizer" meta={stabPlan?cpTileLabel(stabPlan):"—"} disabled={!model.valid||!stabPlan} onClick={()=>cpPrintStabilizer(model,params)}/>
+              </div>
+            )}
+            <div className="cp-print-card-new">
+              <div className="cp-print-card-title">Cutting list</div>
+              <div className="cp-print-card-meta">All pieces &amp; dimensions</div>
+              <PrintButton tone="cp" small label="Print cutting list" onClick={()=>window.print()}/>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

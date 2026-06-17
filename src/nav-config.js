@@ -24,26 +24,34 @@ import ShoppingBagPage from "./tabs/ShoppingBag.jsx";
 // Colors reference the per-group token families defined in moonshot.css
 // (--sp-, --bc-, --tp-, --hh-, --cb-) per the Pass 6 color system.
 // 4-group structure established in Pass 7 — see CLAUDE.md "Navigation Structure".
+//
+// functional: true  — calculator is built and usable; shown in nav
+// functional absent  — stub/coming soon; hidden from nav (route preserved)
+//
+// Hidden tabs (suppressed from nav): simple-bottom, rectangular-panel,
+// tapered-panel, zipper-pocket, welt-pocket, tissue-pocket, zipper-overlays,
+// handles, crossbody-strap, purse-feet, rivet-guide, flat-zipper-pouch,
+// shopping-bag — and the groups Handles & Hardware, Basic Bags entirely.
 export const NAV_GROUPS = [
   {
     id:"bag-structures", label:"Bag Structures", color:"var(--sp-plum)",
     pages:[
       {id:"simple-bottom", label:"Simple Bottom", color:"var(--sp-plum)", component:SimpleBottomPage, coming:true},
       {id:"rectangular-panel", label:"Rectangular Panel", color:"var(--sp-plum)", component:RectangularPanelPage, coming:true},
-      {id:"curved-panel", label:"Curved Panel", color:"var(--sp-plum)", component:CurvedPanelPage},
+      {id:"curved-panel", label:"Curved Panel", color:"var(--sp-plum)", component:CurvedPanelPage, functional:true},
       {id:"tapered-panel", label:"Tapered Panel", color:"var(--sp-plum)", component:TaperedPanelPage, coming:true},
-      {id:"boxed-bottom", label:"Boxed Bottom", color:"var(--sp-plum)", component:BoxedBottomsPage},
-      {id:"gussets", label:"Gussets", color:"var(--sp-plum)", component:GussetPage},
+      {id:"boxed-bottom", label:"Boxed Bottom", color:"var(--sp-plum)", component:BoxedBottomsPage, functional:true},
+      {id:"gussets", label:"Gussets", color:"var(--sp-plum)", component:GussetPage, functional:true},
     ],
   },
   {
     id:"trim-pockets", label:"Trim & Pockets", color:"var(--bc-pumpkin)",
     pages:[
-      {id:"accordion", label:"Accordion Pocket", color:"var(--bc-pumpkin)", component:AccordionPocketPage},
+      {id:"accordion", label:"Accordion Pocket", color:"var(--bc-pumpkin)", component:AccordionPocketPage, functional:true},
       {id:"zipper-pocket", label:"Zipper Pocket", color:"var(--bc-pumpkin)", component:ZipperPocketPage, coming:true},
       {id:"welt-pocket", label:"Welt Pocket", color:"var(--bc-pumpkin)", component:WeltPocketPage, coming:true},
       {id:"tissue-pocket", label:"Tissue Pocket", color:"var(--bc-pumpkin)", component:TissuePocketPage, coming:true},
-      {id:"piping", label:"Piping", color:"var(--bc-pumpkin)", component:PipingPage},
+      {id:"piping", label:"Piping", color:"var(--bc-pumpkin)", component:PipingPage, functional:true},
       {id:"zipper-overlays", label:"Zipper Overlays", color:"var(--bc-pumpkin)", component:ZipperOverlaysPage, coming:true},
     ],
   },

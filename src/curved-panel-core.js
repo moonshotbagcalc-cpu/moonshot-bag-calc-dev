@@ -801,19 +801,38 @@ function runsEquivalent(a,b,tol=0.0025){
 
 function buildStripPiece(side,path,p,startAllowance,endAllowance,label){
   const runLength = polylineLength(path,false);
-  const cutWidth = p.sideDepth + 2*p.sa;
+  let depth = p.sideDepth;
+  let cutWidthTop, cutWidthBottom, finishedWidthTop, finishedWidthBottom;
+  if (p.sideTaper) {
+    if (side === "top") {
+      depth = p.depthTop;
+    } else if (side === "bottom") {
+      depth = p.depthBottom;
+    } else {
+      // left and right span the full bag height; both paths run top→bottom after left reversal
+      finishedWidthTop = p.depthTop; finishedWidthBottom = p.depthBottom;
+      cutWidthTop = p.depthTop + 2*p.sa; cutWidthBottom = p.depthBottom + 2*p.sa;
+      depth = Math.max(p.depthTop, p.depthBottom);
+    }
+  }
+  const cutWidth = depth + 2*p.sa;
   const reserved = [runLength/2];
   const keep = Math.max(0.35,p.sa);
-  return {
+  const piece = {
     type:"side",side,label,quantity:1,path,runLength,
     cutLength:runLength+startAllowance+endAllowance,
-    cutWidth,finishedWidth:p.sideDepth,
+    cutWidth,finishedWidth:depth,
     startAllowance,endAllowance,
     flushStart:startAllowance<=1e-9,flushEnd:endAllowance<=1e-9,
     plan:notchPlan(path,{keepOutStart:keep,keepOutEnd:keep,reserved,maxMarks:40}),
     landmarks:[{s:runLength/2,kind:"mid",label:side+" midpoint"}],
     topAtStart:(side==="right" || side==="left")
   };
+  if (cutWidthTop !== undefined) {
+    piece.cutWidthTop = cutWidthTop; piece.cutWidthBottom = cutWidthBottom;
+    piece.finishedWidthTop = finishedWidthTop; piece.finishedWidthBottom = finishedWidthBottom;
+  }
+  return piece;
 }
 
 function buildSidePieces(model,p){
@@ -851,7 +870,7 @@ function buildSidePieces(model,p){
 }
 
 function buildGussetPiece(model,p){
-  if (!(p.gussetW>0) || !model.valid) return null;
+  if (!(p.sideDepth>0) || !model.valid) return null;
   const open=p.topMode==="3side";
   const order=open?["right","bottom","left"]:SIDE_ORDER;
   const sidePaths=open?model.openSew.sidePaths:model.sewSides;
@@ -863,7 +882,7 @@ function buildGussetPiece(model,p){
   return {
     type:"gusset",label:"GUSSET — CUT 1",quantity:1,open,order,path,sidePaths,
     runLength,cutLength:runLength+2*p.sa,
-    cutWidth:p.gussetW+2*p.sa,finishedWidth:p.gussetW,
+    cutWidth:p.sideDepth+2*p.sa,finishedWidth:p.sideDepth,
     startAllowance:p.sa,endAllowance:p.sa,
     flushStart:false,flushEnd:false,
     plan:notchPlan(path,{keepOutStart:keep,keepOutEnd:keep,reserved,maxMarks:48}),
