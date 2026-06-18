@@ -574,6 +574,12 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const hasGusset=pieceStyle==="gusset"&&sideDepth>0;
   const sides=cpSidesHTML(model,params),gusset=cpGussetHTML(model,params);
   const active=model.activeSew;
+  // Panel shape has curves/softness → pattern required to cut accurately
+  const hasPanelCurves=ready&&model.valid&&(
+    model.crowns.hTop>1e-9||model.crowns.hBot>1e-9||
+    model.crowns.hL>1e-9||model.crowns.hR>1e-9||
+    model.softness.ts>1e-9||model.softness.bs>1e-9
+  );
 
   const panelPlan=ready&&model.valid?cpTilePlan(model.cutBB.w+.8,model.cutBB.h+.8):null;
   const sideSpan=cpSidePrintSpan(model),sidePlan=sideSpan?cpTilePlan(sideSpan.w,sideSpan.h):null;
@@ -1043,14 +1049,13 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
         </div>
 
         <div className="cp-cutting-body">
-          {/* Main panels group */}
+          {/* ── EXTERIOR PIECES ── */}
           <div className="cp-group-header">Main panels</div>
 
-          {/* Panel row */}
           <div className={`cp-cutting-row ${checkedRows.panel?"checked":""}`}>
             <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.panel} onChange={()=>toggleRow("panel")}/></div>
             <div className="cp-row-name">
-              Front &amp; back
+              Front &amp; back{hasPanelCurves&&<span className="cp-row-badge use-pattern">Use pattern</span>}
               {ready&&model.valid&&<div className="cp-row-sewsub">{`sewline: ${cpFmtHyphen(active.bb.w)} × ${cpFmtHyphen(active.bb.h)}`}</div>}
             </div>
             <div className="cp-row-cut">{ready&&model.valid?cpFmtHyphen(model.cutBB.w):"—"}</div>
@@ -1058,30 +1063,18 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
             <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
           </div>
 
-          {/* Stabilizer row */}
-          {stabOn&&(
-            <div className={`cp-cutting-row stab-row ${checkedRows.stab?"checked":""}`}>
-              <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.stab} onChange={()=>toggleRow("stab")}/></div>
-              <div className="cp-row-name">Front &amp; back stabilizer</div>
-              <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.w):"—"}</div>
-              <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.h):"—"}</div>
-              <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
-            </div>
-          )}
-
-          {/* Side/gusset group */}
           <div className="cp-group-header">Side &amp; bottom strips</div>
 
           {pieceStyle==="sides"?(
-            ready&&model.valid&&hasDepth&&(model.displaySidePieces||[]).flatMap((pc,i)=>{
+            ready&&model.valid&&hasDepth&&(model.displaySidePieces||[]).map((pc,i)=>{
               const rk=pc.label.toLowerCase().replace(/[\s&]+/g,"-");
               const isMirror=pc.label.toLowerCase().includes("right")&&pc.quantity===1;
               const taper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
-              const pieceRow=(
+              return(
                 <div key={i} className={`cp-cutting-row ${checkedRows[rk]?"checked":""}`}>
                   <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[rk]} onChange={()=>toggleRow(rk)}/></div>
                   <div className="cp-row-name">
-                    {cpPiecePreviewTitle(pc)}
+                    {cpPiecePreviewTitle(pc)}{taper&&<span className="cp-row-badge use-pattern">Use pattern</span>}
                     <div className="cp-row-sewsub">
                       {taper
                         ?`sewline: ${cpFmtHyphen(pc.runLength)} × ${cpFmtHyphen(pc.finishedWidthTop)}–${cpFmtHyphen(pc.finishedWidthBottom)}`
@@ -1100,28 +1093,9 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                   </div>
                 </div>
               );
-              if(!stabOn)return[pieceRow];
-              const srk="stab-"+rk;
-              const stabCutW=taper
-                ?`${cpFmtHyphen(Math.max(0,pc.cutWidthTop-2*params.stabilizerInset))}–${cpFmtHyphen(Math.max(0,pc.cutWidthBottom-2*params.stabilizerInset))}`
-                :cpFmtHyphen(Math.max(0,pc.cutWidth-2*params.stabilizerInset));
-              const stabRow=(
-                <div key={"s"+i} className={`cp-cutting-row stab-row ${checkedRows[srk]?"checked":""}`}>
-                  <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[srk]} onChange={()=>toggleRow(srk)}/></div>
-                  <div className="cp-row-name">{cpPiecePreviewTitle(pc)} stabilizer</div>
-                  <div className="cp-row-cut">{cpFmtHyphen(pc.cutLength)}</div>
-                  <div className="cp-row-cut">{stabCutW}</div>
-                  <div className="cp-row-qty">
-                    {isMirror?<span className="cp-row-badge mirror">Mirror</span>
-                    :pc.quantity===2?<span className="cp-row-badge cut2">Cut 2</span>
-                    :<span className="cp-row-badge cut1">Cut 1</span>}
-                  </div>
-                </div>
-              );
-              return[pieceRow,stabRow];
             })
           ):(
-            ready&&model.valid&&hasGusset&&model.gussetPiece&&[
+            ready&&model.valid&&hasGusset&&model.gussetPiece&&(
               <div key="gusset" className={`cp-cutting-row ${checkedRows.gusset?"checked":""}`}>
                 <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.gusset} onChange={()=>toggleRow("gusset")}/></div>
                 <div className="cp-row-name">
@@ -1131,8 +1105,50 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                 <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutLength)}</div>
                 <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutWidth)}</div>
                 <div className="cp-row-qty"><span className="cp-row-badge cut1">Cut 1</span></div>
-              </div>,
-              stabOn&&(
+              </div>
+            )
+          )}
+
+          {/* ── STABILIZER SECTION — grouped below all exterior pieces ── */}
+          {stabOn&&ready&&model.valid&&(
+            <>
+              <div className="cp-group-header stab-header">Stabilizer</div>
+
+              {/* Panel stabilizer */}
+              <div className={`cp-cutting-row stab-row ${checkedRows.stab?"checked":""}`}>
+                <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.stab} onChange={()=>toggleRow("stab")}/></div>
+                <div className="cp-row-name">Front &amp; back stabilizer{hasPanelCurves&&<span className="cp-row-badge use-pattern">Use pattern</span>}</div>
+                <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.w):"—"}</div>
+                <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.h):"—"}</div>
+                <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
+              </div>
+
+              {/* Side stabilizer rows */}
+              {pieceStyle==="sides"&&hasDepth&&(model.displaySidePieces||[]).map((pc,i)=>{
+                const rk=pc.label.toLowerCase().replace(/[\s&]+/g,"-");
+                const srk="stab-"+rk;
+                const isMirror=pc.label.toLowerCase().includes("right")&&pc.quantity===1;
+                const taper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
+                const stabCutW=taper
+                  ?`${cpFmtHyphen(Math.max(0,pc.cutWidthTop-2*params.stabilizerInset))}–${cpFmtHyphen(Math.max(0,pc.cutWidthBottom-2*params.stabilizerInset))}`
+                  :cpFmtHyphen(Math.max(0,pc.cutWidth-2*params.stabilizerInset));
+                return(
+                  <div key={"s"+i} className={`cp-cutting-row stab-row ${checkedRows[srk]?"checked":""}`}>
+                    <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[srk]} onChange={()=>toggleRow(srk)}/></div>
+                    <div className="cp-row-name">{cpPiecePreviewTitle(pc)} stabilizer{taper&&<span className="cp-row-badge use-pattern">Use pattern</span>}</div>
+                    <div className="cp-row-cut">{cpFmtHyphen(pc.cutLength)}</div>
+                    <div className="cp-row-cut">{stabCutW}</div>
+                    <div className="cp-row-qty">
+                      {isMirror?<span className="cp-row-badge mirror">Mirror</span>
+                      :pc.quantity===2?<span className="cp-row-badge cut2">Cut 2</span>
+                      :<span className="cp-row-badge cut1">Cut 1</span>}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Gusset stabilizer */}
+              {pieceStyle==="gusset"&&hasGusset&&model.gussetPiece&&(
                 <div key="stab-gusset" className={`cp-cutting-row stab-row ${checkedRows["stab-gusset"]?"checked":""}`}>
                   <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows["stab-gusset"]} onChange={()=>toggleRow("stab-gusset")}/></div>
                   <div className="cp-row-name">Gusset stabilizer</div>
@@ -1140,8 +1156,8 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                   <div className="cp-row-cut">{cpFmtHyphen(Math.max(0,model.gussetPiece.cutWidth-2*params.stabilizerInset))}</div>
                   <div className="cp-row-qty"><span className="cp-row-badge cut1">Cut 1</span></div>
                 </div>
-              ),
-            ]
+              )}
+            </>
           )}
 
           {/* Placeholder when no depth/gusset yet */}

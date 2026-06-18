@@ -2686,9 +2686,18 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-row-badge.cut2 { background: #ede8f8; color: #3d2a8a; }
 .cp-row-badge.cut1 { background: #f4f0fd; color: #7b5cc0; border: 0.5px solid #c4b0e8; }
 .cp-row-badge.mirror { background: #e8f4ee; color: #1d5c3a; }
-.cp-cutting-row.stab-row { padding-left: 36px; border-left: 3px solid #9d8fd0; }
-.cp-cutting-row.stab-row .cp-row-name { font-size: 13px; color: #7b5cc0; }
-.cp-cutting-row.stab-row .cp-row-cut { font-size: 13px; color: #9d8fd0; }
+.cp-row-badge.use-pattern {
+  background: var(--cb-soft);
+  color: var(--cb-maroon);
+  border: 0.5px solid var(--cb-line);
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.cp-cutting-row.stab-row { padding-left: 36px; border-left: 3px solid #bf5630; }
+.cp-cutting-row.stab-row .cp-row-name { color: #bf5630; }
+.cp-cutting-row.stab-row .cp-row-cut { color: #bf5630; }
+.cp-group-header.stab-header { color: #bf5630; border-color: #f0d0c4; }
 .cp-lining-note {
   margin: 0;
   padding: 12px 20px;
