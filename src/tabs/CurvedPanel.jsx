@@ -114,7 +114,7 @@ function cpPanelDiagramSVG(model,params){
   let svg="";
   const fr=model.frame,midX=(fr[0].x+fr[1].x)/2;
   svg+=`<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="#00bcd4" stroke-width="1.2" stroke-dasharray="4 6" opacity="0.6"/>`;
-  svg+=`<path d="${cpPtsToPath(map(active.pts),active.closed)}" fill="none" stroke="#8a8a8a" stroke-width="2" stroke-dasharray="9 7"/>`;
+  svg+=`<path d="${cpPtsToPath(map(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
   const MIN=14;
   function dedup(pts){const kept=[];for(const p of pts){const sx=X(p.x),sy=Y(p.y);if(kept.every(k=>Math.hypot(k.sx-sx,k.sy-sy)>=MIN))kept.push({p,sx,sy});}return kept.map(k=>k.p);}
   const junctions=dedup(active.junctions||[]),midpoints=dedup(active.midpoints||[]);
@@ -205,10 +205,6 @@ function cpMiniStrip(cutL, cutW, label, dims, opts){
   }
   s+=`<line x1="${midX.toFixed(1)}" y1="${yTop.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${yBottom.toFixed(1)}" stroke="${C_CENTER}" stroke-width="${W_CENTER}" stroke-dasharray="${DASH_CENTER}"/>`;
   s+=`<line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${xRight.toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_CENTER}" stroke-width="${W_CENTER}" stroke-dasharray="${DASH_CENTER}"/>`;
-  if(saPx>0){
-    s+=`<circle cx="${sewL.toFixed(1)}" cy="${midY.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-    s+=`<circle cx="${sewR.toFixed(1)}" cy="${midY.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-  }
   const tb=TRIANGLE_BASE,th=TRIANGLE_HEIGHT;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yTop.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yTop.toFixed(1)} ${midX.toFixed(1)},${(yTop+th).toFixed(1)}" fill="${C_MIDPOINT}"/>`;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yBottom.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yBottom.toFixed(1)} ${midX.toFixed(1)},${(yBottom-th).toFixed(1)}" fill="${C_MIDPOINT}"/>`;
@@ -274,9 +270,9 @@ function cpMiniTrapezoid(pc, opts){
   let s=`<svg width="${svgW.toFixed(1)}" height="${svgH.toFixed(1)}" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" xmlns="http://www.w3.org/2000/svg" style="${cpMiniSvgStyle(svgW,svgH)}">`;
   if(o.ghost){
     const gPts=cutPts.map(p=>({x:p.x+10,y:p.y-10}));
-    s+=`<polygon points="${cpSvgPts(gPts)}" fill="none" stroke="${CP.pinkLine}" stroke-width="1.5" opacity="0.5"/>`;
+    s+=`<polygon points="${cpSvgPts(gPts)}" fill="none" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${GHOST_WEIGHT}" stroke-opacity="${GHOST_OPACITY}"/>`;
   }
-  s+=`<polygon points="${cpSvgPts(cutPts)}" fill="#ede8f8" fill-opacity=".72" stroke="none"/>`;
+  s+=`<polygon points="${cpSvgPts(cutPts)}" fill="${CAT_BAG_STRUCTURES.fillTint}" fill-opacity="${FILL_OPACITY_SCREEN}" stroke="none"/>`;
 
   let sewPts=null;
   if(saPx>0){
@@ -301,14 +297,8 @@ function cpMiniTrapezoid(pc, opts){
     }
   }
 
-  s+=`<line x1="${midX.toFixed(1)}" y1="${yTop.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${yBottom.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
-  s+=`<line x1="${leftMidX.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${rightMidX.toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
-  if(sewPts?.length){
-    const leftMid={x:(sewPts[0].x+sewPts[1].x)/2,y:(sewPts[0].y+sewPts[1].y)/2};
-    const rightMid={x:(sewPts[2].x+sewPts[3].x)/2,y:(sewPts[2].y+sewPts[3].y)/2};
-    s+=`<circle cx="${leftMid.x.toFixed(1)}" cy="${leftMid.y.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-    s+=`<circle cx="${rightMid.x.toFixed(1)}" cy="${rightMid.y.toFixed(1)}" r="${MIDPOINT_R}" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
-  }
+  s+=`<line x1="${midX.toFixed(1)}" y1="${yTop.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${yBottom.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/>`;
+  s+=`<line x1="${leftMidX.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${rightMidX.toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/>`;
   const tb=TRIANGLE_BASE,th=TRIANGLE_HEIGHT;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yTop.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yTop.toFixed(1)} ${midX.toFixed(1)},${(yTop+th).toFixed(1)}" fill="${marker}"/>`;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${yBottom.toFixed(1)} ${(midX+tb/2).toFixed(1)},${yBottom.toFixed(1)} ${midX.toFixed(1)},${(yBottom-th).toFixed(1)}" fill="${marker}"/>`;
@@ -369,7 +359,7 @@ function cpSidesHTML(m,p){
     const svg=isTaper
       ?cpMiniTrapezoid(pc,{ghost:pc.quantity===2,sa:p.sa,stabInset,fitScale,flushStart:pc.flushStart,flushEnd:pc.flushEnd})
       :cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset});
-    cards.push({title:cpPiecePreviewTitle(pc),dims:cpPiecePreviewDims(pc),svg});
+    cards.push({title:cpPiecePreviewTitle(pc),dims:cpPiecePreviewDims(pc),svg,cut2:pc.quantity===2});
     if(isTaper){
       const widthRow=cpProw("Width — cut",`${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} btm`,`${cpFmt(pc.finishedWidthTop)} / ${cpFmt(pc.finishedWidthBottom)}`);
       tables+=cpPieceBlock(pc.label,[cpProw("Length — cut",cpFmt(pc.cutLength),cpFmt(pc.runLength)),widthRow],"Tapered: top and bottom widths differ.");
@@ -379,7 +369,7 @@ function cpSidesHTML(m,p){
     }
   }
   const cols=`repeat(${cards.length}, minmax(112px, 1fr))`;
-  const heads=cards.map(c=>`<div class="cp-pieceHead" style="min-width:0;text-align:center"><div style="font-weight:900;color:${CP.ink};line-height:1.05">${c.title}</div><div style="font-size:12px;font-weight:800;color:${CP.muted};line-height:1.2;margin-top:3px">${c.dims}</div></div>`).join("");
+  const heads=cards.map(c=>`<div class="cp-pieceHead" style="min-width:0;text-align:center"><div style="font-weight:900;color:${CP.ink};line-height:1.05">${c.title}${c.cut2?` <span class="cp-row-badge cut2" style="vertical-align:middle">Cut 2</span>`:""}</div><div style="font-size:12px;font-weight:800;color:${CP.muted};line-height:1.2;margin-top:3px">${c.dims}</div></div>`).join("");
   const svgs=cards.map(c=>`<div class="cp-pieceSvg" style="min-width:0;display:flex;align-items:flex-start;justify-content:center">${c.svg}</div>`).join("");
   const minis=`<div class="cp-pieceGrid" style="display:grid;grid-template-columns:${cols};column-gap:14px;row-gap:8px;align-items:start;width:100%;max-width:100%;overflow-x:auto;padding:4px 2px 0">${heads}${svgs}</div>`;
   return {minis,tables};
@@ -393,8 +383,8 @@ function cpGussetMapHTML(pc, stabInset){
   const saPx=(pc.cutWidth-pc.finishedWidth)/2*scale,sewStart=x0+pc.startAllowance*scale,sewEnd=sewStart+pc.runLength*scale,midX=x0+drawL/2,midY=y0+drawW/2;
   let s=`<svg class="cp-zoneMap" viewBox="0 0 ${VW} ${H.toFixed(1)}" xmlns="http://www.w3.org/2000/svg">`;
   s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="#fbecef" fill-opacity=".75" stroke="none"/>`;
-  s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/><line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+drawL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="5 5"/>`;
-  if(saPx>0&&drawW>2*saPx){const yTop=y0+saPx,yBot=y0+drawW-saPx,d=`M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yBot.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)} M ${sewEnd.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)}`;s+=`<path d="${d}" fill="none" stroke="#8f8f8f" stroke-width="1.5" stroke-dasharray="7 5"/>`;}
+  s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/><line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+drawL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/>`;
+  if(saPx>0&&drawW>2*saPx){const yTop=y0+saPx,yBot=y0+drawW-saPx,d=`M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yBot.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)} M ${sewEnd.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)}`;s+=`<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;}
   if(stabInset>0){
     const stPx=stabInset*scale;
     const stabX=x0+stPx,stabY=y0+stPx,stabW=drawL-2*stPx,stabH=drawW-2*stPx;
@@ -402,7 +392,6 @@ function cpGussetMapHTML(pc, stabInset){
       s+=stabSVGElement('rect',`x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}"`);
     }
   }
-  let acc=0;for(let i=0;i<pc.zones.length;i++){const z=pc.zones[i],x1=sewStart+acc*scale,x2=x1+z.length*scale;if(i>0)s+=`<line x1="${x1.toFixed(1)}" y1="${y0}" x2="${x1.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${CP.maroon}" stroke-width="1.4" opacity=".65"/>`;if(x2-x1>54)s+=`<text x="${((x1+x2)/2).toFixed(1)}" y="${(midY+5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,sans-serif" fill="${CP.maroon}">${z.side.toUpperCase()}</text>`;acc+=z.length;}
   const tb=8,th=11;
   s+=`<polygon points="${(midX-tb/2).toFixed(1)},${y0} ${(midX+tb/2).toFixed(1)},${y0} ${midX.toFixed(1)},${(y0+th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(midX-tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${(midX+tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${midX.toFixed(1)},${(y0+drawW-th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${x0.toFixed(1)},${(midY-tb/2).toFixed(1)} ${x0.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(x0+drawL).toFixed(1)},${(midY-tb/2).toFixed(1)} ${(x0+drawL).toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+drawL-th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/>`;
   s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="none" stroke="${CP.maroon}" stroke-width="2.2"/>`;
@@ -675,7 +664,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
                     {ready&&model.valid?"Enter a finished side depth in Stage 4 to preview pieces.":"Complete panel dimensions first."}
                   </div>
                 }
-                <p className="cp-diag-legend" style={{marginTop:6}}>Ghost = cut 2 · bottom width may differ from sides</p>
               </>
             ):(
               <>
@@ -685,7 +673,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
                     {ready&&model.valid?"Enter a depth in Stage 4 to preview the gusset strip.":"Complete panel dimensions first."}
                   </div>
                 }
-                <p className="cp-diag-legend" style={{marginTop:6}}>Zone map · end allowances shown at each end</p>
+                <p className="cp-diag-legend" style={{marginTop:6}}>End allowances shown at each end</p>
               </>
             )}
           </div>
@@ -748,7 +736,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
                           </button>
                         ))}
                       </div>
-                      <p className="cp-stage-hint">How the curve eases, not the depth.</p>
+                      <p className="cp-stage-hint">Curve easing amount.</p>
                     </div>
                   </div>
                 </div>
@@ -803,7 +791,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
                     {sideTaper&&taperAngle>30&&(
                       <div className="cp-taper-warn">Steep taper — consider reducing the depth difference.</div>
                     )}
-                    <p className="cp-stage-hint">{pieceStyle==="gusset"?"Depth drives gusset width — no separate input needed.":"Side panels and bottom strip each use their depth edge."}</p>
                   </div>
                 </div>
               )}
@@ -811,7 +798,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
 
             {/* Stage 5: Stabilizer (optional) */}
             <div className="cp-stage">
-              <StageHeader num={5} title="Stabilizer" summary={stabOn?`Inset ${cpFmt(params.stabilizerInset)}`:"Off"} open={stageOpen[4]} onToggle={()=>toggleStage(4)} optional={true}/>
+              <StageHeader num={5} title="Stabilizer" summary={stabOn?`Inset ${cpFmt(params.stabilizerInset)}`:"Off"} open={stageOpen[4]} onToggle={()=>toggleStage(4)} optional={!stabOn}/>
               {stageOpen[4]&&(
                 <div className="cp-stage-body">
                   <label className="cp-check" style={{marginBottom:10}}>
@@ -874,7 +861,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
           {stabOn&&(
             <div className={`cp-cutting-row stab-row ${checkedRows.stab?"checked":""}`}>
               <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows.stab} onChange={()=>toggleRow("stab")}/></div>
-              <div className="cp-row-name">Stabilizer</div>
+              <div className="cp-row-name">Front &amp; back stabilizer</div>
               <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.w):"—"}</div>
               <div className="cp-row-cut">{stabBB?cpFmtHyphen(stabBB.h):"—"}</div>
               <div className="cp-row-qty"><span className="cp-row-badge cut2">Cut 2</span></div>
@@ -893,7 +880,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
                 <div key={i} className={`cp-cutting-row ${checkedRows[rk]?"checked":""}`}>
                   <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[rk]} onChange={()=>toggleRow(rk)}/></div>
                   <div className="cp-row-name">
-                    {pc.label}
+                    {cpPiecePreviewTitle(pc)}
                     <div className="cp-row-sewsub">
                       {taper
                         ?`sewline: ${cpFmtHyphen(pc.runLength)} × ${cpFmtHyphen(pc.finishedWidthTop)}–${cpFmtHyphen(pc.finishedWidthBottom)}`
@@ -920,7 +907,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
               const stabRow=(
                 <div key={"s"+i} className={`cp-cutting-row stab-row ${checkedRows[srk]?"checked":""}`}>
                   <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows[srk]} onChange={()=>toggleRow(srk)}/></div>
-                  <div className="cp-row-name">Stabilizer</div>
+                  <div className="cp-row-name">{cpPiecePreviewTitle(pc)} stabilizer</div>
                   <div className="cp-row-cut">{cpFmtHyphen(pc.cutLength)}</div>
                   <div className="cp-row-cut">{stabCutW}</div>
                   <div className="cp-row-qty">
@@ -947,7 +934,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
               stabOn&&(
                 <div key="stab-gusset" className={`cp-cutting-row stab-row ${checkedRows["stab-gusset"]?"checked":""}`}>
                   <div className="cp-row-cb"><input type="checkbox" checked={!!checkedRows["stab-gusset"]} onChange={()=>toggleRow("stab-gusset")}/></div>
-                  <div className="cp-row-name">Stabilizer</div>
+                  <div className="cp-row-name">Gusset stabilizer</div>
                   <div className="cp-row-cut">{cpFmtHyphen(model.gussetPiece.cutLength)}</div>
                   <div className="cp-row-cut">{cpFmtHyphen(Math.max(0,model.gussetPiece.cutWidth-2*params.stabilizerInset))}</div>
                   <div className="cp-row-qty"><span className="cp-row-badge cut1">Cut 1</span></div>

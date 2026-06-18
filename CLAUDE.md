@@ -1469,23 +1469,46 @@ nothing overlaps or breaks at smaller viewports.
 
 ---
 
-## Formatting punch list (separate, lower-risk — do after extractions are confirmed)
-
-This work is pure CSS/layout and does not require confirm-after-every-step
-discipline. Make all changes below, then do one full visual pass at the end.
+## Formatting punch list — pure CSS/layout, no confirm-after-every-step.
+Make all changes below, then do one full visual pass at the end.
 
 - add 20 pixel padding on left and right of main calculator cards between browser edge. At mobile size, only 5 pixels padding
 - make <div class="cp-stage-num optional">5</div> the active state (<div class="cp-stage-num active">5</div>) when Stabilizer/Interfacing checkbox is checked
-- increase the size of <div class="ms-tagline">Houston, we have the math.</div> by 30% for browser window size
-- increase sub tab text size by 20% for browser and tablet size windows as long as the type stays within tab borders with 10 pixels spacing on the left and right.
-- Make Seam Allowance (SA) in cp-mission-sa-label white. Increase font size by 20% when title bar allows.
+- increase the size of <div class="ms-tagline">Houston, we have the math.</div> by 30% for browser window size only — leave tablet and mobile unchanged
+- increase sub tab text size by 20% for browser and tablet size windows, capped at whatever fits within tab borders with 10 pixels spacing on the left and right. If 20% doesn't fit, use the largest size that does fit, applied uniformly across all sub-tabs at that breakpoint — don't scale tabs independently
+- Make Seam Allowance (SA) in cp-mission-sa-label white. Increase font size up to 20% in the title bar, capped at whatever size avoids wrapping or overflow
 - Reword "How the curve eases, not the depth." in Edge Shape to say, "Curve easing amount."
 - Remove from Side depth: Side panels and bottom strip each use their depth edge. and Depth drives gusset width — no separate input needed.
-- remove "zone map" feature from gusset diagrams.
+- remove "zone map" feature from gusset diagrams. [If "zone map" isn't the literal name of anything in the code, identify which gusset diagram feature this refers to before removing — flag it rather than guessing.]
+- add vertical padding to <div class="cp-diag-status cp-diag-status--ok">✓ Geometry verified</div> so there is always at least 8 pixels of clearance between the bottom of the SVG diagram and the top of the status box, at every window size
+- increase type size of pattern pieces/panel names, measurements, and quantity required. Add notes here if the piece should be cut from the pattern or if a ruler can be used.
+- Make uniform the type treatment in the cutting list: Title Case for all pattern piece names (Main panels, Sides, Bottom strips, etc.)
+- When stabilizer is listed in the cutting list because it's been toggled on, add name prior to "stabilizer." For example, "Bottom stabilizer." Also include if this requires the pattern piece or can be cut with a ruler.
+- The rule set for "Use Pattern" when cutting is for when there are curves or tapers. Pieces with all straight sides and 90 degree angles can be cut with a ruler.
+- Remove mark formatting from curvedpanel.jsx as it's overwriting our diagrammarks.js.
+- increase legend type size to 12px from 10px.
+- remove "circle cx" from side pieces diagrams only. Circle cx should still apply to front/back panels where appropriate. [If "circle cx" isn't a literal class/variable name, this refers to the center-point circle mark rendered by diagrammarks.js — remove it there for side panels only.]
+- Remove this content under the side pieces diagram: "Ghost = cut 2 · bottom width may differ from sides"
+- in the side pieces diagram, when the sides match and are ghosted, add a "Cut 2" badge next to the Sides pieces header.
+- for mobile, put input the cp-right-col on top with the diagrams underneath.
+- Make cp-body its own card: white background, 10px rounded corners on all four corners, sitting above the main page background (page bg stays visible behind it, not the other way around).
+- Make cp-cutting-list its own card: same 10px rounded corners, max-width 800px, centered within its container (not pinned left) so it doesn't look stranded on wider screens.
+- Add 20px vertical spacing between the cp-body card and the cp-cutting-list card.
+- Apply the same card treatment to cp-print-bar: 10px rounded corners, padding on all sides so the page background shows through behind it.
+- Remove the internal scroll on cp-left-col so its content renders at full height instead of scrolling within a fixed-height box (the page itself will grow taller and scroll — this is intended).
+- Cap cp-mission-bar and cp-title-bar at max-width 1400px, matching the page constraint used elsewhere.
+- Give cp-title-bar rounded corners on top only: 10px 10px 0 0.
+- Give cp-mission-bar rounded corners on bottom only, to match: 0 0 10px 10px (cp-title-bar and cp-mission-bar are visually combined, so the rounding should read as one continuous shape, square in the middle where they meet).
 
 ---
 
-## Confirm before closing this pass
+## Phase 2 — needs confirm-as-you-go (not pure CSS, do not bundle with above)
+
+- **Add outside perimeter measurement of the front and back panel underneath the legend.** Include cut perimeter and sewline perimeter. Add toggle to also include cut line edge lengths and sew line edge lengths. This requires new geometry math and conditional UI state — work through it incrementally, confirming at each step.
+- **Audit all diagram styles** to confirm they live in the appropriate stylesheets/diagram sheets rather than individual calculator tabs like curvedpanel.jsx. This is a structural review that may touch multiple files — flag findings before moving anything.
+---
+
+## Confirm before closing this pass (done)
 
 - [ ] All four extractions confirmed per their checklists above
 - [ ] Formatting punch list items confirmed visually

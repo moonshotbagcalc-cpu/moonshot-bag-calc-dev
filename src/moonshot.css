@@ -1299,7 +1299,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .ms-wordmark span{color:#9880d8;}
 .ms-tagline{
   font-family:var(--font-sans);
-  font-size:clamp(11px,1.05vw,15px);
+  font-size:clamp(14px,1.37vw,20px);
   font-weight:800;
   font-style:italic;
   color:rgba(255,255,255,0.44);
@@ -1521,7 +1521,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 }
 .ms-sub-tab{
   font-family:var(--font-sans);
-  font-size:clamp(11px,1.1vw,14px);
+  font-size:clamp(13px,1.32vw,17px);
   font-weight:900;
   letter-spacing:-0.01em;
   flex:1 1 0;
@@ -2199,11 +2199,11 @@ body{margin:0;padding:0;background-attachment:fixed;}
   overflow: visible;
 }
 .cp-mission-sa-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.45);
+  color: #fff;
   flex-shrink: 0;
   white-space: nowrap;
   line-height: 1.3;
@@ -2306,14 +2306,12 @@ body{margin:0;padding:0;background-attachment:fixed;}
 }
 .cp-left-diag-wrap svg { width: 100%; height: auto; display: block; }
 .cp-diag-status {
-  position: absolute;
-  bottom: 5px;
-  left: 5px;
-  right: 5px;
+  position: relative;
+  margin-top: 8px;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 800;
-  padding: 4px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   color: #fff;
   display: flex;
@@ -2336,7 +2334,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 }
 .cp-diag-meta { margin-top: 6px; }
 .cp-new-shell .cp-diag-legend {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--sp-muted);
   font-weight: 700;
   line-height: 1.4;
@@ -2441,7 +2439,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-meas-row-stab .cp-meas-cut { font-size: 11px; color: #9d8fd0; }
 
 /* ── Right column: cascade stages ── */
-.cp-right-col { background: #faf7ff; }
+.cp-right-col { background: #faf7ff; padding: 0 20px; }
 .cp-stages { display: flex; flex-direction: column; }
 .cp-stage {
   border-bottom: 1px solid var(--sp-soft);
@@ -2666,9 +2664,9 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-cutting-row.checked .cp-row-cut { color: var(--sp-muted); }
 .cp-cutting-row input[type="checkbox"] { accent-color: #6b48d6; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
 .cp-row-cb { width: 44px; flex-shrink: 0; display: flex; align-items: center; }
-.cp-row-name { flex: 1; font-size: 14px; font-weight: 700; color: var(--sp-ink); padding: 8px 0; }
-.cp-row-sewsub { font-size: 10px; font-style: italic; color: var(--sp-muted); margin-top: 1px; text-decoration: none !important; }
-.cp-row-cut { width: 100px; flex-shrink: 0; font-size: 13px; font-weight: 800; color: #5340b8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cp-row-name { flex: 1; font-size: 16px; font-weight: 700; color: var(--sp-ink); padding: 8px 0; }
+.cp-row-sewsub { font-size: 11px; font-style: italic; color: var(--sp-muted); margin-top: 2px; text-decoration: none !important; }
+.cp-row-cut { width: 100px; flex-shrink: 0; font-size: 15px; font-weight: 800; color: #5340b8; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cp-row-qty { width: 72px; flex-shrink: 0; }
 .cp-row-badge {
   font-size: 9px;
@@ -2684,8 +2682,8 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-row-badge.cut1 { background: #f4f0fd; color: #7b5cc0; border: 0.5px solid #c4b0e8; }
 .cp-row-badge.mirror { background: #e8f4ee; color: #1d5c3a; }
 .cp-cutting-row.stab-row { padding-left: 36px; border-left: 3px solid #9d8fd0; }
-.cp-cutting-row.stab-row .cp-row-name { font-size: 12px; color: #7b5cc0; }
-.cp-cutting-row.stab-row .cp-row-cut { font-size: 12px; color: #9d8fd0; }
+.cp-cutting-row.stab-row .cp-row-name { font-size: 13px; color: #7b5cc0; }
+.cp-cutting-row.stab-row .cp-row-cut { font-size: 13px; color: #9d8fd0; }
 .cp-lining-note {
   margin: 0;
   padding: 12px 20px;
@@ -2751,7 +2749,9 @@ body{margin:0;padding:0;background-attachment:fixed;}
     overflow-x: visible;
     border-right: none;
     border-bottom: 1px solid var(--sp-soft);
+    order: 2;
   }
+  .cp-right-col { order: 1; padding: 0 5px; }
   .cp-mission-bar { top: 44px; padding: 8px 16px; }
   .cp-mission-sa-label { white-space: normal; }
   .cp-mission-sa-abbr { display: block; }

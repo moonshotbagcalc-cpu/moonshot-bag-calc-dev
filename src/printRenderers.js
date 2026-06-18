@@ -33,7 +33,7 @@ function cpFmt(v){ return isMetric() ? fmtCm(v) : cpFmtIn(v); }
 function cpFmtD(v){ return isMetric() ? fmtCm(v) : cpFmtDec(v); }
 
 /* ---- TILED PRINT DOCUMENT ---- */
-export function cpPrintDoc(title, geom, spanW, spanH, detailRows, legendLine, allowRotate=true){
+export function cpPrintDoc(title, geom, spanW, spanH, detailRows, legendLine, allowRotate=true, headingColor=CP_MAROON){
   const plan=cpTilePlan(spanW,spanH,allowRotate);
   let draw=geom;
   if(plan.rotated)draw=`<g transform="translate(${spanH.toFixed(4)} 0) rotate(90)">${geom}</g>`;
@@ -66,7 +66,7 @@ export function cpPrintDoc(title, geom, spanW, spanH, detailRows, legendLine, al
     body{font-family:Nunito,system-ui,sans-serif;margin:0;color:#222}
     .page{page-break-after:always}.tile{page-break-after:always;text-align:center}.tile.last{page-break-after:auto}
     .tlabel{margin:0;padding:3pt 0 0;font-size:7pt;font-weight:700;text-align:center;line-height:1.2}.tile svg{display:block;margin:0 auto}
-    h1{font-size:15pt;margin:0 0 3pt;color:${CP_MAROON}}h2{font-size:10pt;margin:0 0 8pt;color:#555}
+    h1{font-size:15pt;margin:0 0 3pt;color:${headingColor}}h2{font-size:10pt;margin:0 0 8pt;color:#555}
     table{border-collapse:collapse;width:100%;font-size:10pt}td{border:1px solid #ddd;padding:4pt 7pt}td:first-child{font-weight:700;width:38%}
     .note{font-size:11pt;font-weight:800;color:#000;margin-top:9pt;line-height:1.5}.legend{font-size:7.5pt;color:#444;margin-top:5pt}
   </style></head><body>
@@ -288,12 +288,6 @@ export function cpPrintGusset(m,p){
     const ty=sy+L.s;
     if(L.kind==="junction"){geom+=cpSquareMark(PADIN+sa,ty)+cpSquareMark(PADIN+w-sa,ty);}
     else{geom+=cpDiamondMark(PADIN+sa,ty)+cpDiamondMark(PADIN+w-sa,ty);}
-  }
-  let acc=0;
-  for(const z of pc.zones.slice(0,-1)){
-    acc+=z.length;
-    const ty=sy+acc;
-    geom+=`<line x1="${PADIN}" y1="${ty.toFixed(4)}" x2="${(PADIN+w).toFixed(4)}" y2="${ty.toFixed(4)}" stroke="${C_PIECE_CENTER}" stroke-width="0.012" stroke-dasharray="0.08 0.08" opacity=".75"/>`;
   }
   geom+=cpTriangleH(midX,PADIN,+1)+cpTriangleH(midX,PADIN+cutL,-1);
   geom+=cpTriangleV(PADIN,midY,+1)+cpTriangleV(PADIN+w,midY,-1);
