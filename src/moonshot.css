@@ -1432,6 +1432,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 /* ── Page card (wraps all content below nav) ── */
 .ms-page-card{
   max-width:1400px;   /* matches .ms-header-inner max-width exactly */
+  width:calc(100% - 40px);   /* 20px margin on each side below 1440px; above 1440px max-width + auto-centering take over */
   margin:30px auto 15px;
   border-radius:10px;
   overflow:clip;
@@ -1611,7 +1612,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 /* ── Mobile nav (<768px) ── */
 @media(max-width:767px){
   .ms-app{padding-bottom:61px;}
-  .ms-page-card{margin-bottom:0;}
+  .ms-page-card{width:calc(100% - 10px);margin-bottom:0;}
 
   /* Hide desktop elements */
   .ms-header-right,.ms-primary-nav,.ms-header-tools{display:none!important;}
@@ -2162,7 +2163,6 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-new-shell {
   font-family: var(--font-sans);
   color: var(--sp-ink);
-  padding: 0 20px;
 }
 .cp-title-bar {
   background: #2d1a6e;
@@ -2599,7 +2599,16 @@ body{margin:0;padding:0;background-attachment:fixed;}
 }
 
 /* ── Cutting list ── */
-.cp-cutting-list { border-top: 2px solid var(--sp-soft); }
+/* cp-cutting-card: the 800px-max sibling card that holds cutting list + print bar */
+.cp-cutting-card {
+  max-width: 800px;
+  margin: 16px auto 0;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.07);
+}
+.cp-cutting-list { }
 .cp-cutting-header {
   display: flex;
   align-items: center;
@@ -2745,7 +2754,6 @@ body{margin:0;padding:0;background-attachment:fixed;}
 /* ── Mobile overrides for new layout ── */
 @media (max-width: 767px) {
   .cp-body { grid-template-columns: 1fr; }
-  .cp-new-shell { padding: 0 5px; }
   .cp-left-col {
     position: static;
     height: auto;

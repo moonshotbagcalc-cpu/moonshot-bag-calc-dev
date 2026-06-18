@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   buildCurvedPanelModel,
   fmtIn as cpFmtIn, fmtDec as cpFmtDec, ptsToPath as cpPtsToPath,
@@ -482,7 +483,7 @@ function cpGussetPrintSpan(m){
 }
 
 // ── CURVED PANEL PAGE ─────────────────────────────────────────────────────────
-export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}){
+export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},isActive=true}){
   // Dimensions
   const [tWW,setTWW]=useState(0),[tWF,setTWF]=useState(0);
   const [bWW,setBWW]=useState(0),[bWF,setBWF]=useState(0);
@@ -584,7 +585,10 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
     ?`Curved panel · ${cpFmt(params.topW)} × ${cpFmt(params.height)} · SA ${cpFmt(sa)}`
     :"Curved panel";
 
+  const cuttingListPortalTarget = document.getElementById('cp-cutting-list-root');
+
   return(
+    <>
     <div className="cp-new-shell">
 
       {/* Title bar */}
@@ -831,7 +835,11 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
 
       </div>{/* end body */}
 
-      {/* Cutting list */}
+    </div>{/* end cp-new-shell */}
+
+    {/* Cutting list + print bar: portaled below ms-page-card as a sibling card */}
+    {isActive && cuttingListPortalTarget && createPortal(
+      <div className="cp-cutting-card">
       <div className="cp-cutting-list">
         <div className="cp-cutting-header">
           <h2>Cutting list</h2>
@@ -1022,6 +1030,9 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}
         </div>
       )}
 
-    </div>
+      </div>,
+      cuttingListPortalTarget
+    )}
+    </>
   );
 }

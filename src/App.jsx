@@ -155,20 +155,24 @@ export default function MoonshotBagCalc() {
         : <NavBar {...navProps} />
       }
 
-      {/* Page card: wraps tab content only */}
+      {/* Page card: wraps tab body content only (cutting list renders below via portal) */}
       <div className="ms-page-card">
         {/* Tab content — always mounted, shown/hidden to preserve state */}
         {NAV_GROUPS.flatMap(group => group.pages).map(item => {
           const TabComponent = item.component;
+          const isActive = page === item.id;
           return (
-            <div key={item.id} style={{ display: page === item.id ? "block" : "none" }}>
-              <TabComponent {...(item.id === "curved-panel" ? { unitMode, setUnitMode } : {})} />
+            <div key={item.id} style={{ display: isActive ? "block" : "none" }}>
+              <TabComponent {...(item.id === "curved-panel" ? { unitMode, setUnitMode, isActive } : {})} />
             </div>
           );
         })}
       </div>
 
-      {/* Footer: full-width sibling of ms-page-card, not contained within it */}
+      {/* Portal target: cp-cutting-list and cp-print-bar render here via CurvedPanel portal */}
+      <div id="cp-cutting-list-root" />
+
+      {/* Footer: full-width sibling of ms-page-card */}
       <Footer />
     </div>
   );
