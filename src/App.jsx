@@ -155,7 +155,7 @@ export default function MoonshotBagCalc() {
         : <NavBar {...navProps} />
       }
 
-      {/* Page card: wraps all content below nav */}
+      {/* Page card: wraps tab content only */}
       <div className="ms-page-card">
         {/* Tab content — always mounted, shown/hidden to preserve state */}
         {NAV_GROUPS.flatMap(group => group.pages).map(item => {
@@ -166,9 +166,10 @@ export default function MoonshotBagCalc() {
             </div>
           );
         })}
-
-        <Footer />
       </div>
+
+      {/* Footer: full-width sibling of ms-page-card, not contained within it */}
+      <Footer />
     </div>
   );
 }

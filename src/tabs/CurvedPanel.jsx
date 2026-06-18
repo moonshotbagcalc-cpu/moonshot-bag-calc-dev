@@ -338,9 +338,9 @@ function cpPiecePreviewOrder(pc){
 }
 function cpPiecePreviewDims(pc){
   if(pc.cutWidthTop!==undefined){
-    return `${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} bottom`;
+    return `${cpFmt(pc.cutLength)} L × ${cpFmt(pc.cutWidthTop)}–${cpFmt(pc.cutWidthBottom)} W`;
   }
-  return `${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidth)}`;
+  return `${cpFmt(pc.cutLength)} L × ${cpFmt(pc.cutWidth)} W`;
 }
 
 /* Sides minis + tables */
@@ -380,11 +380,19 @@ function cpGussetMapHTML(pc, stabInset){
   const VW=760,PADX=28,PADY=34,MAX_DRAW_H=210;
   const scale=Math.min((VW-2*PADX)/Math.max(pc.cutLength,1e-9),MAX_DRAW_H/Math.max(pc.cutWidth,1e-9));
   const drawL=pc.cutLength*scale,drawW=pc.cutWidth*scale,x0=(VW-drawL)/2,y0=PADY,H=drawW+PADY+56;
-  const saPx=(pc.cutWidth-pc.finishedWidth)/2*scale,sewStart=x0+pc.startAllowance*scale,sewEnd=sewStart+pc.runLength*scale,midX=x0+drawL/2,midY=y0+drawW/2;
+  const saPx=(pc.cutWidth-pc.finishedWidth)/2*scale;
+  const sewStart=pc.open?x0:x0+pc.startAllowance*scale;
+  const sewEnd=pc.open?x0+drawL:sewStart+pc.runLength*scale;
+  const midX=x0+drawL/2,midY=y0+drawW/2;
   let s=`<svg class="cp-zoneMap" viewBox="0 0 ${VW} ${H.toFixed(1)}" xmlns="http://www.w3.org/2000/svg">`;
   s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="#fbecef" fill-opacity=".75" stroke="none"/>`;
   s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/><line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+drawL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/>`;
-  if(saPx>0&&drawW>2*saPx){const yTop=y0+saPx,yBot=y0+drawW-saPx,d=`M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yBot.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)} M ${sewEnd.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)}`;s+=`<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;}
+  if(saPx>0&&drawW>2*saPx){
+    const yTop=y0+saPx,yBot=y0+drawW-saPx;
+    let d=`M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} H ${sewEnd.toFixed(1)} M ${sewStart.toFixed(1)} ${yBot.toFixed(1)} H ${sewEnd.toFixed(1)}`;
+    if(!pc.open) d+=` M ${sewStart.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)} M ${sewEnd.toFixed(1)} ${yTop.toFixed(1)} V ${yBot.toFixed(1)}`;
+    s+=`<path d="${d}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
+  }
   if(stabInset>0){
     const stPx=stabInset*scale;
     const stabX=x0+stPx,stabY=y0+stPx,stabW=drawL-2*stPx,stabH=drawW-2*stPx;
