@@ -7,9 +7,9 @@ import {
   CP_TILE_W, CP_TILE_H,
   cpTilePlan, cpRowLabel, cpTestSquareSVG, cpRegistrationMarks,
 } from './utils/print-utils.js';
-import { C_SEW, C_CENTER, C_STAB, C_EASING } from './diagramTokens.js';
+import { C_SEW, C_CENTER, C_STAB, C_EASING, C_MIDPOINT, CAT_BAG_STRUCTURES, FILL_OPACITY_PRINT } from './diagramTokens.js';
 import {
-  cpSquareMark, cpDiamondMark, cpTriangleMark, cpPerpTick,
+  cpSquareMark, cpMidpointMark, cpTriangleMark, cpPerpTick,
   cpTriangleH, cpTriangleV,
 } from './diagramMarks.js';
 import { cpStabilizerPoints, cpPtsBB } from './stabilizer.js';
@@ -184,20 +184,28 @@ export function cpPrintPanel(m,p){
   const shift=pts=>pts.map(q=>({x:q.x-originX,y:q.y-originY,side:q.side}));
   const active=m.activeSew;
   let geom="";
+  // Z-order: fill → stabilizer → sewline → center → junctions → midpoints → triangles → cut stroke
+  // 1. fill tint (bottommost layer)
+  geom+=`<path d="${cpPtsToPath(shift(m.cutPts),true)}" fill="${CAT_BAG_STRUCTURES.fillTint}" fill-opacity="${FILL_OPACITY_PRINT}" stroke="none"/>`;
+  // stabilizer always prints on its own separate sheet — never overlaid on the main panel
+  // 3. sewline
   geom+=`<path d="${cpPtsToPath(shift(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="0.022" stroke-dasharray="0.15 0.1"/>`;
-  const stabPts=(!p.stabilizerSeparate ? cpStabilizerPoints(m,p) : null);
-  if(stabPts)geom+=`<path d="${cpPtsToPath(shift(stabPts),true)}" fill="none" stroke="${C_STAB}" stroke-width="0.026" stroke-dasharray="0.10 0.08"/>`;
+  // 4. center fold line
   const midX=(m.frame[0].x+m.frame[1].x)/2-originX;
   geom+=`<line x1="${midX.toFixed(4)}" y1="${(m.cutBB.minY-originY-0.05).toFixed(4)}" x2="${midX.toFixed(4)}" y2="${(m.cutBB.maxY-originY+0.05).toFixed(4)}" stroke="${C_CENTER}" stroke-width="0.018" stroke-dasharray="0.25 0.15"/>`;
-  geom+=`<path d="${cpPtsToPath(shift(m.cutPts),true)}" fill="none" stroke="${C_CUT}" stroke-width="0.04"/>`;
-  shift(active.junctions||[]).forEach(j=>geom+=cpSquareMark(j.x,j.y));
-  shift(active.midpoints||[]).forEach(mp=>geom+=cpDiamondMark(mp.x,mp.y));
+  // 5. junction squares — category color (matching screen)
+  shift(active.junctions||[]).forEach(j=>geom+=cpSquareMark(j.x,j.y,CAT_BAG_STRUCTURES.color));
+  // 6. midpoint circles — C_MIDPOINT red (matching screen; replaces grey diamonds)
+  shift(active.midpoints||[]).forEach(mp=>geom+=cpMidpointMark(mp.x,mp.y));
+  // 7. center match triangles + perp ticks — C_MIDPOINT red (matching screen)
   const mds=cpMarkDetails(m.cutPts,m.marks,originX,originY);
   mds.forEach((md,mi)=>{
     const mark=m.marks[mi],isEdge=!mark||mark.kind!=="blend";
-    geom+=cpTriangleMark(md.x,md.y,md.nx,md.ny,md.tx,md.ty,isEdge?1:.5);
-    if(isEdge)geom+=cpPerpTick(md.x,md.y,md.nx,md.ny);
+    geom+=cpTriangleMark(md.x,md.y,md.nx,md.ny,md.tx,md.ty,isEdge?1:.5,C_MIDPOINT);
+    if(isEdge)geom+=cpPerpTick(md.x,md.y,md.nx,md.ny,C_MIDPOINT);
   });
+  // 8. cut line stroke — black for print reliability, 0.042in ≈ 3pt (topmost layer)
+  geom+=`<path d="${cpPtsToPath(shift(m.cutPts),true)}" fill="none" stroke="#000000" stroke-width="0.042" stroke-linejoin="round"/>`;
   const open=p.topMode==="3side";
   const r=active.runs;
   const detailRows=[
@@ -206,7 +214,7 @@ export function cpPrintPanel(m,p){
     ["Cut perimeter",cpFmt(m.cutPerim)+"  ("+cpFmtD(m.cutPerim)+")"],
     [open?"Three-sided sewline length":"Sewline perimeter",cpFmt(active.total)+"  ("+cpFmtD(active.total)+")"],
     ["Seam allowance",cpFmt(p.sa)],
-    ...(p.stabilizerOn ? [["Stabilizer inset",cpFmt(p.stabilizerInset)+(p.stabilizerSeparate?" · printed separately":" · guide shown on main panel")]] : []),
+    ...(p.stabilizerOn ? [["Stabilizer inset",cpFmt(p.stabilizerInset)+" · prints as separate sheet"]] : []),
     ["Fullness / crown","Left "+cpFmt(m.crowns.hL)+" · Right "+cpFmt(m.crowns.hR)+" · Top "+cpFmt(m.crowns.hTop)+" · Bottom "+cpFmt(m.crowns.hBot)+" · feel: "+p.feel],
     ["Corner softness","top "+cpFmt(m.softness.ts)+" · bottom "+cpFmt(m.softness.bs)+" (0 = crisp)"],
     ["Construction",open?"3-sided open top":"4-sided enclosed"],
@@ -215,7 +223,7 @@ export function cpPrintPanel(m,p){
       :("Top "+cpFmt(r.top)+" · Right "+cpFmt(r.right)+" · Bottom "+cpFmt(r.bottom)+" · Left "+cpFmt(r.left))]
   ];
   cpPrintDoc("Curved Panel — Main Panel",geom,spanW,spanH,detailRows,
-    "Purple = cut line · grey dashed = sewline · lavender dotted = stabilizer guide · cyan dashed = center fold line. ▲ = center/fold mark · □ = side junction · ◇ = side midpoint.");
+    "Black = cut line · grey dashed = sewline · rust dotted = stabilizer guide · cyan dashed = center fold line · red ▲ = center/fold mark · purple □ = side junction · red ○ = side midpoint.");
 }
 
 /* ---- PRINT: STABILIZER ---- */

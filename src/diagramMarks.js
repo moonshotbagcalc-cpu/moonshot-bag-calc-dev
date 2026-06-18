@@ -8,16 +8,23 @@
    systems and would require new wrappers (beyond pure relocation).
    Flagged for a future pass.
    ===================================================================== */
-import { C_SEW } from './diagramTokens.js';
+import { C_SEW, C_MIDPOINT } from './diagramTokens.js';
 
 /* C_BORDER_MARK is the print-doc tile border; cpSquareMark uses it (pre-existing
    deviation from diagram standard — should be catColor but not changed here). */
 const C_BORDER_MARK = "#000000";
 
-/* Corner junction square mark (print inches). */
-export function cpSquareMark(x, y){
+/* Corner junction square mark (print inches).
+   catColor: pass CAT_BAG_STRUCTURES.color for category-colored junctions; defaults to black. */
+export function cpSquareMark(x, y, catColor = C_BORDER_MARK){
   const s = 0.055;
-  return `<rect x="${(x-s).toFixed(4)}" y="${(y-s).toFixed(4)}" width="${(2*s).toFixed(4)}" height="${(2*s).toFixed(4)}" fill="none" stroke="${C_BORDER_MARK}" stroke-width="0.018" rx="0.01"/>`;
+  return `<rect x="${(x-s).toFixed(4)}" y="${(y-s).toFixed(4)}" width="${(2*s).toFixed(4)}" height="${(2*s).toFixed(4)}" fill="none" stroke="${catColor}" stroke-width="0.018" rx="0.01"/>`;
+}
+
+/* Midpoint open-circle mark (print inches).
+   Spec: 0.07in radius · white fill · C_MIDPOINT stroke · 0.022in weight. */
+export function cpMidpointMark(x, y){
+  return `<circle cx="${x.toFixed(4)}" cy="${y.toFixed(4)}" r="0.07" fill="#ffffff" stroke="${C_MIDPOINT}" stroke-width="0.022"/>`;
 }
 
 /* Side midpoint diamond mark (print inches). */

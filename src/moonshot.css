@@ -2273,8 +2273,6 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-left-col {
   position: sticky;
   top: 130px;
-  height: calc(100vh - 130px);
-  overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;

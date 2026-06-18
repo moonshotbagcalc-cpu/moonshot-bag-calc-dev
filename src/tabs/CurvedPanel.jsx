@@ -132,18 +132,27 @@ function cpPanelDiagramSVG(model,params){
   const active=model.activeSew;
   let svg="";
   const fr=model.frame,midX=(fr[0].x+fr[1].x)/2;
-  svg+=`<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="${C_CENTER}" stroke-width="${W_CENTER}" stroke-dasharray="${DASH_CENTER}"/>`;
-  svg+=`<path d="${cpPtsToPath(map(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
   const MIN=14;
   function dedup(pts){const kept=[];for(const p of pts){const sx=X(p.x),sy=Y(p.y);if(kept.every(k=>Math.hypot(k.sx-sx,k.sy-sy)>=MIN))kept.push({p,sx,sy});}return kept.map(k=>k.p);}
   const junctions=dedup(active.junctions||[]),midpoints=dedup(active.midpoints||[]);
-  // junction squares — category color (open square, 7×7px per spec)
-  for(const j of junctions){const cx=X(j.x),cy=Y(j.y),q=3.5;svg+=`<rect x="${(cx-q).toFixed(1)}" y="${(cy-q).toFixed(1)}" width="${(2*q).toFixed(1)}" height="${(2*q).toFixed(1)}" fill="#fff" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_MIDPOINT}" rx="1"/>`;}
-  // midpoint circles — red open circle per spec (C_MIDPOINT, MIDPOINT_R)
-  for(const m of midpoints){const cx=X(m.x),cy=Y(m.y);svg+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${MIDPOINT_R}" fill="#fff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;}
   const mds=cpMarkDetails(model.cutPts,model.marks,0,0);
+  const stabPts=cpStabilizerPoints(model,params);
+
+  // Z-order: fill → stabilizer → sewline → center → junctions → midpoints → triangles → cut stroke
+  // 1. fill tint (bottommost — drawn before all strokes)
+  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="${CAT_BAG_STRUCTURES.fillTint}" fill-opacity="${FILL_OPACITY_SCREEN}" stroke="none"/>`;
+  // 2. stabilizer (above fill, below sewline per spec)
+  if(stabPts)svg+=stabSVGElement('path',`d="${cpPtsToPath(map(stabPts),true)}"`);
+  // 3. sewline
+  svg+=`<path d="${cpPtsToPath(map(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
+  // 4. center fold line
+  svg+=`<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="${C_CENTER}" stroke-width="${W_CENTER}" stroke-dasharray="${DASH_CENTER}"/>`;
+  // 5. junction squares — category color (open square, 7×7px per spec)
+  for(const j of junctions){const cx=X(j.x),cy=Y(j.y),q=3.5;svg+=`<rect x="${(cx-q).toFixed(1)}" y="${(cy-q).toFixed(1)}" width="${(2*q).toFixed(1)}" height="${(2*q).toFixed(1)}" fill="#fff" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_MIDPOINT}" rx="1"/>`;}
+  // 6. midpoint circles — red open circle per spec (C_MIDPOINT, MIDPOINT_R)
+  for(const m of midpoints){const cx=X(m.x),cy=Y(m.y);svg+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${MIDPOINT_R}" fill="#fff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;}
+  // 7. center match triangles + perp ticks (blend marks at 50% scale — intentional)
   mds.forEach((md,mi)=>{
-    // blend marks intentionally rendered at 50% scale to de-emphasise arc corners
     const isEdge=!model.marks[mi]||model.marks[mi].kind!=="blend";
     const base=isEdge?TRIANGLE_BASE:TRIANGLE_BASE*0.5,ht=isEdge?TRIANGLE_HEIGHT:TRIANGLE_HEIGHT*0.5;
     const px=X(md.x),py=Y(md.y);
@@ -151,9 +160,8 @@ function cpPanelDiagramSVG(model,params){
     svg+=`<polygon points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${ax.toFixed(1)},${ay.toFixed(1)}" fill="${C_MIDPOINT}"/>`;
     if(isEdge)svg+=`<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*TRIANGLE_HEIGHT).toFixed(1)}" y2="${(py+md.ny*TRIANGLE_HEIGHT).toFixed(1)}" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
   });
-  const stabPts=cpStabilizerPoints(model,params);
-  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="${CAT_BAG_STRUCTURES.fillTint}" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}" stroke-linejoin="round" fill-opacity="${FILL_OPACITY_SCREEN}"/>`;
-  if(stabPts)svg+=stabSVGElement('path',`d="${cpPtsToPath(map(stabPts),true)}"`);
+  // 8. cut line stroke (topmost — drawn last so it's never obscured)
+  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="none" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}" stroke-linejoin="round"/>`;
   return svg;
 }
 
@@ -534,7 +542,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   // Stabilizer
   const [stabOn,setStabOn]=useState(false);
   const [stabW,setStabW]=useState(0),[stabF,setStabF]=useState(0.625);
-  const [stabSeparate,setStabSeparate]=useState(false);
   // UI state
   const [stageOpen,setStageOpen]=useState([true,true,true,true,false]);
   const [checkedRows,setCheckedRows]=useState({});
@@ -557,7 +564,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
     leftFull:lf,rightFull:rf,matchingSides,feel,topMode,
     topSoft:Math.max(0,tsW+tsF),botSoft:Math.max(0,bsW+bsF),
     sideDepth:modelSideDepth,
-    stabilizerOn:stabOn,stabilizerInset:Math.max(0,stabW+stabF),stabilizerSeparate:stabSeparate,
+    stabilizerOn:stabOn,stabilizerInset:Math.max(0,stabW+stabF),
     sideTaper,depthTop,depthBottom,
   };
 
@@ -1003,12 +1010,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                   </label>
                   <div style={{opacity:stabOn?1:0.35,pointerEvents:stabOn?"auto":"none"}}>
                     <FracInput variant="cp" label="Inset" decMode={decMode} ghost={!stabOn} whole={stabW} frac={stabF} onWhole={setStabW} onFrac={setStabF}/>
-                    <div className="cp-stage-input-label" style={{margin:"8px 0 5px"}}>Print</div>
-                    <StageSeg
-                      options={[{v:false,label:"With panel"},{v:true,label:"Separately"}]}
-                      value={stabSeparate}
-                      set={setStabSeparate}
-                    />
                   </div>
                 </div>
               )}
