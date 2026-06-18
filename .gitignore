@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Scratch / experimental variants — keep out of staging
+*.fixed.jsx
+*.cut-edge-inline.jsx
+*.side-grid-stab-fix.jsx
+*.scratch.jsx
+*.wip.jsx
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

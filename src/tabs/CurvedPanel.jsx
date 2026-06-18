@@ -138,10 +138,10 @@ function cpSvgPts(pts){
   return (pts||[]).map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 }
 function cpMiniSvgStyle(svgW,svgH){
-  return `width:auto;height:${svgH.toFixed(1)}px;max-height:230px;max-width:165px;display:block;margin:0 auto;overflow:visible`;
+  return `width:${svgW.toFixed(1)}px;height:${svgH.toFixed(1)}px;display:block;margin:0 auto;overflow:visible`;
 }
 function cpMiniShell(svg){
-  return `<div class="cp-mini" style="flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;max-width:170px;margin:0">${svg}</div>`;
+  return `<div class="cp-mini" style="flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:center;margin:0">${svg}</div>`;
 }
 function cpInsetScreenPolygon(pts,inset){
   if(!pts?.length||pts.length<3||!(inset>0))return null;
@@ -360,7 +360,7 @@ function cpSidesHTML(m,p){
   const maxW=Math.max(...pieces.map(x=>x.cutWidthTop!==undefined?Math.max(x.cutWidthTop,x.cutWidthBottom):x.cutWidth));
   const maxL=Math.max(...pieces.map(x=>x.cutLength));
   // Shared preview scale keeps all piece drawings readable without letting one SVG grow huge.
-  const fitScale=Math.min(170/Math.max(maxL,1e-9),96/Math.max(maxW,1e-9));
+  const fitScale=Math.min(300/Math.max(maxL,1e-9),120/Math.max(maxW,1e-9));
   const stabInset=(p.stabilizerOn&&p.stabilizerInset>0)?p.stabilizerInset:0;
   const cards=[];
   let tables="";
