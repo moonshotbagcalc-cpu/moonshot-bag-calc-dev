@@ -674,12 +674,12 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                 </div>
               }
               {/* Geometry status overlay — pinned to bottom of diagram box */}
-              {ready&&model.valid&&model.errors.length===0&&(
+              {ready&&model.valid&&model.errors.length===0&&model.notes.length===0&&(
                 <div className="cp-diag-status cp-diag-status--ok">✓ Geometry verified</div>
               )}
-              {ready&&(!model.valid||model.errors.length>0)&&(
+              {ready&&(!model.valid||model.errors.length>0||model.notes.length>0)&&(
                 <div className="cp-diag-status cp-diag-status--warn">
-                  <span>⚠ Pattern output locked</span>
+                  <span>{(!model.valid||model.errors.length>0)?"⚠ Pattern output locked":"⚠ Values adjusted"}</span>
                   {model.errors.length>0&&(
                     <span className="cp-diag-status-errors">
                       {model.errors.join(" · ")}
