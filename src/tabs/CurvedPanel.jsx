@@ -55,6 +55,24 @@ const CP = {
 function cpFmt(v){ return isMetric() ? fmtCm(v) : cpFmtIn(v); }
 function cpFmtD(v){ return isMetric() ? fmtCm(v) : cpFmtDec(v); }
 
+/* 1/16" precision formatter — used only in the perimeter block.
+   Curves/tapers are the only context where sub-1/8" differences matter,
+   and that's also the only context where this block appears.
+   Uses FM32 fraction entries that land on even 32nds (= 1/16" boundaries). */
+const _FM16={0:"",0.0625:"1/16",0.125:"1/8",0.1875:"3/16",0.25:"1/4",
+  0.3125:"5/16",0.375:"3/8",0.4375:"7/16",0.5:"1/2",0.5625:"9/16",
+  0.625:"5/8",0.6875:"11/16",0.75:"3/4",0.8125:"13/16",0.875:"7/8",0.9375:"15/16"};
+function cpFmtPerim(v){
+  if(isMetric())return fmtCm(v);
+  if(!v||v<=0)return "—";
+  const r=Math.round(v*16)/16,w=Math.floor(r),fr=Math.round((r-w)*16)/16;
+  const wh=fr>=1?w+1:w,fv=fr>=1?0:fr;
+  const fs=_FM16[Math.round(fv*16)/16]??"";
+  if(wh===0&&fs)return `${fs}"`;
+  if(!fs)return `${wh}"`;
+  return `${wh}-${fs}"`;
+}
+
 /* =====================================================================
    TILED PRINT ENGINE — 7" × 10" tiles, Letter and A4 safe at 100%.
    Kept as-is from the standalone prototype: pure DOM generation.
@@ -114,22 +132,27 @@ function cpPanelDiagramSVG(model,params){
   const active=model.activeSew;
   let svg="";
   const fr=model.frame,midX=(fr[0].x+fr[1].x)/2;
-  svg+=`<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="#00bcd4" stroke-width="1.2" stroke-dasharray="4 6" opacity="0.6"/>`;
+  svg+=`<line x1="${X(midX).toFixed(1)}" y1="${Y(bb.minY).toFixed(1)}" x2="${X(midX).toFixed(1)}" y2="${Y(bb.maxY).toFixed(1)}" stroke="${C_CENTER}" stroke-width="${W_CENTER}" stroke-dasharray="${DASH_CENTER}"/>`;
   svg+=`<path d="${cpPtsToPath(map(active.pts),active.closed)}" fill="none" stroke="${C_SEW}" stroke-width="${W_SEW}" stroke-dasharray="${DASH_SEW}"/>`;
   const MIN=14;
   function dedup(pts){const kept=[];for(const p of pts){const sx=X(p.x),sy=Y(p.y);if(kept.every(k=>Math.hypot(k.sx-sx,k.sy-sy)>=MIN))kept.push({p,sx,sy});}return kept.map(k=>k.p);}
   const junctions=dedup(active.junctions||[]),midpoints=dedup(active.midpoints||[]);
-  for(const j of junctions){const cx=X(j.x),cy=Y(j.y),q=3.8;svg+=`<rect x="${(cx-q).toFixed(1)}" y="${(cy-q).toFixed(1)}" width="${(2*q).toFixed(1)}" height="${(2*q).toFixed(1)}" fill="#fff" stroke="${CP.maroon}" stroke-width="1.8" rx="1"/>`;}
-  for(const m of midpoints){const cx=X(m.x),cy=Y(m.y),d=5;svg+=`<polygon points="${cx.toFixed(1)},${(cy-d).toFixed(1)} ${(cx+d).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+d).toFixed(1)} ${(cx-d).toFixed(1)},${cy.toFixed(1)}" fill="#fff" stroke="#8a8a8a" stroke-width="1.8"/>`;}
+  // junction squares — category color (open square, 7×7px per spec)
+  for(const j of junctions){const cx=X(j.x),cy=Y(j.y),q=3.5;svg+=`<rect x="${(cx-q).toFixed(1)}" y="${(cy-q).toFixed(1)}" width="${(2*q).toFixed(1)}" height="${(2*q).toFixed(1)}" fill="#fff" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_MIDPOINT}" rx="1"/>`;}
+  // midpoint circles — red open circle per spec (C_MIDPOINT, MIDPOINT_R)
+  for(const m of midpoints){const cx=X(m.x),cy=Y(m.y);svg+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${MIDPOINT_R}" fill="#fff" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;}
   const mds=cpMarkDetails(model.cutPts,model.marks,0,0);
   mds.forEach((md,mi)=>{
-    const isEdge=!model.marks[mi]||model.marks[mi].kind!=="blend",px=X(md.x),py=Y(md.y),base=isEdge?7:3.8,ht=isEdge?11:6;
+    // blend marks intentionally rendered at 50% scale to de-emphasise arc corners
+    const isEdge=!model.marks[mi]||model.marks[mi].kind!=="blend";
+    const base=isEdge?TRIANGLE_BASE:TRIANGLE_BASE*0.5,ht=isEdge?TRIANGLE_HEIGHT:TRIANGLE_HEIGHT*0.5;
+    const px=X(md.x),py=Y(md.y);
     const b1x=px-md.tx*base/2,b1y=py-md.ty*base/2,b2x=px+md.tx*base/2,b2y=py+md.ty*base/2,ax=px+md.nx*ht,ay=py+md.ny*ht;
-    svg+=`<polygon points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${ax.toFixed(1)},${ay.toFixed(1)}" fill="${CP.maroon}"/>`;
-    if(isEdge)svg+=`<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*11).toFixed(1)}" y2="${(py+md.ny*11).toFixed(1)}" stroke="${CP.maroon}" stroke-width="2"/>`;
+    svg+=`<polygon points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${ax.toFixed(1)},${ay.toFixed(1)}" fill="${C_MIDPOINT}"/>`;
+    if(isEdge)svg+=`<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*TRIANGLE_HEIGHT).toFixed(1)}" y2="${(py+md.ny*TRIANGLE_HEIGHT).toFixed(1)}" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
   });
   const stabPts=cpStabilizerPoints(model,params);
-  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="#f6edff" stroke="${CP.maroon}" stroke-width="3.5" stroke-linejoin="round" fill-opacity="0.48"/>`;
+  svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="${CAT_BAG_STRUCTURES.fillTint}" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}" stroke-linejoin="round" fill-opacity="${FILL_OPACITY_SCREEN}"/>`;
   if(stabPts)svg+=stabSVGElement('path',`d="${cpPtsToPath(map(stabPts),true)}"`);
   return svg;
 }
@@ -386,7 +409,7 @@ function cpGussetMapHTML(pc, stabInset){
   const sewEnd=pc.open?x0+drawL:sewStart+pc.runLength*scale;
   const midX=x0+drawL/2,midY=y0+drawW/2;
   let s=`<svg class="cp-zoneMap" viewBox="0 0 ${VW} ${H.toFixed(1)}" xmlns="http://www.w3.org/2000/svg">`;
-  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="#fbecef" fill-opacity=".75" stroke="none"/>`;
+  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="${CAT_BAG_STRUCTURES.fillTint}" fill-opacity="${FILL_OPACITY_SCREEN}" stroke="none"/>`;
   s+=`<line x1="${midX.toFixed(1)}" y1="${y0}" x2="${midX.toFixed(1)}" y2="${(y0+drawW).toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/><line x1="${x0.toFixed(1)}" y1="${midY.toFixed(1)}" x2="${(x0+drawL).toFixed(1)}" y2="${midY.toFixed(1)}" stroke="${C_PIECE_CENTER}" stroke-width="1.2" stroke-dasharray="${DASH_CENTER}"/>`;
   if(saPx>0&&drawW>2*saPx){
     const yTop=y0+saPx,yBot=y0+drawW-saPx;
@@ -401,9 +424,9 @@ function cpGussetMapHTML(pc, stabInset){
       s+=stabSVGElement('rect',`x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}"`);
     }
   }
-  const tb=8,th=11;
-  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${y0} ${(midX+tb/2).toFixed(1)},${y0} ${midX.toFixed(1)},${(y0+th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(midX-tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${(midX+tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${midX.toFixed(1)},${(y0+drawW-th).toFixed(1)}" fill="${CP.maroon}"/><polygon points="${x0.toFixed(1)},${(midY-tb/2).toFixed(1)} ${x0.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/><polygon points="${(x0+drawL).toFixed(1)},${(midY-tb/2).toFixed(1)} ${(x0+drawL).toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+drawL-th).toFixed(1)},${midY.toFixed(1)}" fill="${CP.maroon}"/>`;
-  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="none" stroke="${CP.maroon}" stroke-width="2.2"/>`;
+  const tb=TRIANGLE_BASE,th=TRIANGLE_HEIGHT;
+  s+=`<polygon points="${(midX-tb/2).toFixed(1)},${y0} ${(midX+tb/2).toFixed(1)},${y0} ${midX.toFixed(1)},${(y0+th).toFixed(1)}" fill="${C_MIDPOINT}"/><polygon points="${(midX-tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${(midX+tb/2).toFixed(1)},${(y0+drawW).toFixed(1)} ${midX.toFixed(1)},${(y0+drawW-th).toFixed(1)}" fill="${C_MIDPOINT}"/><polygon points="${x0.toFixed(1)},${(midY-tb/2).toFixed(1)} ${x0.toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+th).toFixed(1)},${midY.toFixed(1)}" fill="${C_MIDPOINT}"/><polygon points="${(x0+drawL).toFixed(1)},${(midY-tb/2).toFixed(1)} ${(x0+drawL).toFixed(1)},${(midY+tb/2).toFixed(1)} ${(x0+drawL-th).toFixed(1)},${midY.toFixed(1)}" fill="${C_MIDPOINT}"/>`;
+  s+=`<rect x="${x0.toFixed(1)}" y="${y0}" width="${drawL.toFixed(1)}" height="${drawW.toFixed(1)}" rx="4" fill="none" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}"/>`;
   s+=`<text x="${x0.toFixed(1)}" y="${(y0-10).toFixed(1)}" font-size="12.5" font-weight="800" font-family="Nunito,sans-serif" fill="${CP.muted}">END SA ${cpFmt(pc.startAllowance)}</text><text x="${(x0+drawL).toFixed(1)}" y="${(y0-10).toFixed(1)}" text-anchor="end" font-size="12.5" font-weight="800" font-family="Nunito,sans-serif" fill="${CP.muted}">END SA ${cpFmt(pc.endAllowance)}</text></svg>`;
   return s;
 }
@@ -515,6 +538,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   // UI state
   const [stageOpen,setStageOpen]=useState([true,true,true,true,false]);
   const [checkedRows,setCheckedRows]=useState({});
+  const [showEdges,setShowEdges]=useState(false);
 
   // Derived values
   const lf=Math.max(0,lfW+lfF);
@@ -658,9 +682,95 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
             </div>
             {ready&&model.valid&&(
               <div className="cp-diag-meta">
-                <p className="cp-diag-legend">
-                  ▲ center · ○ midpoints · solid = cut · dashed = sewline{stabOn?" · dotted = stabilizer":""}
-                </p>
+                <div className="cp-diag-legend" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"4px 10px"}}>
+                  {/* center match triangle */}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width={TRIANGLE_BASE+2} height={TRIANGLE_HEIGHT+2} viewBox={`0 0 ${TRIANGLE_BASE+2} ${TRIANGLE_HEIGHT+2}`} style={{display:"block"}}>
+                      <polygon points={`1,${TRIANGLE_HEIGHT+1} ${TRIANGLE_BASE+1},${TRIANGLE_HEIGHT+1} ${(TRIANGLE_BASE/2+1).toFixed(1)},1`} fill={C_MIDPOINT}/>
+                    </svg>
+                    center mark
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  {/* midpoint circle */}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width={MIDPOINT_R*2+4} height={MIDPOINT_R*2+4} viewBox={`0 0 ${MIDPOINT_R*2+4} ${MIDPOINT_R*2+4}`} style={{display:"block"}}>
+                      <circle cx={MIDPOINT_R+2} cy={MIDPOINT_R+2} r={MIDPOINT_R} fill="#fff" stroke={C_MIDPOINT} strokeWidth={W_MIDPOINT}/>
+                    </svg>
+                    midpoint
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  {/* junction square */}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width="9" height="9" viewBox="0 0 9 9" style={{display:"block"}}>
+                      <rect x="1" y="1" width="7" height="7" fill="#fff" stroke={CAT_BAG_STRUCTURES.color} strokeWidth="1.5" rx="1"/>
+                    </svg>
+                    junction
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  {/* cut line */}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                      <line x1="0" y1="2" x2="20" y2="2" stroke={CAT_BAG_STRUCTURES.color} strokeWidth={W_CUT} strokeLinecap="round"/>
+                    </svg>
+                    cut
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  {/* sewline */}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                      <line x1="0" y1="2" x2="20" y2="2" stroke={C_SEW} strokeWidth={W_SEW} strokeDasharray={DASH_SEW} strokeLinecap="round"/>
+                    </svg>
+                    sewline
+                  </span>
+                  {stabOn&&(<>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    {/* stabilizer */}
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                        <line x1="0" y1="2" x2="20" y2="2" stroke={C_STAB} strokeWidth={W_STAB} strokeDasharray={DASH_STAB} strokeLinecap="round"/>
+                      </svg>
+                      stabilizer
+                    </span>
+                  </>)}
+                </div>
+              </div>
+            )}
+
+            {/* Perimeter stats — cut + sewline totals, expandable per-side */}
+            {ready&&model.valid&&(
+              <div className="cp-perim">
+                <div className="cp-perim-row">
+                  <span className="cp-perim-label">Cut Perimeter</span>
+                  <span className="cp-perim-val">{cpFmtPerim(model.cutPerim)}</span>
+                  <button className="cp-perim-expand" onClick={()=>setShowEdges(s=>!s)} aria-label={showEdges?"Hide edge lengths":"Show edge lengths"}>
+                    {showEdges?"▲":"▼"}
+                  </button>
+                </div>
+                <div className="cp-perim-row cp-perim-row--last">
+                  <span className="cp-perim-label">Sewline Perimeter{topMode==="3side"?" (open)":""}</span>
+                  <span className="cp-perim-val">{cpFmtPerim(active.total)}</span>
+                  <span/>
+                </div>
+                {showEdges&&(
+                  <div className="cp-perim-edges">
+                    <div className="cp-perim-edge-hdr">
+                      <div/>
+                      <div>Cut</div>
+                      <div>Sewline</div>
+                    </div>
+                    {['top','right','bottom','left'].map(side=>{
+                      const cutRun=model.cutRuns?.[side]??0;
+                      const sewRun=active.runs?.[side];
+                      return(
+                        <div className="cp-perim-edge-row" key={side}>
+                          <div className="cp-perim-edge-side">{side.charAt(0).toUpperCase()+side.slice(1)}</div>
+                          <div className="cp-perim-edge-val">{cpFmtPerim(cutRun)}</div>
+                          <div className="cp-perim-edge-val">{sewRun!=null?cpFmtPerim(sewRun):"—"}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -676,6 +786,46 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                     {ready&&model.valid?"Enter a finished side depth in Stage 4 to preview pieces.":"Complete panel dimensions first."}
                   </div>
                 }
+                {ready&&model.valid&&hasDepth&&(
+                  <div className="cp-diag-legend" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"4px 10px",marginTop:6}}>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width={TRIANGLE_BASE+2} height={TRIANGLE_HEIGHT+2} viewBox={`0 0 ${TRIANGLE_BASE+2} ${TRIANGLE_HEIGHT+2}`} style={{display:"block"}}>
+                        <polygon points={`1,${TRIANGLE_HEIGHT+1} ${TRIANGLE_BASE+1},${TRIANGLE_HEIGHT+1} ${(TRIANGLE_BASE/2+1).toFixed(1)},1`} fill={C_MIDPOINT}/>
+                      </svg>
+                      center mark
+                    </span>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                        <line x1="0" y1="2" x2="20" y2="2" stroke={CAT_BAG_STRUCTURES.color} strokeWidth={W_CUT} strokeLinecap="round"/>
+                      </svg>
+                      cut
+                    </span>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                        <line x1="0" y1="2" x2="20" y2="2" stroke={C_SEW} strokeWidth={W_SEW} strokeDasharray={DASH_SEW} strokeLinecap="round"/>
+                      </svg>
+                      sewline
+                    </span>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="6" height="14" viewBox="0 0 6 14" style={{display:"block"}}>
+                        <line x1="3" y1="0" x2="3" y2="10" stroke={C_EASING} strokeWidth={W_EASING_CLIP} strokeLinecap="round"/>
+                      </svg>
+                      easing clip
+                    </span>
+                    {stabOn&&(<>
+                      <span style={{color:"var(--sp-muted)"}}>·</span>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                        <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                          <line x1="0" y1="2" x2="20" y2="2" stroke={C_STAB} strokeWidth={W_STAB} strokeDasharray={DASH_STAB} strokeLinecap="round"/>
+                        </svg>
+                        stabilizer
+                      </span>
+                    </>)}
+                  </div>
+                )}
               </>
             ):(
               <>
@@ -685,7 +835,41 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                     {ready&&model.valid?"Enter a depth in Stage 4 to preview the gusset strip.":"Complete panel dimensions first."}
                   </div>
                 }
-                <p className="cp-diag-legend" style={{marginTop:6}}>End allowances shown at each end</p>
+                <div className="cp-diag-legend" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"4px 10px",marginTop:6}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width={TRIANGLE_BASE+2} height={TRIANGLE_HEIGHT+2} viewBox={`0 0 ${TRIANGLE_BASE+2} ${TRIANGLE_HEIGHT+2}`} style={{display:"block"}}>
+                      <polygon points={`1,${TRIANGLE_HEIGHT+1} ${TRIANGLE_BASE+1},${TRIANGLE_HEIGHT+1} ${(TRIANGLE_BASE/2+1).toFixed(1)},1`} fill={C_MIDPOINT}/>
+                    </svg>
+                    center mark
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                      <line x1="0" y1="2" x2="20" y2="2" stroke={CAT_BAG_STRUCTURES.color} strokeWidth={W_CUT} strokeLinecap="round"/>
+                    </svg>
+                    cut
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                      <line x1="0" y1="2" x2="20" y2="2" stroke={C_SEW} strokeWidth={W_SEW} strokeDasharray={DASH_SEW} strokeLinecap="round"/>
+                    </svg>
+                    sewline
+                  </span>
+                  <span style={{color:"var(--sp-muted)"}}>·</span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,fontStyle:"italic"}}>
+                    END SA — end seam allowances
+                  </span>
+                  {stabOn&&(<>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="20" height="4" viewBox="0 0 20 4" style={{display:"block"}}>
+                        <line x1="0" y1="2" x2="20" y2="2" stroke={C_STAB} strokeWidth={W_STAB} strokeDasharray={DASH_STAB} strokeLinecap="round"/>
+                      </svg>
+                      stabilizer
+                    </span>
+                  </>)}
+                </div>
               </>
             )}
           </div>

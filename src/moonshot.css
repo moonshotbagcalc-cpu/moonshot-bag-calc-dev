@@ -2714,6 +2714,87 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-progress-fill { height: 100%; background: #6b48d6; border-radius: 2px; transition: width 0.2s; }
 .cp-progress-text { font-size: 12px; font-weight: 700; color: var(--sp-muted); }
 
+/* ── Perimeter stats block ── */
+.cp-perim {
+  margin-top: 8px;
+  border: 1px solid var(--sp-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--sp-cream);
+}
+.cp-perim-row {
+  display: grid;
+  grid-template-columns: 1fr auto 28px;
+  align-items: center;
+  padding: 0 4px 0 12px;
+  border-bottom: 1px solid var(--sp-soft);
+}
+.cp-perim-row--last { border-bottom: none; }
+.cp-perim-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sp-muted);
+  padding: 6px 8px 6px 0;
+}
+.cp-perim-val {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: #5340b8;
+  text-align: right;
+  padding: 6px 0;
+}
+.cp-perim-expand {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+  color: var(--sp-muted);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cp-perim-expand:hover { color: var(--sp-ink); }
+.cp-perim-edges { border-top: 1px solid var(--sp-soft); }
+.cp-perim-edge-hdr {
+  display: grid;
+  grid-template-columns: 52px 1fr 1fr;
+  padding: 4px 12px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sp-muted);
+  opacity: 0.65;
+  border-bottom: 1px solid var(--sp-soft);
+  text-align: right;
+}
+.cp-perim-edge-hdr > div:first-child { text-align: left; }
+.cp-perim-edge-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 1fr;
+  padding: 4px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+.cp-perim-edge-row:last-child { border-bottom: none; }
+.cp-perim-edge-side {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sp-muted);
+}
+.cp-perim-edge-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--sp-ink);
+  text-align: right;
+}
+
 /* ── Print bar ── */
 .cp-print-bar {
   background: var(--sp-cream);
