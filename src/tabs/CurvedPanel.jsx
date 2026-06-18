@@ -589,7 +589,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
 
   return(
     <>
-    <div className="cp-new-shell">
+    <div>
 
       {/* Title bar */}
       <div className="cp-title-bar">
@@ -835,7 +835,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
 
       </div>{/* end body */}
 
-    </div>{/* end cp-new-shell */}
+    </div>{/* end calculator shell */}
 
     {/* Cutting list + print bar: portaled below ms-page-card as a sibling card */}
     {isActive && cuttingListPortalTarget && createPortal(

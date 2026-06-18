@@ -2155,15 +2155,10 @@ body{margin:0;padding:0;background-attachment:fixed;}
 }
 
 /* =====================================================================
-   Curved Panel — Page Redesign (new layout shell)
-   .cp-new-shell replaces .cp-wrap.cp-redesign for the new design.
+   Curved Panel — Page Layout
    ===================================================================== */
 
 /* ── Title bar ── */
-.cp-new-shell {
-  font-family: var(--font-sans);
-  color: var(--sp-ink);
-}
 .cp-title-bar {
   background: #2d1a6e;
   padding: 20px 28px 22px;
@@ -2334,21 +2329,21 @@ body{margin:0;padding:0;background-attachment:fixed;}
   line-height: 1.4;
 }
 .cp-diag-meta { margin-top: 6px; }
-.cp-new-shell .cp-diag-legend {
+.cp-diag-legend {
   font-size: 12px;
   color: var(--sp-muted);
   font-weight: 700;
   line-height: 1.4;
   margin: 0 0 2px;
 }
-.cp-new-shell .cp-symline {
+.cp-symline {
   font-size: 12px;
   font-weight: 800;
   text-align: right;
   margin: 3px 0 0;
 }
-.cp-new-shell .cp-symline.yes { color: var(--cp-green); }
-.cp-new-shell .cp-symline.no { color: var(--cp-amber-ink); }
+.cp-symline.yes { color: var(--cp-green); }
+.cp-symline.no { color: var(--cp-amber-ink); }
 .cp-diag-placeholder {
   min-height: 120px;
   display: flex;
