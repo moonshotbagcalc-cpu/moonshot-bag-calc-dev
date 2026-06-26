@@ -41,6 +41,40 @@ function _offsetOpen(pts, d){
   return out;
 }
 
+/* Returns true only for proper interior crossings — no endpoint coincidences. */
+function _segsProperCross(a, b, c, d){
+  const d1x = b.x - a.x, d1y = b.y - a.y;
+  const d2x = d.x - c.x, d2y = d.y - c.y;
+  const cross = d1x*d2y - d1y*d2x;
+  if (Math.abs(cross) < 1e-12) return false;
+  const t = ((c.x - a.x)*d2y - (c.y - a.y)*d2x) / cross;
+  const u = ((c.x - a.x)*d1y - (c.y - a.y)*d1x) / cross;
+  return t > 1e-9 && t < 1 - 1e-9 && u > 1e-9 && u < 1 - 1e-9;
+}
+
+/* Collapse self-crossings within a forward window of 5 segments.
+   Handles fold artifacts from step-size ratio jumps at arc/edge junctions
+   (e.g. the 50× step-size drop where trimPolyline lands close to a sample). */
+function _removeLocalLoops(pts){
+  const out = [...pts];
+  let i = 0;
+  while (i < out.length - 3){
+    let fixed = false;
+    for (let j = i + 2; j <= Math.min(i + 5, out.length - 2); j++){
+      if (!_segsProperCross(out[i], out[i + 1], out[j], out[j + 1])) continue;
+      const ta = _unit(out[i + 1].x - out[i].x, out[i + 1].y - out[i].y);
+      const tb = _unit(out[j + 1].x - out[j].x, out[j + 1].y - out[j].y);
+      const X = _lineIntersect(out[i], ta, out[j], tb);
+      if (!X || !isFinite(X.x) || !isFinite(X.y)) break;
+      out.splice(i + 1, j - i, { x: X.x, y: X.y, side: out[i + 1].side });
+      fixed = true;
+      break;
+    }
+    if (!fixed) i++;
+  }
+  return out;
+}
+
 function _joinOffsetPair(A, B){
   if (A.length < 2 || B.length < 2) return;
   const a0 = A[A.length - 1], b0 = B[0];
@@ -71,7 +105,9 @@ function _joinOffsetPair(A, B){
 export function offsetSidePaths(sidePaths, inset){
   const out = {};
   for (const side of _SIDE_ORDER){
-    out[side] = _offsetOpen(sidePaths[side] || [], inset).map(q => ({ ...q, side }));
+    let pts = _offsetOpen(sidePaths[side] || [], inset);
+    pts = _removeLocalLoops(pts);
+    out[side] = pts.map(q => ({ ...q, side }));
   }
   _joinOffsetPair(out.top, out.right);
   _joinOffsetPair(out.right, out.bottom);
