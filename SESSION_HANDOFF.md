@@ -1,8 +1,17 @@
 # Session Handoff — _offsetOpen Geometry Bug
 
 **Written:** end of session, June 19 2026  
-**Status:** investigation complete, fix proposed but NOT yet implemented  
-**Next session should:** implement `_removeLocalLoops` in `src/geometryOffset.js` and run the 7-case test plan (see §4)
+**Status:** RESOLVED — June 25 2026
+
+### Fixed — _offsetOpen fold in geometryOffset.js
+
+Resolved June 25 2026. See git history (commit c1be3d9) for full details.
+`_removeLocalLoops()` added to `offsetSidePaths()` in `src/geometryOffset.js`.
+All 7 test cases pass (`repro_test_7cases.mjs`). Visually confirmed in browser.
+
+---
+
+*Original handoff (investigation notes, repro output, and proposed fix) preserved below for reference.*
 
 ---
 

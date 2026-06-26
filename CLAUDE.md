@@ -629,28 +629,6 @@ If any box fails, the pass is not done — fix before reporting back.
 
 ## Active Work
 
-### Bug — _offsetOpen fold in geometryOffset.js (NOT YET IMPLEMENTED)
-
-**File:** src/geometryOffset.js — function `offsetSidePaths`
-**Full context:** SESSION_HANDOFF.md at the repo root (root-cause analysis,
-exact repro, proposed fix code, 7-case test plan).
-
-**Summary:** A step-size ratio jump at arc/edge junctions in `_offsetOpen`
-causes a ~0.003" reversal in the sewline path for panels with a small
-top-corner radius (e.g. topSoft = 1", SA = 3/8"). The reversal is detected
-as a self-intersection and blocks print output with "The seam allowance
-causes the sewline to cross itself."
-
-**Fix:** Add `_removeLocalLoops()` called inside `offsetSidePaths()` after
-each `_offsetOpen()` call. The complete helper function and the one-line
-change to `offsetSidePaths` are in SESSION_HANDOFF.md §4. Do not rewrite
-from memory — copy directly from that document.
-
-**After implementing:** run the 7-case test plan from SESSION_HANDOFF.md §4,
-then `npm run build`, then commit.
-
----
-
 ### Pass 12 -- Remaining Tabs
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
