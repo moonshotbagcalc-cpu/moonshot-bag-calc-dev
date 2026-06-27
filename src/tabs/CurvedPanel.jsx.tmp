@@ -1,1 +1,0 @@
-export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{}}){
