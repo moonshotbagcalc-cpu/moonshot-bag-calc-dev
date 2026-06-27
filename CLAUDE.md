@@ -705,3 +705,15 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
   thickness guide) has a one-off inline implementation. Piping.jsx has a
   different inline-expanding variant. Both should be replaced when a proper
   shared component is built.
+
+- Piping.jsx strip-width formula is now outdated relative to CurvedPanel.
+  Piping.jsx uses the legacy constant `4×dia + 2×SA`. CurvedPanel uses the
+  thickness-aware geometric model `2×SA + π×(D+T) + 2×C` (where T = wrap
+  material thickness, C = CORD_STAY_AWAY = 1/64"). Piping.jsx will be brought
+  into alignment when piping becomes its own shared module. Do not "fix"
+  Piping.jsx to match CurvedPanel piecemeal -- wait for the module extraction.
+
+- CurvedPanel piping strip-width formula (W = 2×SA + π×(D+T) + 2×C) is
+  geometrically derived but untested on physical builds with thick materials
+  (foam-backed vinyl, heavy neoprene, etc.). Recommend a test-wrap with a
+  known thick material before relying on it for a final build.
