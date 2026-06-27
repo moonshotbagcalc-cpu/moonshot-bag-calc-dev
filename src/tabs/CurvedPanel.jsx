@@ -415,11 +415,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     }
     function drawStripRun(sides,startFail,endFail){
       const pieceId=++pipingPieceSerial;
-      // Exit point P = arc-length walk of 1.5×SA + easeOff from the failing corner along the
-      // cut edge. Both outer (cut edge) and inner paths trim by the same arc distance, so P and
-      // Q are paired approximately perpendicularly. The Bézier end cap curves from P (on cut
-      // edge) to Q (inboard at stripVisibleWidth), with the inner fold edge physically reaching
-      // the cut edge at P.
       const exitOffset=1.5*SA+easeOff;
       const trimStart=startFail?exitOffset:0;
       const trimEnd=endFail?exitOffset:0;
@@ -428,35 +423,44 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       const cord=runPath(cordSides,sides,trimStart,trimEnd);
       if(outer.length<2||inner.length<2)return;
       const startTan=tangentAt(outer,true),endTan=tangentAt(outer,false);
-      const innerStartTan=tangentAt(inner,true),innerEndTan=tangentAt(inner,false);
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       const inwardNormal=(tangent,point)=>{
         let n=unitV(perp(tangent));
         if(dot(n,sub(center,point))<0)n=mul(n,-1);
         return n;
       };
+      // Fix trim drift: arc-length walk is shorter on the inner path (smaller radius on curves),
+      // so independently-trimmed Q lands further around the corner than P. Override both
+      // inner endpoints to the exact perpendicular offset of their outer counterparts — same
+      // angular station, chord strictly perpendicular to cut edge at P.
+      let nStart,nEnd;
+      if(startFail){
+        nStart=inwardNormal(startTan,outer[0]);
+        inner[0]=add(outer[0],mul(nStart,stripVisibleWidth));
+      }
+      if(endFail){
+        nEnd=inwardNormal(endTan,outer[outer.length-1]);
+        inner[inner.length-1]=add(outer[outer.length-1],mul(nEnd,stripVisibleWidth));
+      }
       const cpt=p=>pt(sc(p));
       const C=(c1,c2,end)=>` C ${cpt(c1)} ${cpt(c2)} ${cpt(end)}`;
       const L=p=>` L ${cpt(p)}`;
       let d=`M ${cpt(outer[0])}`;
       for(let i=1;i<outer.length;i++)d+=L(outer[i]);
       if(endFail){
-        // Bézier from P (outer/cut-edge endpoint) to Q (inner endpoint).
-        // Departs P perpendicular to cut edge (inward); arrives at Q tangent to inner path.
+        // Both handles use nEnd (perpendicular inward), symmetric with start cap.
+        // c2 = Q - nEnd·h keeps all four control points on the perpendicular axis P→Q,
+        // producing a straight cap that holds constant band width — no corner-bow.
         const P=outer[outer.length-1],Q=inner[inner.length-1];
         const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
-        const nEnd=inwardNormal(endTan,P);
-        d+=C(add(P,mul(nEnd,h)),add(Q,mul(innerEndTan,h)),Q);
+        d+=C(add(P,mul(nEnd,h)),sub(Q,mul(nEnd,h)),Q);
       }else{
         d+=L(inner[inner.length-1]);
       }
       for(let i=inner.length-2;i>=0;i--)d+=L(inner[i]);
       if(startFail){
-        // Bézier from Q_start (inner endpoint) back to P_start (outer/cut-edge endpoint).
-        // Departs Q outward (toward cut edge); arrives at P from inboard.
         const P=outer[0],Q=inner[0];
         const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
-        const nStart=inwardNormal(startTan,P);
         d+=C(sub(Q,mul(nStart,h)),add(P,mul(nStart,h)),P);
       }
       d+=" Z";
