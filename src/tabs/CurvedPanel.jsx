@@ -169,7 +169,7 @@ function cpPanelDiagramSVG(model,params,pipOpts){
   // 9. Piping overlay — rule-driven physical strip runs + separate cord strokes
   if(pipOpts?.on && pipOpts.cord>1e-9 && pipOpts.corners && model.cutSides?.top){
     const D=pipOpts.cord, SA=params.sa;
-    const easeOff=Math.max(0,pipOpts.easeOff||(2*SA));
+    const easeOff=Math.max(0,pipOpts.easeOff||0);
     const cordOffset=D/2+CORD_STAY_AWAY; // cord centerline inset from sewline (inward)
 
     /* Trust/accuracy: the diagram starts from the SAME recommended cut-strip
@@ -200,8 +200,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     const unitV=v=>{const l=len(v)||1e-9;return{x:v.x/l,y:v.y/l};};
     const cordW=Math.max(1.0,D*scale).toFixed(2);
     const stripStroke=Math.max(1.0,Math.min(2.2,stripVisibleWidth*scale*0.055)).toFixed(2);
-    const PIPING_EXIT_ANGLE_DEG=55; // steeper peel-away so tails clear adjacent seam allowance visually
-    const PIPING_EXIT_ANGLE_RAD=PIPING_EXIT_ANGLE_DEG*Math.PI/180;
     let pipingPieceSerial=0;
     const pipingClipMarkPoints=[];
 
@@ -253,30 +251,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       const b=atStart?pts[1]:pts[pts.length-1];
       return unitV(sub(b,a));
     }
-    function raySegmentIntersection(o,d,a,b){
-      const v=sub(b,a);
-      const den=d.x*v.y-d.y*v.x;
-      if(Math.abs(den)<1e-9)return null;
-      const ao=sub(a,o);
-      const t=(ao.x*v.y-ao.y*v.x)/den;
-      const u=(ao.x*d.y-ao.y*d.x)/den;
-      if(t>1e-7&&u>=-1e-7&&u<=1+1e-7)return add(o,mul(d,t));
-      return null;
-    }
-    function rayPathIntersection(o,d,path,maxDist=Infinity){
-      // Restrict a piping-tail exit to the same cut-edge side that owns the run end.
-      // This prevents tails at crisp/tight corners from jumping across to the adjacent
-      // side's cut edge and visually crossing over each other.
-      let best=null,bestT=Infinity;
-      const pts=path||[];
-      for(let i=0;i<pts.length-1;i++){
-        const hit=raySegmentIntersection(o,d,pts[i],pts[i+1]);
-        if(!hit)continue;
-        const t=dot(sub(hit,o),d);
-        if(t>1e-6&&t<bestT&&t<=maxDist){best=hit;bestT=t;}
-      }
-      return best;
-    }
     function nearestCutFrame(point){
       const pts=model.cutPts||[];
       if(pts.length<2){
@@ -313,16 +287,15 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       best.inward=unitV(sub(center,best.point));
       return best;
     }
-    function drawPipingEaseAwayNotch(cordEnd,owningPath=null){
-      // Ease-away / strip-bend notch: this is a CUT-EDGE mark at the station
-      // corresponding to the cord endpoint.  The mark's base sits on the panel
-      // cut edge and points inward, so it reads like a notch on the pattern edge —
-      // not like a floating marker on the cord path.
+    function drawPipingEaseAwayNotch(exitPt,owningPath=null){
+      // Ease-away / strip-bend notch: outline triangle rendered AT the cut-edge exit point.
+      // Uses cutFrameOnPath for the tangent direction; position is the exit point on the cut edge.
+      const cordEnd=exitPt; // alias for local vector helpers that still reference cordEnd
       const f=owningPath?cutFrameOnPath(cordEnd,owningPath):nearestCutFrame(cordEnd);
-      const p=sc(f.point),t=unitV(f.tangent);
+      const p=sc(cordEnd),t=unitV(f.tangent);
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       let inward=unitV(perp(t));
-      if(dot(inward,sub(center,f.point))<0)inward=mul(inward,-1);
+      if(dot(inward,sub(center,cordEnd))<0)inward=mul(inward,-1);
       const base=TRIANGLE_BASE*0.85,ht=TRIANGLE_HEIGHT*0.75;
       const b1={x:p.x-t.x*base/2,y:p.y-t.y*base/2};
       const b2={x:p.x+t.x*base/2,y:p.y+t.y*base/2};
@@ -433,44 +406,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
         }
       }
     }
-    function failWindowOnSide(sidePath,trimDist,fromStart){
-      const L=pathLen(sidePath||[]);
-      if(!(L>1e-7)||!(trimDist>1e-7))return sidePath||[];
-      if(fromStart)return pathSegModel(sidePath,0,Math.min(trimDist,L));
-      return pathSegModel(sidePath,Math.max(0,L-trimDist),L);
-    }
-    function tailData(outerBend,innerBend,runTan,towardCorner,cutPath){
-      /* Robust tail direction:
-         Previous versions chose the peel direction by comparing the cut edge to the
-         offset inner strip edge. On some offset/curved cases that inner edge could
-         drift enough to make "outward" flip, causing the tail to cross over the
-         panel. The tail now uses panel-center outward as the source of truth. */
-      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
-      const outward=unitV(sub(outerBend,center));       // guaranteed away from panel body
-      const cosA=Math.cos(PIPING_EXIT_ANGLE_RAD),sinA=Math.sin(PIPING_EXIT_ANGLE_RAD);
-      const v=unitV(towardCorner);                      // continue toward the failing corner
-      let dir=unitV(add(mul(v,cosA),mul(outward,sinA))); // peel toward corner AND outward
-      if(dot(dir,outward)<0.08)dir=outward;             // final guard: never aim into panel
-      let n=unitV(perp(dir));
-      if(dot(n,sub(center,outerBend))<0)n=mul(n,-1);    // strip-width normal points inward
-      const fallbackTailLen=Math.max(SA*1.65,stripVisibleWidth*0.70,0.28);
-      const fillet=Math.min(Math.max(0.06,stripVisibleWidth*0.22),Math.max(0.08,easeOff*0.45));
-      const outerJoin=add(outerBend,mul(dir,fillet));
-      const innerBendTarget=add(outerBend,mul(n,stripVisibleWidth));
-      const innerJoin=add(outerJoin,mul(n,stripVisibleWidth));
-      let outerEnd=add(outerBend,mul(dir,fallbackTailLen));
-      let innerEnd=add(outerEnd,mul(n,stripVisibleWidth));
-      const maxSameSideExit=Math.max(fallbackTailLen*1.65,stripVisibleWidth*2.75,SA*2.5);
-      const cutExit=rayPathIntersection(innerJoin,dir,cutPath,maxSameSideExit);
-      const validExit=cutExit&&dot(sub(cutExit,innerJoin),dir)>Math.max(0.04,stripVisibleWidth*0.18);
-      if(validExit){
-        innerEnd=cutExit;
-        outerEnd=add(innerEnd,mul(n,-stripVisibleWidth));
-      }
-      // If the ray misses, keep the short outward fallback tail. Do NOT snap to
-      // nearest cut edge; that is what produced long cross-panel tails.
-      return{dir,n,fillet,outerJoin,innerJoin,outerEnd,innerEnd,innerBendTarget,exitPoint:innerEnd};
-    }
     function drawCordPath(pts,pieceId){
       const cordPts=cpDedupePath(pts,false).map(sc);
       if(cordPts.length<2)return;
@@ -480,58 +415,57 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     }
     function drawStripRun(sides,startFail,endFail){
       const pieceId=++pipingPieceSerial;
-      const cordSafety=Math.max(D/2+CORD_STAY_AWAY,1/32);
-      const bendTrimStart=startFail?Math.max(easeOff,cordSafety):0;
-      const bendTrimEnd=endFail?Math.max(easeOff,cordSafety):0;
-      const outer=runPath(model.cutSides,sides,bendTrimStart,bendTrimEnd);
-      const inner=runPath(innerSides,sides,bendTrimStart,bendTrimEnd);
+      // Exit point P = arc-length walk of 1.5×SA + easeOff from the failing corner along the
+      // cut edge. Both outer (cut edge) and inner paths trim by the same arc distance, so P and
+      // Q are paired approximately perpendicularly. The Bézier end cap curves from P (on cut
+      // edge) to Q (inboard at stripVisibleWidth), with the inner fold edge physically reaching
+      // the cut edge at P.
+      const exitOffset=1.5*SA+easeOff;
+      const trimStart=startFail?exitOffset:0;
+      const trimEnd=endFail?exitOffset:0;
+      const outer=runPath(model.cutSides,sides,trimStart,trimEnd);
+      const inner=runPath(innerSides,sides,trimStart,trimEnd);
+      const cord=runPath(cordSides,sides,trimStart,trimEnd);
       if(outer.length<2||inner.length<2)return;
-
       const startTan=tangentAt(outer,true),endTan=tangentAt(outer,false);
       const innerStartTan=tangentAt(inner,true),innerEndTan=tangentAt(inner,false);
-      // Cord terminates at the same visual bend point where the folded strip
-      // leaves the normal run. It remains shorter than the strip because the
-      // strip tail continues to the cut-edge exit after this bend.
-      const cord=runPath(cordSides,sides,bendTrimStart,bendTrimEnd);
-
-      const startSide=sides[0],endSide=sides[sides.length-1];
-      const startCutWindow=startFail?failWindowOnSide(model.cutSides[startSide],bendTrimStart,true):null;
-      const endCutWindow=endFail?failWindowOnSide(model.cutSides[endSide],bendTrimEnd,false):null;
-      const startTail=startFail?tailData(outer[0],inner[0],startTan,mul(startTan,-1),startCutWindow):null;
-      const endTail=endFail?tailData(outer[outer.length-1],inner[inner.length-1],endTan,endTan,endCutWindow):null;
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      const inwardNormal=(tangent,point)=>{
+        let n=unitV(perp(tangent));
+        if(dot(n,sub(center,point))<0)n=mul(n,-1);
+        return n;
+      };
       const cpt=p=>pt(sc(p));
-      const C=(p1,p2,p3)=>` C ${cpt(p1)} ${cpt(p2)} ${cpt(p3)}`;
+      const C=(c1,c2,end)=>` C ${cpt(c1)} ${cpt(c2)} ${cpt(end)}`;
       const L=p=>` L ${cpt(p)}`;
-      const filStart=startTail?.fillet||0,filEnd=endTail?.fillet||0;
-
-      let d="";
-      if(startTail){
-        d=`M ${cpt(startTail.outerEnd)}${L(startTail.outerJoin)}`;
-        d+=C(add(startTail.outerJoin,mul(startTail.dir,-filStart)),add(outer[0],mul(startTan,-filStart)),outer[0]);
-      }else{
-        d=`M ${cpt(outer[0])}`;
-      }
+      let d=`M ${cpt(outer[0])}`;
       for(let i=1;i<outer.length;i++)d+=L(outer[i]);
-      if(endTail){
-        d+=C(add(outer[outer.length-1],mul(endTan,filEnd)),add(endTail.outerJoin,mul(endTail.dir,-filEnd)),endTail.outerJoin);
-        d+=L(endTail.outerEnd);
-        d+=L(endTail.innerEnd); // perpendicular end cap at failing end
-        d+=L(endTail.innerJoin);
-        d+=C(add(endTail.innerJoin,mul(endTail.dir,-filEnd)),add(inner[inner.length-1],mul(innerEndTan,filEnd)),inner[inner.length-1]);
+      if(endFail){
+        // Bézier from P (outer/cut-edge endpoint) to Q (inner endpoint).
+        // Departs P perpendicular to cut edge (inward); arrives at Q tangent to inner path.
+        const P=outer[outer.length-1],Q=inner[inner.length-1];
+        const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
+        const nEnd=inwardNormal(endTan,P);
+        d+=C(add(P,mul(nEnd,h)),add(Q,mul(innerEndTan,h)),Q);
       }else{
         d+=L(inner[inner.length-1]);
       }
       for(let i=inner.length-2;i>=0;i--)d+=L(inner[i]);
-      if(startTail){
-        d+=C(add(inner[0],mul(innerStartTan,-filStart)),add(startTail.innerJoin,mul(startTail.dir,-filStart)),startTail.innerJoin);
-        d+=L(startTail.innerEnd);
-        d+=L(startTail.outerEnd); // perpendicular end cap at failing start
+      if(startFail){
+        // Bézier from Q_start (inner endpoint) back to P_start (outer/cut-edge endpoint).
+        // Departs Q outward (toward cut edge); arrives at P from inboard.
+        const P=outer[0],Q=inner[0];
+        const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
+        const nStart=inwardNormal(startTan,P);
+        d+=C(sub(Q,mul(nStart,h)),add(P,mul(nStart,h)),P);
       }
       d+=" Z";
       svg+=`<g class="cp-piping-piece" data-piece="${pieceId}"><path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="${stripStroke}" stroke-opacity="0.70" stroke-linejoin="round" stroke-linecap="round"/></g>`;
       drawCordPath(cord,pieceId);
-      if(startFail&&startTail&&cord.length)drawPipingEaseAwayNotch(cord[0],startCutWindow||model.cutSides[startSide]);
-      if(endFail&&endTail&&cord.length)drawPipingEaseAwayNotch(cord[cord.length-1],endCutWindow||model.cutSides[endSide]);
+      // Notch at the cut-edge exit point P (outer strip endpoint = the primary computed constraint).
+      const startSide=sides[0],endSide=sides[sides.length-1];
+      if(startFail)drawPipingEaseAwayNotch(outer[0],model.cutSides[startSide]);
+      if(endFail)drawPipingEaseAwayNotch(outer[outer.length-1],model.cutSides[endSide]);
     }
 
     if(active.closed&&pipOpts.allCornersPass){
