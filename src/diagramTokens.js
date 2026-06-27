@@ -19,6 +19,9 @@ export const C_FOLD     = "#2e7d32";  // fold lines (green)
 export const C_STAB     = "#bf5630";  // stabilizer (rust)
 export const C_MIDPOINT = "#d32f2f";  // midpoint marks + center match triangles (red)
 export const C_EASING   = "#0097a7";  // easing marks — distinct dark cyan, never reuse C_CENTER
+export const C_PIPING   = "#1AA3A3";  // piping band overlay (teal-aqua)
+export const C_CORD     = "#2e7d32";  // piping cord fill — dark green, distinct from band
+export const W_PIPING   = 1.5;
 
 // ── Screen stroke weights (px) ────────────────────────────────────────────────
 export const W_CUT          = 2.5;

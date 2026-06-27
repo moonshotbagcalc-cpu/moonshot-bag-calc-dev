@@ -15,14 +15,15 @@ import PrintButton from "../components/PrintButton.jsx";
 import FracInput, { VINYL_FRACS } from "../components/FracInput.jsx";
 import {
   CAT_BAG_STRUCTURES,
-  C_SEW, C_CENTER, C_EASING, C_STAB, C_MIDPOINT,
-  W_CUT, W_SEW, W_STAB, W_CENTER, W_MIDPOINT,
+  C_SEW, C_CENTER, C_EASING, C_STAB, C_MIDPOINT, C_PIPING, C_CORD,
+  W_CUT, W_SEW, W_STAB, W_CENTER, W_MIDPOINT, W_PIPING,
   W_EASING_CLIP, W_EASING_NOTCH,
   DASH_SEW, DASH_STAB, DASH_CENTER,
   MIDPOINT_R, TRIANGLE_BASE, TRIANGLE_HEIGHT,
   GHOST_OPACITY, GHOST_WEIGHT, GHOST_OFFSET,
   FILL_OPACITY_SCREEN, STRIP_PAD,
 } from "../diagramTokens.js";
+import { offsetSidePaths, joinAllSides } from "../geometryOffset.js";
 import {
   cpStabilizerPoints, cpOffsetInwardMiter, cpInsetClosedPoints,
   cpHasSelfCross, cpPtsBB, stabSVGElement,
@@ -122,8 +123,9 @@ function cpDedupePath(pts,closed=false){
    ON-SCREEN DIAGRAM + PIECE RENDERERS (ported from prototype render())
    ===================================================================== */
 
-/* Main panel diagram — returns inner SVG markup for a 760×520 viewBox. */
-function cpPanelDiagramSVG(model,params){
+/* Main panel diagram — returns inner SVG markup for a 760×520 viewBox.
+   pipOpts: { on, cord, vinyl, corners, allCornersPass } — optional piping overlay */
+function cpPanelDiagramSVG(model,params,pipOpts){
   const VW=760,VH=490,PAD_X=28,PAD_TOP=28,PAD_BOT=48,bb=model.cutBB;
   const scale=Math.min((VW-PAD_X*2)/bb.w,(VH-PAD_TOP-PAD_BOT)/bb.h);
   const ox=(VW-bb.w*scale)/2-bb.minX*scale;
@@ -160,8 +162,186 @@ function cpPanelDiagramSVG(model,params){
     svg+=`<polygon points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${ax.toFixed(1)},${ay.toFixed(1)}" fill="${C_MIDPOINT}"/>`;
     if(isEdge)svg+=`<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px+md.nx*TRIANGLE_HEIGHT).toFixed(1)}" y2="${(py+md.ny*TRIANGLE_HEIGHT).toFixed(1)}" stroke="${C_MIDPOINT}" stroke-width="${W_MIDPOINT}"/>`;
   });
-  // 8. cut line stroke (topmost — drawn last so it's never obscured)
+  // 8. cut line stroke (topmost line layer)
   svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="none" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}" stroke-linejoin="round"/>`;
+
+  // 9. Piping overlay — one continuous closed strip shape + separate cord stroke
+  if(pipOpts?.on && pipOpts.cord>1e-9 && pipOpts.corners && model.cutSides?.top){
+    const D=pipOpts.cord, SA=params.sa;
+    const isClosed=active.closed;
+    const easeOff=pipOpts.easeOff||(2*SA);
+    const cordOffset=D/2+CORD_STAY_AWAY;   // cord centerline inset from sewline (inward)
+    const stripInset=D+2*CORD_STAY_AWAY;   // inner strip edge inset from sewline (inward)
+
+    const innerSides=offsetSidePaths(model.sewSides,stripInset);
+    const cordSides=offsetSidePaths(model.sewSides,cordOffset);
+
+    // Screen coord converter
+    const sc=p=>({x:X(p.x),y:Y(p.y)});
+    // SVG point serializer
+    const pt=q=>`${q.x.toFixed(1)},${q.y.toFixed(1)}`;
+
+    // Screen-coord point array along a model-coord path, from arc-dist dS to dE
+    function pathSeg(path,dS,dE){
+      if(!path||path.length<1)return[];
+      dS=dS??0;
+      const ann=[{dist:0,x:path[0].x,y:path[0].y}];
+      for(let i=1;i<path.length;i++)ann.push({dist:ann[i-1].dist+cpDist(path[i-1],path[i]),x:path[i].x,y:path[i].y});
+      dE=dE??ann[ann.length-1].dist;
+      const out=[];
+      for(let i=0;i<ann.length-1;i++){
+        const a=ann[i],b=ann[i+1];
+        if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/(b.dist-a.dist);out.push(sc({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t}));}
+        if(a.dist>=dS&&a.dist<=dE)out.push(sc(a));
+        if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/(b.dist-a.dist);out.push(sc({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t}));}
+      }
+      const last=ann[ann.length-1];
+      if(last.dist>=dS&&last.dist<=dE)out.push(sc(last));
+      return cpDedupePath(out);
+    }
+    function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
+    // Walk model-coord path forward by arc distance
+    function wFwd(path,dist){
+      let r=dist;
+      for(let i=0;i<path.length-1;i++){const d=cpDist(path[i],path[i+1]);if(r<=d){const t=r/d;return{x:path[i].x+(path[i+1].x-path[i].x)*t,y:path[i].y+(path[i+1].y-path[i].y)*t};}r-=d;}
+      return{...path[path.length-1]};
+    }
+    // Walk model-coord path backward by arc distance from end
+    function wBack(path,dist){
+      let r=dist;
+      for(let i=path.length-1;i>0;i--){const d=cpDist(path[i],path[i-1]);if(r<=d){const t=r/d;return{x:path[i].x+(path[i-1].x-path[i].x)*t,y:path[i].y+(path[i-1].y-path[i].y)*t};}r-=d;}
+      return{...path[0]};
+    }
+    // Exit tangent + 30° taper direction at an open-top corner
+    function exitGeom(sewPath,exitAtStart){
+      const eP=exitAtStart?sewPath[0]:sewPath[sewPath.length-1];
+      const nP=exitAtStart?sewPath[1]:sewPath[sewPath.length-2];
+      const exitTan=cpUnit(eP.x-nP.x,eP.y-nP.y);
+      const cw90={x:exitTan.y,y:-exitTan.x},ccw90={x:-exitTan.y,y:exitTan.x};
+      const panCx=(bb.minX+bb.maxX)/2,panCy=(bb.minY+bb.maxY)/2;
+      const outLat=(eP.x-panCx)*cw90.x+(eP.y-panCy)*cw90.y>0?cw90:ccw90;
+      const COS30=Math.sqrt(3)/2,SIN30=0.5;
+      const rCW={x:exitTan.x*COS30+exitTan.y*SIN30,y:-exitTan.x*SIN30+exitTan.y*COS30};
+      const rCCW={x:exitTan.x*COS30-exitTan.y*SIN30,y:exitTan.x*SIN30+exitTan.y*COS30};
+      const tapDir=(rCW.x*outLat.x+rCW.y*outLat.y)>(rCCW.x*outLat.x+rCCW.y*outLat.y)?rCW:rCCW;
+      return{tapDir};
+    }
+    // Deduplicate screen-coord points (0.5px tolerance)
+    function scDedup(pts){const out=[];for(const p of pts){if(!out.length||Math.hypot(p.x-out[out.length-1].x,p.y-out[out.length-1].y)>0.5)out.push(p);}return out;}
+
+    const cordW=Math.max(1.0,D*scale).toFixed(2);
+
+    if(isClosed){
+      // ── Closed 4-sided: simple band between cut edge and inner strip edge ──
+      const innerPts=map(joinAllSides(innerSides,true));
+      svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)} ${cpPtsToPath(innerPts,true)}" fill="${C_PIPING}" fill-opacity="0.20" fill-rule="evenodd" stroke="${C_PIPING}" stroke-width="1.2" stroke-opacity="0.55"/>`;
+      const cpFull=map(joinAllSides(cordSides,true));
+      svg+=`<path d="${cpPtsToPath(cpFull,true)}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round"/>`;
+      if(pipOpts.allCornersPass){
+        const mx=X(midX),by=Y(bb.maxY);
+        svg+=`<line x1="${(mx-8).toFixed(1)}" y1="${by.toFixed(1)}" x2="${(mx+8).toFixed(1)}" y2="${by.toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
+        svg+=`<line x1="${mx.toFixed(1)}" y1="${(by-5).toFixed(1)}" x2="${mx.toFixed(1)}" y2="${(by+5).toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
+      }
+    } else {
+      // ── 3-sided open-top: one continuous closed strip shape + separate cord ──
+      const csR=model.cutSides.right||[],csB=model.cutSides.bottom||[],csL=model.cutSides.left||[];
+      const isR=innerSides.right||[],isB=innerSides.bottom||[],isL=innerSides.left||[];
+      const crR=cordSides.right||[],crB=cordSides.bottom||[],crL=cordSides.left||[];
+      const swR=model.sewSides.right||[],swL=model.sewSides.left||[];
+
+      if(csR.length>=2&&csB.length>=2&&csL.length>=2&&isR.length>=2&&isB.length>=2&&isL.length>=2){
+        const gR=exitGeom(swR,true);   // right exit at start (TR corner)
+        const gL=exitGeom(swL,false);  // left exit at end (TL corner)
+
+        // Fillet size: fraction of easeOff, capped to avoid eating the normal run
+        const filR_m=Math.min(easeOff*0.35,SA*0.4);
+        const filR_sc=filR_m*scale;
+        // Exit tail length: enough to visually clear the cut edge
+        const tailLen_sc=SA*scale*2.5;
+
+        // ── TR fillet / tail key points (screen coords) ──
+        // outerTR: bend vertex on cut edge at easeOff from TR
+        // pOA_TR: approach end (filR before bend, on cut edge)
+        // pOB_TR: exit end (filR past bend, on tail direction)
+        // pOEnd_TR: far end of outer exit tail
+        const outerTR=sc(wFwd(csR,easeOff));
+        const pOA_TR=sc(wFwd(csR,easeOff-filR_m));
+        const pOB_TR={x:outerTR.x+gR.tapDir.x*filR_sc,y:outerTR.y+gR.tapDir.y*filR_sc};
+        const pOEnd_TR={x:pOB_TR.x+gR.tapDir.x*tailLen_sc,y:pOB_TR.y+gR.tapDir.y*tailLen_sc};
+
+        const innerTR=sc(wFwd(isR,easeOff));
+        const pIA_TR=sc(wFwd(isR,easeOff-filR_m));
+        const pIB_TR={x:innerTR.x+gR.tapDir.x*filR_sc,y:innerTR.y+gR.tapDir.y*filR_sc};
+        const pIEnd_TR={x:pIB_TR.x+gR.tapDir.x*tailLen_sc,y:pIB_TR.y+gR.tapDir.y*tailLen_sc};
+
+        // ── TL fillet / tail key points ──
+        const outerTL=sc(wBack(csL,easeOff));
+        const pOA_TL=sc(wBack(csL,easeOff-filR_m));
+        const pOB_TL={x:outerTL.x+gL.tapDir.x*filR_sc,y:outerTL.y+gL.tapDir.y*filR_sc};
+        const pOEnd_TL={x:pOB_TL.x+gL.tapDir.x*tailLen_sc,y:pOB_TL.y+gL.tapDir.y*tailLen_sc};
+
+        const innerTL=sc(wBack(isL,easeOff));
+        const pIA_TL=sc(wBack(isL,easeOff-filR_m));
+        const pIB_TL={x:innerTL.x+gL.tapDir.x*filR_sc,y:innerTL.y+gL.tapDir.y*filR_sc};
+        const pIEnd_TL={x:pIB_TL.x+gL.tapDir.x*tailLen_sc,y:pIB_TL.y+gL.tapDir.y*tailLen_sc};
+
+        // ── Normal-run segments in screen coords ──
+        // Outer right: from pOA_TR (easeOff-filR from TR) downward to BR
+        const outerRight=pathSeg(csR,easeOff-filR_m,null);
+        // Outer bottom: full BR→BL
+        const outerBottom=pathSeg(csB,null,null);
+        // Outer left: from BL upward to pOA_TL
+        const csL_len=pathLen(csL);
+        const outerLeft=pathSeg(csL,null,csL_len-(easeOff-filR_m));
+        // Inner right/bottom/left: same logic on inner strip edge
+        const innerRight=pathSeg(isR,easeOff-filR_m,null);
+        const innerBottom=pathSeg(isB,null,null);
+        const isL_len=pathLen(isL);
+        const innerLeft=pathSeg(isL,null,isL_len-(easeOff-filR_m));
+
+        // ── Build closed strip path ──
+        // Trace starting at pOEnd_TR, counterclockwise:
+        //   outer tail TR → fillet TR → outer edge right↓ bottom left↑ → fillet TL → outer tail TL
+        //   end cap TL → inner tail TL → fillet TL inner → inner edge left↓ bottom right↑ → fillet TR inner
+        //   inner tail TR → end cap TR → Z
+        let d=`M ${pt(pOEnd_TR)} L ${pt(pOB_TR)} Q ${pt(outerTR)} ${pt(pOA_TR)}`;
+        // Outer right: skip [0] (= pOA_TR, already at pen position)
+        for(const q of outerRight.slice(1))d+=` L ${pt(q)}`;
+        // Outer bottom: skip [0] (= BR_cut, same as outerRight's last)
+        for(const q of outerBottom.slice(1))d+=` L ${pt(q)}`;
+        // Outer left: skip [0] (= BL_cut, same as outerBottom's last)
+        for(const q of outerLeft.slice(1))d+=` L ${pt(q)}`;
+        // Last of outerLeft is pOA_TL → fillet TL
+        d+=` Q ${pt(outerTL)} ${pt(pOB_TL)}`;
+        d+=` L ${pt(pOEnd_TL)} L ${pt(pIEnd_TL)}`; // TL outer tail end, end cap TL
+        d+=` L ${pt(pIB_TL)} Q ${pt(innerTL)} ${pt(pIA_TL)}`; // inner TL tail + fillet
+        // Inner left reversed (pIA_TL→BL_inner): skip [0] = pIA_TL
+        for(const q of [...innerLeft].reverse().slice(1))d+=` L ${pt(q)}`;
+        // Inner bottom reversed (BL_inner→BR_inner): skip [0] = BL_inner
+        for(const q of [...innerBottom].reverse().slice(1))d+=` L ${pt(q)}`;
+        // Inner right reversed (BR_inner→pIA_TR): skip [0] = BR_inner
+        for(const q of [...innerRight].reverse().slice(1))d+=` L ${pt(q)}`;
+        // Last of inner right reversed is pIA_TR → fillet TR inner
+        d+=` Q ${pt(innerTR)} ${pt(pIB_TR)} L ${pt(pIEnd_TR)} L ${pt(pOEnd_TR)} Z`;
+
+        svg+=`<path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="1.2" stroke-opacity="0.55" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+        // ── Cord: right→bottom→left, stopping easeOff before each open-top exit ──
+        const crL_len=pathLen(crL);
+        const cordPts=scDedup([
+          ...pathSeg(crR,easeOff,null),
+          ...pathSeg(crB,null,null),
+          ...pathSeg(crL,null,crL_len-easeOff),
+        ]);
+        if(cordPts.length>1){
+          let cd=`M ${pt(cordPts[0])}`;
+          for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
+          svg+=`<path d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round"/>`;
+        }
+      }
+    }
+  }
+
   return svg;
 }
 
@@ -869,6 +1049,10 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
     ?cpPipingClosedLoop(model.cutPerim,model.activeSew.total,sa,pipingCord,vinylThick)
     :null;
 
+  const pipOpts=pipingOn&&pipingCord>1e-9&&ready&&model.valid&&pipingCorners
+    ?{on:true,cord:pipingCord,vinyl:vinylThick,corners:pipingCorners,allCornersPass:pipingAllCornersPass,easeOff:pipingEaseOff}
+    :null;
+
   // Dynamic title
   const panelTitle=pieceStyle==="gusset"
     ?"Front & back panel — gusset"
@@ -948,7 +1132,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
             <div className="cp-left-diag-wrap">
               {ready&&model.valid
                 ?<svg viewBox="0 0 760 490" style={{width:"100%",height:"auto",display:"block"}}
-                    dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params)}}/>
+                    dangerouslySetInnerHTML={{__html:cpPanelDiagramSVG(model,params,pipOpts)}}/>
                 :<div className="cp-diag-placeholder">
                   {ready?"Fix geometry to see the diagram.":"Enter top width, bottom width, and height to begin."}
                 </div>
@@ -1023,6 +1207,17 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                         <line x1="0" y1="2" x2="20" y2="2" stroke={C_STAB} strokeWidth={W_STAB} strokeDasharray={DASH_STAB} strokeLinecap="round"/>
                       </svg>
                       stabilizer
+                    </span>
+                  </>)}
+                  {pipOpts&&(<>
+                    <span style={{color:"var(--sp-muted)"}}>·</span>
+                    {/* piping band */}
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                      <svg width="20" height="10" viewBox="0 0 20 10" style={{display:"block"}}>
+                        <rect x="0" y="0" width="20" height="10" fill={C_PIPING} fillOpacity="0.16"/>
+                        <line x1="0" y1="5" x2="20" y2="5" stroke={C_PIPING} strokeWidth={W_PIPING} strokeDasharray="5 4"/>
+                      </svg>
+                      piping
                     </span>
                   </>)}
                 </div>
