@@ -8,13 +8,23 @@ const EIGHTHS = [
 const FOPTS = EIGHTHS.map(([,v]) => v);
 const FLBLS = EIGHTHS.map(([l]) => l);
 
-function ThemeFracInput({ label, sub, whole, frac, onWhole, onFrac, th, append }) {
+// Small-fraction list for vinyl/cord thickness inputs (1/64" through 1/8").
+// Pass as fracList prop to override the default EIGHTHS dropdown.
+export const VINYL_FRACS = [
+  ["0",0],["1/64",1/64],["1/32",1/32],["3/64",3/64],
+  ["1/16",1/16],["3/32",3/32],["1/8",0.125],
+];
+
+function ThemeFracInput({ label, sub, whole, frac, onWhole, onFrac, th, append, fracList }) {
   const [focused, setFocused] = useState(false);
   const valueInches = Math.max(0, (parseFloat(whole)||0) + (parseFloat(frac)||0));
   const metricValue = Math.round(inToMm(valueInches) / 10 * 10) / 10; // cm to 1 decimal
   const metricDisplay = focused && metricValue === 0 ? "" : (metricValue % 1 === 0 ? String(metricValue) : metricValue.toFixed(1));
   const currentFrac = parseFloat(frac) || 0;
-  const standardFrac = FOPTS.some(f => Math.abs(f - currentFrac) < 0.0001);
+  const fracs = fracList || EIGHTHS;
+  const fopts = fracs.map(([,v]) => v);
+  const flbls = fracs.map(([l]) => l);
+  const standardFrac = fopts.some(f => Math.abs(f - currentFrac) < 0.0001);
 
   if (isMetric()) {
     return (
@@ -75,7 +85,7 @@ function ThemeFracInput({ label, sub, whole, frac, onWhole, onFrac, th, append }
             background:th.inputBg, border:`2px solid ${th.border}`, borderRadius:8,
             color:th.inputTxt, outline:"none", cursor:"pointer" }}>
           {!standardFrac && <option value="custom">custom</option>}
-          {FOPTS.map((f,i)=><option key={f} value={f}>{FLBLS[i]}</option>)}
+          {fopts.map((f,i)=><option key={f} value={f}>{flbls[i]}</option>)}
         </select>
         <div style={{ fontSize:20, fontFamily:"DM Mono,monospace", fontWeight:500, color:th.accent, minWidth:56 }}>
           {fmtInch(whole+frac)}
@@ -90,10 +100,11 @@ function ThemeFracInput({ label, sub, whole, frac, onWhole, onFrac, th, append }
    Imperial fraction: whole box + 16ths dropdown. Decimal toggle: single
    inches box. Metric mode: single cm box (decimal). Same whole+frac state
    contract as the app FracInput. */
-function ClassFracInput({ tone, label, whole, frac, onWhole, onFrac, ghost, decMode }){
+function ClassFracInput({ tone, label, whole, frac, onWhole, onFrac, ghost, decMode, fracList, append }){
   const inches = Math.max(0, (parseFloat(whole)||0) + (parseFloat(frac)||0));
   const currentFrac = parseFloat(frac) || 0;
-  const matchIdx = EIGHTHS.findIndex(([,v]) => Math.abs(v - currentFrac) < 0.0001);
+  const fracs = fracList || EIGHTHS;
+  const matchIdx = fracs.findIndex(([,v]) => Math.abs(v - currentFrac) < 0.0001);
   const metricValue = Math.round(inToMm(inches) / 10 * 10) / 10;
   const fieldClass = tone === "cp" ? "cp-field" : "bc-field";
   const fiClass = tone === "cp" ? "cp-fi" : "bc-fi";
@@ -114,6 +125,7 @@ function ClassFracInput({ tone, label, whole, frac, onWhole, onFrac, ghost, decM
             onChange={e=>setFromInches(mmToIn((parseFloat(e.target.value)||0) * 10))}
             onFocus={e=>e.target.select()}/>
           <span className={unitClass}>cm</span>
+          {append}
         </div>
       ) : decMode ? (
         <div className={fiClass}>
@@ -121,6 +133,7 @@ function ClassFracInput({ tone, label, whole, frac, onWhole, onFrac, ghost, decM
             onChange={e=>setFromInches(e.target.value)}
             onFocus={e=>e.target.select()}/>
           <span className={unitClass}>{"″"}</span>
+          {append}
         </div>
       ) : (
         <div className={fiClass}>
@@ -128,20 +141,21 @@ function ClassFracInput({ tone, label, whole, frac, onWhole, onFrac, ghost, decM
             onChange={e=>onWhole(Math.max(0, parseInt(e.target.value)||0))}
             onFocus={e=>e.target.select()}/>
           <select value={matchIdx >= 0 ? matchIdx : "custom"}
-            onChange={e=>{ if(e.target.value !== "custom") onFrac(EIGHTHS[parseInt(e.target.value)][1]); }}>
+            onChange={e=>{ if(e.target.value !== "custom") onFrac(fracs[parseInt(e.target.value)][1]); }}>
             {matchIdx < 0 && <option value="custom">custom</option>}
-            {EIGHTHS.map(([lbl], i)=><option key={i} value={i}>{lbl}</option>)}
+            {fracs.map(([lbl], i)=><option key={i} value={i}>{lbl}</option>)}
           </select>
           <span className={unitClass}>{"″"}</span>
+          {append}
         </div>
       )}
     </div>
   );
 }
 
-export default function FracInput({ variant="theme", label, sub, whole, frac, onWhole, onFrac, th, append, ghost, decMode }) {
+export default function FracInput({ variant="theme", label, sub, whole, frac, onWhole, onFrac, th, append, ghost, decMode, fracList }) {
   if (variant === "cp" || variant === "bc") {
-    return <ClassFracInput tone={variant} label={label} whole={whole} frac={frac} onWhole={onWhole} onFrac={onFrac} ghost={ghost} decMode={decMode}/>;
+    return <ClassFracInput tone={variant} label={label} whole={whole} frac={frac} onWhole={onWhole} onFrac={onFrac} ghost={ghost} decMode={decMode} fracList={fracList} append={append}/>;
   }
-  return <ThemeFracInput label={label} sub={sub} whole={whole} frac={frac} onWhole={onWhole} onFrac={onFrac} th={th} append={append}/>;
+  return <ThemeFracInput label={label} sub={sub} whole={whole} frac={frac} onWhole={onWhole} onFrac={onFrac} th={th} append={append} fracList={fracList}/>;
 }

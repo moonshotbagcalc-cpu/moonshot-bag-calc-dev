@@ -699,3 +699,9 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
   is confirmed.
 
 - CurvedPanel.jsx.tmp (src/tabs/) -- orphaned file, safe to delete.
+
+- Standardized info-button component -- a reusable ⓘ toggle button + popover
+  for use across all calculator tabs. Currently CurvedPanel Stage 6 (vinyl
+  thickness guide) has a one-off inline implementation. Piping.jsx has a
+  different inline-expanding variant. Both should be replaced when a proper
+  shared component is built.

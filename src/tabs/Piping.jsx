@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../utils/theme.js";
 import { Card, CardTitle, RRow, InfoBox, NoteBox, SubTabs, SABar } from "../components/SharedUI.jsx";
-import FracInput from "../components/FracInput.jsx";
+import FracInput, { VINYL_FRACS } from "../components/FracInput.jsx";
 import { roundRectPerim } from "../utils/geometry.js";
 import { PI, DEFAULT_SA, CORDS } from "../utils/constants.js";
 import { smartRound, fmtInch } from "../utils/formatting.js";
@@ -17,7 +17,8 @@ export default function PipingPage() {
   const [sa,setSa]=useState(DEFAULT_SA); const [cSa,setCsa]=useState("");
   const [shape,setShape]=useState("rect");
   const [cIdx,setCIdx]=useState(0);
-  const [vinylThick,setVinylThick]=useState(1/32);
+  const [vinylThickW,setVinylThickW]=useState(0),[vinylThickF,setVinylThickF]=useState(1/32);
+  const [vinylInfoOpen,setVinylInfoOpen]=useState(false);
 
   // Rectangle
   const [rLW,setRLW]=useState(0); const [rLF,setRLF]=useState(0);
@@ -40,6 +41,7 @@ export default function PipingPage() {
 
   const cord=CORDS[cIdx];
   const sw=pipingStripWidth(cord.d,sa);
+  const vinylThick=vinylThickW+vinylThickF;
 
   // Cut perimeters — calculated directly from cut dimensions (what you can measure)
   const rL_cut=rLW+rLF, rW2_cut=rWW+rWF, rRs_cut=rrW+rrF;
@@ -85,8 +87,6 @@ export default function PipingPage() {
     background:on?th.btnOn:th.btnOff, color:on?"#fff":th.btnOffTxt,
   });
 
-  const vinylPresets=[{l:'1/32"',v:1/32},{l:'1/16"',v:1/16},{l:'3/32"',v:3/32}];
-
   return (
     <div className="tab-page" data-group="trim-pockets">
       <div className="tab-content-wrap">
@@ -124,22 +124,55 @@ export default function PipingPage() {
 
           <Card th={th}>
             <CardTitle th={th}>Piping Material Wrap Thickness</CardTitle>
-            <div style={{ fontSize:15, fontWeight:700, color:th.label, marginBottom:8, fontFamily:"Nunito,sans-serif" }}>Wrap material thickness</div>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center", marginBottom:8 }}>
-              {vinylPresets.map(p=>(
-                <button key={p.l} onClick={()=>setVinylThick(p.v)} style={{
-                  padding:"8px 14px", fontSize:17, fontFamily:"DM Mono,monospace", fontWeight:500,
-                  borderRadius:8, cursor:"pointer",
-                  background:Math.abs(vinylThick-p.v)<0.001?th.btnOn:th.btnOff,
-                  color:Math.abs(vinylThick-p.v)<0.001?"#fff":th.btnOffTxt,
-                  border:`2px solid ${Math.abs(vinylThick-p.v)<0.001?th.btnOn:th.border}`,
-                  transition:"all 0.15s"
-                }}>{p.l}</button>
-              ))}
+            <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
+              <div style={{flex:1,minWidth:0}}>
+                <FracInput th={th} label="Wrap material thickness" fracList={VINYL_FRACS}
+                  whole={vinylThickW} frac={vinylThickF} onWhole={setVinylThickW} onFrac={setVinylThickF}/>
+              </div>
+              <div style={{marginBottom:16}}>
+                <button onClick={()=>setVinylInfoOpen(v=>!v)} title="Material wrap thickness guide" aria-label="Material wrap thickness guide"
+                  style={{
+                    width:28,height:28,borderRadius:"50%",
+                    background:vinylInfoOpen?th.btnOn:th.btnOff,
+                    color:vinylInfoOpen?"#fff":th.btnOffTxt,
+                    border:`1.5px solid ${vinylInfoOpen?th.btnOn:th.border}`,
+                    fontSize:14,cursor:"pointer",fontWeight:900,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                  }}
+                >ℹ</button>
+              </div>
             </div>
-            <InfoBox th={th}>
-              Wrap thickness affects cord length because the cord curves slightly inside the sewline. Default is 1/32" for standard vinyl/faux leather. Use 1/16" for heavier upholstery vinyl or cork, then ease as needed while sewing.
-            </InfoBox>
+            {vinylInfoOpen&&(
+              <div style={{background:th.resBg,border:`1px solid ${th.border}`,borderRadius:8,padding:"12px 14px",marginBottom:12,fontSize:12.5,fontFamily:"Nunito,sans-serif"}}>
+                <div style={{fontWeight:700,color:th.label,marginBottom:6,lineHeight:1.4}}>These are starting points — always test-wrap your cord before cutting the full length.</div>
+                <div style={{marginTop:6}}>
+                  <div style={{fontWeight:900,color:th.accent,fontSize:11,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:3}}>Lightweight</div>
+                  <ul style={{margin:0,paddingLeft:14,color:th.label,lineHeight:1.5,fontSize:12}}>
+                    <li>Very thin ripstop / lightweight technical fabric / lining — <strong>1/64"–1/32"</strong></li>
+                    <li>Quilting cotton / lightweight woven — <strong>1/64"–1/32"</strong> (higher if interfaced or laminated)</li>
+                  </ul>
+                </div>
+                <div style={{marginTop:8,borderTop:`1px solid ${th.border}`,paddingTop:8}}>
+                  <div style={{fontWeight:900,color:th.accent,fontSize:11,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:3}}>Standard</div>
+                  <ul style={{margin:0,paddingLeft:14,color:th.label,lineHeight:1.5,fontSize:12}}>
+                    <li>Standard vinyl / faux leather / UltraLeather — <strong>1/32"</strong> (default)</li>
+                    <li>Garment leather / soft leather — <strong>1/32"–1/16"</strong></li>
+                    <li>Cork fabric — <strong>1/32"–1/16"</strong> (backing and quality vary)</li>
+                    <li>Waterproof canvas / waxed cotton / duck / denim / twill — <strong>1/32"–1/16"</strong></li>
+                    <li>Cordura / packcloth / coated nylon — <strong>1/32"–1/16"</strong> (higher end for heavier coated versions)</li>
+                  </ul>
+                </div>
+                <div style={{marginTop:8,borderTop:`1px solid ${th.border}`,paddingTop:8}}>
+                  <div style={{fontWeight:900,color:th.accent,fontSize:11,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:3}}>Heavy</div>
+                  <ul style={{margin:0,paddingLeft:14,color:th.label,lineHeight:1.5,fontSize:12}}>
+                    <li>Upholstery vinyl / marine vinyl — <strong>1/16"</strong> (use 3/32"–1/8" if foam-backed or padded)</li>
+                    <li>Neoprene / scuba fabric — <strong>1/16"–1/8"</strong></li>
+                    <li>Veg-tan / tooling leather — <strong>1/16"–1/8"</strong> (use 1/8" if it doesn't compress around the cord)</li>
+                  </ul>
+                </div>
+                <div style={{marginTop:8,color:th.muted||th.label,fontSize:11,fontStyle:"italic",borderTop:`1px solid ${th.border}`,paddingTop:6}}>Material thickness, backing, coatings, and compression can all change the result.</div>
+              </div>
+            )}
           </Card>
 
           <Card th={th}>
