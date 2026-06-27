@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   buildCurvedPanelModel,
@@ -102,6 +102,7 @@ function cpLineIntersect(a1,a2,b1,b2){
   return {x:px,y:py};
 }
 function cpDist(a,b){return Math.hypot((b?.x||0)-(a?.x||0),(b?.y||0)-(a?.y||0));}
+function cpPathLen(pts){let l=0;for(let i=1;i<(pts?.length||0);i++)l+=cpDist(pts[i-1],pts[i]);return l;}
 function cpUnit(x,y){const l=Math.hypot(x,y)||1e-9;return {x:x/l,y:y/l};}
 function cpLineDirIntersect(p1,d1,p2,d2){
   const den=d1.x*d2.y-d1.y*d2.x;
@@ -165,181 +166,409 @@ function cpPanelDiagramSVG(model,params,pipOpts){
   // 8. cut line stroke (topmost line layer)
   svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)}" fill="none" stroke="${CAT_BAG_STRUCTURES.color}" stroke-width="${W_CUT}" stroke-linejoin="round"/>`;
 
-  // 9. Piping overlay — one continuous closed strip shape + separate cord stroke
+  // 9. Piping overlay — rule-driven physical strip runs + separate cord strokes
   if(pipOpts?.on && pipOpts.cord>1e-9 && pipOpts.corners && model.cutSides?.top){
     const D=pipOpts.cord, SA=params.sa;
-    const isClosed=active.closed;
-    const easeOff=pipOpts.easeOff||(2*SA);
-    const cordOffset=D/2+CORD_STAY_AWAY;   // cord centerline inset from sewline (inward)
-    const stripInset=D+2*CORD_STAY_AWAY;   // inner strip edge inset from sewline (inward)
+    const easeOff=Math.max(0,pipOpts.easeOff||(2*SA));
+    const cordOffset=D/2+CORD_STAY_AWAY; // cord centerline inset from sewline (inward)
 
-    const innerSides=offsetSidePaths(model.sewSides,stripInset);
-    const cordSides=offsetSidePaths(model.sewSides,cordOffset);
+    /* Trust/accuracy: the diagram starts from the SAME recommended cut-strip
+       width shown in the Piping dropdown, then converts that flat cut width into
+       the installed/folded width that is actually visible on the panel. */
+    const stripCutWidth=Math.max(
+      SA+D+2*CORD_STAY_AWAY,
+      pipOpts.stripWidth || cpPipingStripWidth(D,pipOpts.vinyl||0,SA).recommended
+    );
+    const stripVisibleWidth=cpPipingInstalledFoldWidth(stripCutWidth,D,pipOpts.vinyl||0,SA);
 
-    // Screen coord converter
+    const innerSides=offsetSidePaths(model.cutSides,stripVisibleWidth); // folded/inner edge, installed to-scale from cut edge
+    const cordSides=offsetSidePaths(model.sewSides,cordOffset);         // cord centerline, from sewline
+
+    const SIDE_ORDER_CLOSED=['top','right','bottom','left'];
+    const SIDE_ORDER_OPEN=['right','bottom','left'];
+    const JOINT_BEFORE={top:3,right:0,bottom:1,left:2};
+    const JOINT_AFTER ={top:0,right:1,bottom:2,left:3};
+    const cornerFails=idx=>!!pipOpts.corners?.[idx]&&!pipOpts.corners[idx].allowed;
     const sc=p=>({x:X(p.x),y:Y(p.y)});
-    // SVG point serializer
     const pt=q=>`${q.x.toFixed(1)},${q.y.toFixed(1)}`;
+    const add=(a,b)=>({x:a.x+b.x,y:a.y+b.y});
+    const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y});
+    const mul=(a,k)=>({x:a.x*k,y:a.y*k});
+    const dot=(a,b)=>a.x*b.x+a.y*b.y;
+    const perp=v=>({x:-v.y,y:v.x});
+    const len=v=>Math.hypot(v.x,v.y);
+    const unitV=v=>{const l=len(v)||1e-9;return{x:v.x/l,y:v.y/l};};
+    const cordW=Math.max(1.0,D*scale).toFixed(2);
+    const stripStroke=Math.max(1.0,Math.min(2.2,stripVisibleWidth*scale*0.055)).toFixed(2);
+    const PIPING_EXIT_ANGLE_DEG=55; // steeper peel-away so tails clear adjacent seam allowance visually
+    const PIPING_EXIT_ANGLE_RAD=PIPING_EXIT_ANGLE_DEG*Math.PI/180;
+    let pipingPieceSerial=0;
+    const pipingClipMarkPoints=[];
 
-    // Screen-coord point array along a model-coord path, from arc-dist dS to dE
-    function pathSeg(path,dS,dE){
-      if(!path||path.length<1)return[];
-      dS=dS??0;
-      const ann=[{dist:0,x:path[0].x,y:path[0].y}];
-      for(let i=1;i<path.length;i++)ann.push({dist:ann[i-1].dist+cpDist(path[i-1],path[i]),x:path[i].x,y:path[i].y});
-      dE=dE??ann[ann.length-1].dist;
+    function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
+    function pathSegModel(path,dS=0,dE=null){
+      if(!path||path.length<2)return[];
+      const total=pathLen(path);
+      dS=Math.max(0,Math.min(dS,total));
+      dE=dE==null?total:Math.max(0,Math.min(dE,total));
+      if(dE<=dS+1e-7)return[];
+      const ann=[{dist:0,...path[0]}];
+      for(let i=1;i<path.length;i++)ann.push({dist:ann[i-1].dist+cpDist(path[i-1],path[i]),...path[i]});
       const out=[];
       for(let i=0;i<ann.length-1;i++){
-        const a=ann[i],b=ann[i+1];
-        if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/(b.dist-a.dist);out.push(sc({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t}));}
-        if(a.dist>=dS&&a.dist<=dE)out.push(sc(a));
-        if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/(b.dist-a.dist);out.push(sc({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t}));}
+        const a=ann[i],b=ann[i+1],seg=b.dist-a.dist||1e-9;
+        if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:a.side});}
+        if(a.dist>=dS&&a.dist<=dE)out.push({x:a.x,y:a.y,side:a.side});
+        if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:b.side});}
       }
       const last=ann[ann.length-1];
-      if(last.dist>=dS&&last.dist<=dE)out.push(sc(last));
-      return cpDedupePath(out);
+      if(last.dist>=dS&&last.dist<=dE)out.push({x:last.x,y:last.y,side:last.side});
+      return cpDedupePath(out,false);
     }
-    function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
-    // Walk model-coord path forward by arc distance
-    function wFwd(path,dist){
-      let r=dist;
-      for(let i=0;i<path.length-1;i++){const d=cpDist(path[i],path[i+1]);if(r<=d){const t=r/d;return{x:path[i].x+(path[i+1].x-path[i].x)*t,y:path[i].y+(path[i+1].y-path[i].y)*t};}r-=d;}
-      return{...path[path.length-1]};
-    }
-    // Walk model-coord path backward by arc distance from end
-    function wBack(path,dist){
-      let r=dist;
-      for(let i=path.length-1;i>0;i--){const d=cpDist(path[i],path[i-1]);if(r<=d){const t=r/d;return{x:path[i].x+(path[i-1].x-path[i].x)*t,y:path[i].y+(path[i-1].y-path[i].y)*t};}r-=d;}
-      return{...path[0]};
-    }
-    // Exit tangent + 30° taper direction at an open-top corner
-    function exitGeom(sewPath,exitAtStart){
-      const eP=exitAtStart?sewPath[0]:sewPath[sewPath.length-1];
-      const nP=exitAtStart?sewPath[1]:sewPath[sewPath.length-2];
-      const exitTan=cpUnit(eP.x-nP.x,eP.y-nP.y);
-      const cw90={x:exitTan.y,y:-exitTan.x},ccw90={x:-exitTan.y,y:exitTan.x};
-      const panCx=(bb.minX+bb.maxX)/2,panCy=(bb.minY+bb.maxY)/2;
-      const outLat=(eP.x-panCx)*cw90.x+(eP.y-panCy)*cw90.y>0?cw90:ccw90;
-      const COS30=Math.sqrt(3)/2,SIN30=0.5;
-      const rCW={x:exitTan.x*COS30+exitTan.y*SIN30,y:-exitTan.x*SIN30+exitTan.y*COS30};
-      const rCCW={x:exitTan.x*COS30-exitTan.y*SIN30,y:exitTan.x*SIN30+exitTan.y*COS30};
-      const tapDir=(rCW.x*outLat.x+rCW.y*outLat.y)>(rCCW.x*outLat.x+rCCW.y*outLat.y)?rCW:rCCW;
-      return{tapDir};
-    }
-    // Deduplicate screen-coord points (0.5px tolerance)
-    function scDedup(pts){const out=[];for(const p of pts){if(!out.length||Math.hypot(p.x-out[out.length-1].x,p.y-out[out.length-1].y)>0.5)out.push(p);}return out;}
-
-    const cordW=Math.max(1.0,D*scale).toFixed(2);
-
-    if(isClosed){
-      // ── Closed 4-sided: simple band between cut edge and inner strip edge ──
-      const innerPts=map(joinAllSides(innerSides,true));
-      svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)} ${cpPtsToPath(innerPts,true)}" fill="${C_PIPING}" fill-opacity="0.20" fill-rule="evenodd" stroke="${C_PIPING}" stroke-width="1.2" stroke-opacity="0.55"/>`;
-      const cpFull=map(joinAllSides(cordSides,true));
-      svg+=`<path d="${cpPtsToPath(cpFull,true)}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round"/>`;
-      if(pipOpts.allCornersPass){
-        const mx=X(midX),by=Y(bb.maxY);
-        svg+=`<line x1="${(mx-8).toFixed(1)}" y1="${by.toFixed(1)}" x2="${(mx+8).toFixed(1)}" y2="${by.toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
-        svg+=`<line x1="${mx.toFixed(1)}" y1="${(by-5).toFixed(1)}" x2="${mx.toFixed(1)}" y2="${(by+5).toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
+    function concatSegs(segments){
+      const out=[];
+      for(const seg of segments){
+        for(let i=0;i<seg.length;i++){
+          const p=seg[i];
+          if(out.length&&i===0&&cpDist(out[out.length-1],p)<1e-7)continue;
+          out.push({...p});
+        }
       }
-    } else {
-      // ── 3-sided open-top: one continuous closed strip shape + separate cord ──
-      const csR=model.cutSides.right||[],csB=model.cutSides.bottom||[],csL=model.cutSides.left||[];
-      const isR=innerSides.right||[],isB=innerSides.bottom||[],isL=innerSides.left||[];
-      const crR=cordSides.right||[],crB=cordSides.bottom||[],crL=cordSides.left||[];
-      const swR=model.sewSides.right||[],swL=model.sewSides.left||[];
-
-      if(csR.length>=2&&csB.length>=2&&csL.length>=2&&isR.length>=2&&isB.length>=2&&isL.length>=2){
-        const gR=exitGeom(swR,true);   // right exit at start (TR corner)
-        const gL=exitGeom(swL,false);  // left exit at end (TL corner)
-
-        // Fillet size: fraction of easeOff, capped to avoid eating the normal run
-        const filR_m=Math.min(easeOff*0.35,SA*0.4);
-        const filR_sc=filR_m*scale;
-        // Exit tail length: enough to visually clear the cut edge
-        const tailLen_sc=SA*scale*2.5;
-
-        // ── TR fillet / tail key points (screen coords) ──
-        // outerTR: bend vertex on cut edge at easeOff from TR
-        // pOA_TR: approach end (filR before bend, on cut edge)
-        // pOB_TR: exit end (filR past bend, on tail direction)
-        // pOEnd_TR: far end of outer exit tail
-        const outerTR=sc(wFwd(csR,easeOff));
-        const pOA_TR=sc(wFwd(csR,easeOff-filR_m));
-        const pOB_TR={x:outerTR.x+gR.tapDir.x*filR_sc,y:outerTR.y+gR.tapDir.y*filR_sc};
-        const pOEnd_TR={x:pOB_TR.x+gR.tapDir.x*tailLen_sc,y:pOB_TR.y+gR.tapDir.y*tailLen_sc};
-
-        const innerTR=sc(wFwd(isR,easeOff));
-        const pIA_TR=sc(wFwd(isR,easeOff-filR_m));
-        const pIB_TR={x:innerTR.x+gR.tapDir.x*filR_sc,y:innerTR.y+gR.tapDir.y*filR_sc};
-        const pIEnd_TR={x:pIB_TR.x+gR.tapDir.x*tailLen_sc,y:pIB_TR.y+gR.tapDir.y*tailLen_sc};
-
-        // ── TL fillet / tail key points ──
-        const outerTL=sc(wBack(csL,easeOff));
-        const pOA_TL=sc(wBack(csL,easeOff-filR_m));
-        const pOB_TL={x:outerTL.x+gL.tapDir.x*filR_sc,y:outerTL.y+gL.tapDir.y*filR_sc};
-        const pOEnd_TL={x:pOB_TL.x+gL.tapDir.x*tailLen_sc,y:pOB_TL.y+gL.tapDir.y*tailLen_sc};
-
-        const innerTL=sc(wBack(isL,easeOff));
-        const pIA_TL=sc(wBack(isL,easeOff-filR_m));
-        const pIB_TL={x:innerTL.x+gL.tapDir.x*filR_sc,y:innerTL.y+gL.tapDir.y*filR_sc};
-        const pIEnd_TL={x:pIB_TL.x+gL.tapDir.x*tailLen_sc,y:pIB_TL.y+gL.tapDir.y*tailLen_sc};
-
-        // ── Normal-run segments in screen coords ──
-        // Outer right: from pOA_TR (easeOff-filR from TR) downward to BR
-        const outerRight=pathSeg(csR,easeOff-filR_m,null);
-        // Outer bottom: full BR→BL
-        const outerBottom=pathSeg(csB,null,null);
-        // Outer left: from BL upward to pOA_TL
-        const csL_len=pathLen(csL);
-        const outerLeft=pathSeg(csL,null,csL_len-(easeOff-filR_m));
-        // Inner right/bottom/left: same logic on inner strip edge
-        const innerRight=pathSeg(isR,easeOff-filR_m,null);
-        const innerBottom=pathSeg(isB,null,null);
-        const isL_len=pathLen(isL);
-        const innerLeft=pathSeg(isL,null,isL_len-(easeOff-filR_m));
-
-        // ── Build closed strip path ──
-        // Trace starting at pOEnd_TR, counterclockwise:
-        //   outer tail TR → fillet TR → outer edge right↓ bottom left↑ → fillet TL → outer tail TL
-        //   end cap TL → inner tail TL → fillet TL inner → inner edge left↓ bottom right↑ → fillet TR inner
-        //   inner tail TR → end cap TR → Z
-        let d=`M ${pt(pOEnd_TR)} L ${pt(pOB_TR)} Q ${pt(outerTR)} ${pt(pOA_TR)}`;
-        // Outer right: skip [0] (= pOA_TR, already at pen position)
-        for(const q of outerRight.slice(1))d+=` L ${pt(q)}`;
-        // Outer bottom: skip [0] (= BR_cut, same as outerRight's last)
-        for(const q of outerBottom.slice(1))d+=` L ${pt(q)}`;
-        // Outer left: skip [0] (= BL_cut, same as outerBottom's last)
-        for(const q of outerLeft.slice(1))d+=` L ${pt(q)}`;
-        // Last of outerLeft is pOA_TL → fillet TL
-        d+=` Q ${pt(outerTL)} ${pt(pOB_TL)}`;
-        d+=` L ${pt(pOEnd_TL)} L ${pt(pIEnd_TL)}`; // TL outer tail end, end cap TL
-        d+=` L ${pt(pIB_TL)} Q ${pt(innerTL)} ${pt(pIA_TL)}`; // inner TL tail + fillet
-        // Inner left reversed (pIA_TL→BL_inner): skip [0] = pIA_TL
-        for(const q of [...innerLeft].reverse().slice(1))d+=` L ${pt(q)}`;
-        // Inner bottom reversed (BL_inner→BR_inner): skip [0] = BL_inner
-        for(const q of [...innerBottom].reverse().slice(1))d+=` L ${pt(q)}`;
-        // Inner right reversed (BR_inner→pIA_TR): skip [0] = BR_inner
-        for(const q of [...innerRight].reverse().slice(1))d+=` L ${pt(q)}`;
-        // Last of inner right reversed is pIA_TR → fillet TR inner
-        d+=` Q ${pt(innerTR)} ${pt(pIB_TR)} L ${pt(pIEnd_TR)} L ${pt(pOEnd_TR)} Z`;
-
-        svg+=`<path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="1.2" stroke-opacity="0.55" stroke-linejoin="round" stroke-linecap="round"/>`;
-
-        // ── Cord: right→bottom→left, stopping easeOff before each open-top exit ──
-        const crL_len=pathLen(crL);
-        const cordPts=scDedup([
-          ...pathSeg(crR,easeOff,null),
-          ...pathSeg(crB,null,null),
-          ...pathSeg(crL,null,crL_len-easeOff),
-        ]);
-        if(cordPts.length>1){
-          let cd=`M ${pt(cordPts[0])}`;
-          for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
-          svg+=`<path d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round"/>`;
+      return cpDedupePath(out,false);
+    }
+    function runPath(sidePaths,sides,startTrim,endTrim){
+      const segs=[];
+      for(let i=0;i<sides.length;i++){
+        const side=sides[i],path=sidePaths[side]||[],L=pathLen(path);
+        const dS=i===0?Math.min(startTrim,L*0.45):0;
+        const dE=i===sides.length-1?Math.max(0,L-Math.min(endTrim,L*0.45)):L;
+        const seg=pathSegModel(path,dS,dE);
+        if(seg.length)segs.push(seg);
+      }
+      return concatSegs(segs);
+    }
+    function tangentAt(pts,atStart){
+      if(!pts||pts.length<2)return {x:1,y:0};
+      const a=atStart?pts[0]:pts[pts.length-2];
+      const b=atStart?pts[1]:pts[pts.length-1];
+      return unitV(sub(b,a));
+    }
+    function raySegmentIntersection(o,d,a,b){
+      const v=sub(b,a);
+      const den=d.x*v.y-d.y*v.x;
+      if(Math.abs(den)<1e-9)return null;
+      const ao=sub(a,o);
+      const t=(ao.x*v.y-ao.y*v.x)/den;
+      const u=(ao.x*d.y-ao.y*d.x)/den;
+      if(t>1e-7&&u>=-1e-7&&u<=1+1e-7)return add(o,mul(d,t));
+      return null;
+    }
+    function rayPathIntersection(o,d,path,maxDist=Infinity){
+      // Restrict a piping-tail exit to the same cut-edge side that owns the run end.
+      // This prevents tails at crisp/tight corners from jumping across to the adjacent
+      // side's cut edge and visually crossing over each other.
+      let best=null,bestT=Infinity;
+      const pts=path||[];
+      for(let i=0;i<pts.length-1;i++){
+        const hit=raySegmentIntersection(o,d,pts[i],pts[i+1]);
+        if(!hit)continue;
+        const t=dot(sub(hit,o),d);
+        if(t>1e-6&&t<bestT&&t<=maxDist){best=hit;bestT=t;}
+      }
+      return best;
+    }
+    function nearestCutFrame(point){
+      const pts=model.cutPts||[];
+      if(pts.length<2){
+        const inward=unitV(sub({x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2},point));
+        return{point,tangent:{x:1,y:0},inward};
+      }
+      let best=null,bestD=Infinity;
+      for(let i=0;i<pts.length;i++){
+        const a=pts[i],b=pts[(i+1)%pts.length],ab=sub(b,a);
+        const ab2=dot(ab,ab)||1e-9;
+        const t=Math.max(0,Math.min(1,dot(sub(point,a),ab)/ab2));
+        const q=add(a,mul(ab,t));
+        const d=cpDist(point,q);
+        if(d<bestD){bestD=d;best={point:q,tangent:unitV(ab),a,b};}
+      }
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      best.inward=unitV(sub(center,best.point));
+      return best;
+    }
+    function cutFrameOnPath(point,path){
+      // Project a model-space point to a specific cut-edge path so the mark cannot
+      // snap to an adjacent side at crisp/tight corners.
+      const pts=path||[];
+      if(pts.length<2)return nearestCutFrame(point);
+      let best=null,bestD=Infinity;
+      for(let i=0;i<pts.length-1;i++){
+        const a=pts[i],b=pts[i+1],ab=sub(b,a),ab2=dot(ab,ab)||1e-9;
+        const t=Math.max(0,Math.min(1,dot(sub(point,a),ab)/ab2));
+        const q=add(a,mul(ab,t));
+        const d=cpDist(point,q);
+        if(d<bestD){bestD=d;best={point:q,tangent:unitV(ab),a,b};}
+      }
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      best.inward=unitV(sub(center,best.point));
+      return best;
+    }
+    function drawPipingEaseAwayNotch(cordEnd,owningPath=null){
+      // Ease-away / strip-bend notch: this is a CUT-EDGE mark at the station
+      // corresponding to the cord endpoint.  The mark's base sits on the panel
+      // cut edge and points inward, so it reads like a notch on the pattern edge —
+      // not like a floating marker on the cord path.
+      const f=owningPath?cutFrameOnPath(cordEnd,owningPath):nearestCutFrame(cordEnd);
+      const p=sc(f.point),t=unitV(f.tangent);
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      let inward=unitV(perp(t));
+      if(dot(inward,sub(center,f.point))<0)inward=mul(inward,-1);
+      const base=TRIANGLE_BASE*0.85,ht=TRIANGLE_HEIGHT*0.75;
+      const b1={x:p.x-t.x*base/2,y:p.y-t.y*base/2};
+      const b2={x:p.x+t.x*base/2,y:p.y+t.y*base/2};
+      const apex={x:p.x+inward.x*ht,y:p.y+inward.y*ht};
+      svg+=`<polygon points="${pt(b1)} ${pt(b2)} ${pt(apex)}" fill="none" stroke="${C_CORD}" stroke-width="1.4" stroke-linejoin="round"/>`;
+    }
+    function drawPipingClipMark(point,owningPath=null){
+      // Curve clipping marks: short line notches that begin on the cut edge,
+      // run perpendicular inward, and stop short of the sewline.
+      // Rule: notch occupies 60% of SA and keeps 40% stay-away from the stitch line.
+      const f=owningPath?cutFrameOnPath(point,owningPath):nearestCutFrame(point);
+      const markKey=f.point;
+      for(const prev of pipingClipMarkPoints){
+        if(cpDist(prev,markKey)<Math.max(0.10,SA*0.42))return; // prevent double marks at corner/side joins
+      }
+      pipingClipMarkPoints.push({...markKey});
+      const p=sc(f.point),t=unitV(f.tangent);
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      let n=unitV(perp(t));
+      if(dot(n,sub(center,f.point))<0)n=mul(n,-1);
+      const notchLen=Math.max(5,SA*scale*0.60);
+      const p2={x:p.x+n.x*notchLen,y:p.y+n.y*notchLen};
+      svg+=`<line x1="${p.x.toFixed(1)}" y1="${p.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${C_CORD}" stroke-width="${(W_EASING_NOTCH*1.2).toFixed(2)}" stroke-linecap="round"/>`;
+    }
+    function pointOnPath(path,distAlong){
+      if(!path||path.length<2)return null;
+      let r=distAlong;
+      for(let i=0;i<path.length-1;i++){
+        const a=path[i],b=path[i+1],L=cpDist(a,b);
+        if(r<=L){
+          const t=L>1e-9?r/L:0;
+          return{point:{x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t},tangent:unitV(sub(b,a))};
+        }
+        r-=L;
+      }
+      const n=path.length;
+      return{point:path[n-1],tangent:unitV(sub(path[n-1],path[n-2]))};
+    }
+    function localTurnAtDistance(path,d,delta=0.18){
+      if(!path||path.length<4)return 0;
+      const a=pointOnPath(path,Math.max(0,d-delta));
+      const b=pointOnPath(path,Math.min(pathLen(path),d+delta));
+      if(!a||!b)return 0;
+      const c=Math.max(-1,Math.min(1,dot(a.tangent,b.tangent)));
+      return Math.acos(c);
+    }
+    function sideCurveClipSpacing(path,curveAmt){
+      const L=pathLen(path||[]);
+      const h=Math.max(0,curveAmt||0);
+      if(!(L>0.75)||h<1/32)return null;
+      // Radius estimate from sagitta/chord: R = L²/(8h) + h/2.
+      // This keeps gentle side curves around the 1″ spacing end-state.
+      const r=(L*L)/(8*h)+h/2;
+      return cpPipingNotchSpacing(r);
+    }
+    function cornerClipPath(corner){
+      const pts=model.cutPts||[],n=pts.length;
+      if(n<4||!corner)return[];
+      let j=-1;
+      for(let i=0;i<n;i++){
+        if(pts[i].side===corner.sideA&&pts[(i+1)%n].side===corner.sideB){j=i;break;}
+      }
+      if(j<0)return[];
+      const W=28; // only the curved blend window; avoids spilling clip marks onto straight adjacent edges
+      const out=[];
+      for(let k=-W;k<=W;k++)out.push(pts[(j+k+n)%n]);
+      return cpDedupePath(out,false);
+    }
+    function drawPipingCornerClipMarks(){
+      if(!pipOpts?.corners)return;
+      for(const corner of pipOpts.corners){
+        if(!corner?.allowed||!(corner.notchSpacing>0))continue;
+        const path=cornerClipPath(corner),L=pathLen(path);
+        if(path.length<2||L<=corner.notchSpacing*1.25)continue;
+        // Only mark the actual curved portion of the corner window. This prevents
+        // clip marks from marching onto straight side/bottom runs.
+        const spacing=corner.notchSpacing;
+        for(let d=spacing*0.5;d<L-spacing*0.35;d+=spacing){
+          if(localTurnAtDistance(path,d,Math.min(0.22,spacing*0.45))<0.006)continue;
+          const m=pointOnPath(path,d);
+          if(m)drawPipingClipMark(m.point,path);
         }
       }
     }
+    function sideCurveAmount(side){
+      if(side==="top")return params.topCrown||0;
+      if(side==="bottom")return params.botCrown||0;
+      if(side==="left")return params.leftFull||0;
+      if(side==="right")return params.rightFull||0;
+      return 0;
+    }
+    function drawPipingSideCurveClipMarks(){
+      const activeSides=active.closed?SIDE_ORDER_CLOSED:SIDE_ORDER_OPEN;
+      for(const side of activeSides){
+        const curveAmt=sideCurveAmount(side);
+        if(curveAmt<1/32)continue; // true straight edges do not need clipping
+        const path=model.cutSides?.[side]||[],L=pathLen(path);
+        if(path.length<3||L<0.75)continue;
+        // Use the user-entered curve amount as the primary signal, because cutSides
+        // can include adjacent corner blends that make a straight side look curved.
+        const spacing=sideCurveClipSpacing(path,curveAmt);
+        if(!(spacing>0))continue;
+        // Keep side-curve notches away from corner notch windows so corners don't double-mark.
+        const margin=Math.min(Math.max(spacing*1.15,easeOff+SA,0.45),L*0.36);
+        for(let d=margin+spacing;d<L-margin;d+=spacing){
+          const m=pointOnPath(path,d);
+          if(m)drawPipingClipMark(m.point,path);
+        }
+      }
+    }
+    function failWindowOnSide(sidePath,trimDist,fromStart){
+      const L=pathLen(sidePath||[]);
+      if(!(L>1e-7)||!(trimDist>1e-7))return sidePath||[];
+      if(fromStart)return pathSegModel(sidePath,0,Math.min(trimDist,L));
+      return pathSegModel(sidePath,Math.max(0,L-trimDist),L);
+    }
+    function tailData(outerBend,innerBend,runTan,towardCorner,cutPath){
+      /* Robust tail direction:
+         Previous versions chose the peel direction by comparing the cut edge to the
+         offset inner strip edge. On some offset/curved cases that inner edge could
+         drift enough to make "outward" flip, causing the tail to cross over the
+         panel. The tail now uses panel-center outward as the source of truth. */
+      const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+      const outward=unitV(sub(outerBend,center));       // guaranteed away from panel body
+      const cosA=Math.cos(PIPING_EXIT_ANGLE_RAD),sinA=Math.sin(PIPING_EXIT_ANGLE_RAD);
+      const v=unitV(towardCorner);                      // continue toward the failing corner
+      let dir=unitV(add(mul(v,cosA),mul(outward,sinA))); // peel toward corner AND outward
+      if(dot(dir,outward)<0.08)dir=outward;             // final guard: never aim into panel
+      let n=unitV(perp(dir));
+      if(dot(n,sub(center,outerBend))<0)n=mul(n,-1);    // strip-width normal points inward
+      const fallbackTailLen=Math.max(SA*1.65,stripVisibleWidth*0.70,0.28);
+      const fillet=Math.min(Math.max(0.06,stripVisibleWidth*0.22),Math.max(0.08,easeOff*0.45));
+      const outerJoin=add(outerBend,mul(dir,fillet));
+      const innerBendTarget=add(outerBend,mul(n,stripVisibleWidth));
+      const innerJoin=add(outerJoin,mul(n,stripVisibleWidth));
+      let outerEnd=add(outerBend,mul(dir,fallbackTailLen));
+      let innerEnd=add(outerEnd,mul(n,stripVisibleWidth));
+      const maxSameSideExit=Math.max(fallbackTailLen*1.65,stripVisibleWidth*2.75,SA*2.5);
+      const cutExit=rayPathIntersection(innerJoin,dir,cutPath,maxSameSideExit);
+      const validExit=cutExit&&dot(sub(cutExit,innerJoin),dir)>Math.max(0.04,stripVisibleWidth*0.18);
+      if(validExit){
+        innerEnd=cutExit;
+        outerEnd=add(innerEnd,mul(n,-stripVisibleWidth));
+      }
+      // If the ray misses, keep the short outward fallback tail. Do NOT snap to
+      // nearest cut edge; that is what produced long cross-panel tails.
+      return{dir,n,fillet,outerJoin,innerJoin,outerEnd,innerEnd,innerBendTarget,exitPoint:innerEnd};
+    }
+    function drawCordPath(pts,pieceId){
+      const cordPts=cpDedupePath(pts,false).map(sc);
+      if(cordPts.length<2)return;
+      let cd=`M ${pt(cordPts[0])}`;
+      for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
+      svg+=`<path class="cp-piping-cord" data-piece="${pieceId}" d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+    function drawStripRun(sides,startFail,endFail){
+      const pieceId=++pipingPieceSerial;
+      const cordSafety=Math.max(D/2+CORD_STAY_AWAY,1/32);
+      const bendTrimStart=startFail?Math.max(easeOff,cordSafety):0;
+      const bendTrimEnd=endFail?Math.max(easeOff,cordSafety):0;
+      const outer=runPath(model.cutSides,sides,bendTrimStart,bendTrimEnd);
+      const inner=runPath(innerSides,sides,bendTrimStart,bendTrimEnd);
+      if(outer.length<2||inner.length<2)return;
+
+      const startTan=tangentAt(outer,true),endTan=tangentAt(outer,false);
+      const innerStartTan=tangentAt(inner,true),innerEndTan=tangentAt(inner,false);
+      // Cord terminates at the same visual bend point where the folded strip
+      // leaves the normal run. It remains shorter than the strip because the
+      // strip tail continues to the cut-edge exit after this bend.
+      const cord=runPath(cordSides,sides,bendTrimStart,bendTrimEnd);
+
+      const startSide=sides[0],endSide=sides[sides.length-1];
+      const startCutWindow=startFail?failWindowOnSide(model.cutSides[startSide],bendTrimStart,true):null;
+      const endCutWindow=endFail?failWindowOnSide(model.cutSides[endSide],bendTrimEnd,false):null;
+      const startTail=startFail?tailData(outer[0],inner[0],startTan,mul(startTan,-1),startCutWindow):null;
+      const endTail=endFail?tailData(outer[outer.length-1],inner[inner.length-1],endTan,endTan,endCutWindow):null;
+      const cpt=p=>pt(sc(p));
+      const C=(p1,p2,p3)=>` C ${cpt(p1)} ${cpt(p2)} ${cpt(p3)}`;
+      const L=p=>` L ${cpt(p)}`;
+      const filStart=startTail?.fillet||0,filEnd=endTail?.fillet||0;
+
+      let d="";
+      if(startTail){
+        d=`M ${cpt(startTail.outerEnd)}${L(startTail.outerJoin)}`;
+        d+=C(add(startTail.outerJoin,mul(startTail.dir,-filStart)),add(outer[0],mul(startTan,-filStart)),outer[0]);
+      }else{
+        d=`M ${cpt(outer[0])}`;
+      }
+      for(let i=1;i<outer.length;i++)d+=L(outer[i]);
+      if(endTail){
+        d+=C(add(outer[outer.length-1],mul(endTan,filEnd)),add(endTail.outerJoin,mul(endTail.dir,-filEnd)),endTail.outerJoin);
+        d+=L(endTail.outerEnd);
+        d+=L(endTail.innerEnd); // perpendicular end cap at failing end
+        d+=L(endTail.innerJoin);
+        d+=C(add(endTail.innerJoin,mul(endTail.dir,-filEnd)),add(inner[inner.length-1],mul(innerEndTan,filEnd)),inner[inner.length-1]);
+      }else{
+        d+=L(inner[inner.length-1]);
+      }
+      for(let i=inner.length-2;i>=0;i--)d+=L(inner[i]);
+      if(startTail){
+        d+=C(add(inner[0],mul(innerStartTan,-filStart)),add(startTail.innerJoin,mul(startTail.dir,-filStart)),startTail.innerJoin);
+        d+=L(startTail.innerEnd);
+        d+=L(startTail.outerEnd); // perpendicular end cap at failing start
+      }
+      d+=" Z";
+      svg+=`<g class="cp-piping-piece" data-piece="${pieceId}"><path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="${stripStroke}" stroke-opacity="0.70" stroke-linejoin="round" stroke-linecap="round"/></g>`;
+      drawCordPath(cord,pieceId);
+      if(startFail&&startTail&&cord.length)drawPipingEaseAwayNotch(cord[0],startCutWindow||model.cutSides[startSide]);
+      if(endFail&&endTail&&cord.length)drawPipingEaseAwayNotch(cord[cord.length-1],endCutWindow||model.cutSides[endSide]);
+    }
+
+    if(active.closed&&pipOpts.allCornersPass){
+      // All corners pass: draw one unbroken, fully closed strip and cord.
+      const innerPts=map(joinAllSides(innerSides,true));
+      svg+=`<path d="${cpPtsToPath(map(model.cutPts),true)} ${cpPtsToPath(innerPts,true)}" fill="${C_PIPING}" fill-opacity="0.20" fill-rule="evenodd" stroke="${C_PIPING}" stroke-width="${stripStroke}" stroke-opacity="0.70"/>`;
+      const cpFull=map(joinAllSides(cordSides,true));
+      svg+=`<path d="${cpPtsToPath(cpFull,true)}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+      const mx=X(midX),by=Y(bb.maxY);
+      svg+=`<line x1="${(mx-8).toFixed(1)}" y1="${by.toFixed(1)}" x2="${(mx+8).toFixed(1)}" y2="${by.toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
+      svg+=`<line x1="${mx.toFixed(1)}" y1="${(by-5).toFixed(1)}" x2="${mx.toFixed(1)}" y2="${(by+5).toFixed(1)}" stroke="${C_PIPING}" stroke-width="2.5" stroke-linecap="round"/>`;
+    }else{
+      // Any failing corner breaks the physical piping into independent runs.
+      const baseOrder=active.closed?SIDE_ORDER_CLOSED:SIDE_ORDER_OPEN;
+      let ordered=[...baseOrder];
+      if(active.closed){
+        const breakIdx=baseOrder.findIndex(s=>cornerFails(JOINT_AFTER[s]));
+        if(breakIdx>=0)ordered=[...baseOrder.slice(breakIdx+1),...baseOrder.slice(0,breakIdx+1)];
+      }
+      let run=[];
+      for(let i=0;i<ordered.length;i++){
+        const side=ordered[i];
+        run.push(side);
+        const exitFail=cornerFails(JOINT_AFTER[side]);
+        const isLast=i===ordered.length-1;
+        if(exitFail||isLast){
+          const first=run[0],last=run[run.length-1];
+          const startFail=cornerFails(JOINT_BEFORE[first]);
+          const endFail=cornerFails(JOINT_AFTER[last]);
+          drawStripRun([...run],startFail,endFail);
+          run=[];
+        }
+      }
+    }
+    // Piping clipping/easing marks from the dropdown curvature rules.
+    drawPipingCornerClipMarks();
+    drawPipingSideCurveClipMarks();
   }
 
   return svg;
@@ -680,11 +909,14 @@ function cpCornerMinRadius(cutPts, sideA, sideB){
 
 /* Notch spacing for piping strip at a curved corner.
    Returns spacing in inches, or null (no notches / piping not allowed). */
-function cpPipingNotchSpacing(radius,overrideEnabled){
-  if(radius<1)return null;        // piping disallowed
-  if(radius<2)return 3/8;         // every 3/8"
-  if(radius<2.5)return 0.5;       // every 1/2"
-  return overrideEnabled?3/8:null; // >2.5": no notches unless user overrides
+function cpPipingNotchSpacing(radius){
+  if(radius<MIN_PIPING_RADIUS)return null; // piping disallowed below minimum bend radius
+  if(radius<=1)return 3/8;
+  if(radius>=2.5)return 1;
+  // Smooth transition from 3/8″ at 1″ radius to 1″ at 2.5″ radius.
+  // Rounded to the nearest 1/8″ so the diagram and labels stay sewist-friendly.
+  const raw=3/8 + ((radius-1)/(2.5-1))*(1-3/8);
+  return Math.max(3/8,Math.min(1,Math.round(raw*8)/8));
 }
 
 /* Strip width — thickness-aware geometric model.
@@ -700,8 +932,27 @@ function cpPipingStripWidth(cordDia, vinylThick, sa){
   return {raw, recommended};
 }
 
+/* Installed folded-strip visual width for the panel diagram.
+   The dropdown's cut-strip width is the flat piece before it wraps around the
+   cord.  Once installed, the diagram should show the folded band from the
+   panel cut edge to the folded/inner edge, not the full flat strip width.
+
+   Effective installed width = half the cut strip minus the arc-length that is
+   consumed wrapping around the cord instead of lying flat on the panel.
+
+   The wrap loss uses the same material-centerline diameter as the strip-width
+   formula: cord diameter + estimated wrap material thickness. */
+function cpPipingInstalledFoldWidth(cutStripWidth, cordDia, vinylThick, sa){
+  const wrapDia = Math.max(0, cordDia + vinylThick);
+  const halfWrapArc = Math.PI * wrapDia / 2;
+  const projectedWrapSpan = wrapDia;
+  const wrapLoss = Math.max(0, halfWrapArc - projectedWrapSpan);
+  const minToContainCord = sa + CORD_STAY_AWAY + cordDia + vinylThick;
+  return Math.max(minToContainCord, cutStripWidth/2 - wrapLoss);
+}
+
 /* Per-corner piping eligibility.  topMode "3side" marks top corners as n/a. */
-function cpPipingCornerRules(cutPts,softTs,softBs,notchOverride,topMode){
+function cpPipingCornerRules(cutPts,softTs,softBs,topMode){
   const corners=[
     {name:"Top-right",   sideA:"top",   sideB:"right",  soft:softTs,openTop:topMode==="3side"},
     {name:"Bottom-right",sideA:"right", sideB:"bottom", soft:softBs,openTop:false},
@@ -713,7 +964,7 @@ function cpPipingCornerRules(cutPts,softTs,softBs,notchOverride,topMode){
     if(c.soft<1e-9)return{...c,crisp:true,allowed:false,minRadius:null,notchSpacing:null};
     const minR=cpCornerMinRadius(cutPts,c.sideA,c.sideB);
     const allowed=minR>=MIN_PIPING_RADIUS;
-    const spacing=allowed?cpPipingNotchSpacing(minR,notchOverride):null;
+    const spacing=allowed?cpPipingNotchSpacing(minR):null;
     return{...c,crisp:false,allowed,minRadius:minR,notchSpacing:spacing};
   });
 }
@@ -727,7 +978,7 @@ function cpPipingCornerRules(cutPts,softTs,softBs,notchOverride,topMode){
      [0]=Top-right  [1]=Bottom-right  [2]=Bottom-left  [3]=Top-left
    Corner BEFORE each side:  top→3, right→0, bottom→1, left→2
    Corner AFTER  each side:  top→0, right→1, bottom→2, left→3            */
-function cpPipingStraightStrips(activeRuns,sa,cordDia,vinylThick,easeOff,cornerResults){
+function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOff,cornerResults){
   const JOINT_BEFORE={top:3,right:0,bottom:1,left:2};
   const JOINT_AFTER ={top:0,right:1,bottom:2,left:3};
   const ALL_SIDES   =['top','right','bottom','left'];
@@ -750,12 +1001,13 @@ function cpPipingStraightStrips(activeRuns,sa,cordDia,vinylThick,easeOff,cornerR
   }
 
   const strips=[];
-  let runSides=[],totalLen=0;
+  let runSides=[],totalLen=0,totalCordLen=0;
 
   for(let i=0;i<orderedSides.length;i++){
     const side=orderedSides[i];
     runSides.push(side);
     totalLen+=activeRuns[side];
+    totalCordLen+=(cordRuns?.[side]??activeRuns[side]);
 
     const isLast=i===orderedSides.length-1;
     const exitFails=fails(cornerResults?.[JOINT_AFTER[side]]);
@@ -765,6 +1017,7 @@ function cpPipingStraightStrips(activeRuns,sa,cordDia,vinylThick,easeOff,cornerR
       const startEase=fails(cornerResults?.[JOINT_BEFORE[firstSide]])?easeOff:0;
       const endEase  =exitFails?easeOff:0;
       const effective=Math.max(0,totalLen-startEase-endEase);
+      const cordEffective=Math.max(0,totalCordLen-startEase-endEase);
       if(effective>1e-9){
         // Human-readable label: "Right + Bottom + Left" for a 3-side merge
         const label=runSides.map(s=>s[0].toUpperCase()+s.slice(1)).join(' + ');
@@ -774,9 +1027,10 @@ function cpPipingStraightStrips(activeRuns,sa,cordDia,vinylThick,easeOff,cornerR
           effectiveRun:effective,
           cutLength:effective+2*sa,
           cutWidth:cpPipingStripWidth(cordDia,vinylThick,sa).recommended,
+          cordLength:cordEffective,
         });
       }
-      runSides=[];totalLen=0;
+      runSides=[];totalLen=0;totalCordLen=0;
     }
   }
   return strips;
@@ -973,7 +1227,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const [pipingOn,setPipingOn]=useState(false);
   const [pipingCordW,setPipingCordW]=useState(0);
   const [pipingCordN,setPipingCordN]=useState(3),[pipingCordD,setPipingCordD]=useState(32);
-  const [pipingNotchOverride,setPipingNotchOverride]=useState(false);
   const [pipingEaseW,setPipingEaseW]=useState(0),[pipingEaseF,setPipingEaseF]=useState(0);
   const [vinylThickW,setVinylThickW]=useState(0),[vinylThickF,setVinylThickF]=useState(1/32);
   const [vinylPreset,setVinylPreset]=useState("2"); // "2" = Standard vinyl / faux leather (1/32")
@@ -1039,18 +1292,21 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const pipingEaseOff=(pipingEaseW+pipingEaseF)>1e-9?(pipingEaseW+pipingEaseF):2*sa;
   const pipingStripWidth=pipingOn&&pipingCord>1e-9?cpPipingStripWidth(pipingCord,vinylThick,sa):null;
   const pipingCorners=ready&&model.valid&&pipingOn
-    ?cpPipingCornerRules(model.cutPts,model.softness.ts,model.softness.bs,pipingNotchOverride,topMode)
+    ?cpPipingCornerRules(model.cutPts,model.softness.ts,model.softness.bs,topMode)
     :null;
   const pipingAllCornersPass=!!(pipingCorners&&pipingCorners.every(c=>c.allowed)&&topMode==="4side");
+  const pipingCordRuns=ready&&model.valid&&pipingOn&&pipingCord>1e-9
+    ?Object.fromEntries(Object.entries(offsetSidePaths(model.sewSides,pipingCord/2+CORD_STAY_AWAY)).map(([side,path])=>[side,cpPathLen(path)]))
+    :null;
   const pipingStraightStrips=ready&&model.valid&&pipingOn&&pipingCord>1e-9&&!pipingAllCornersPass
-    ?cpPipingStraightStrips(model.activeSew.runs,sa,pipingCord,vinylThick,pipingEaseOff,pipingCorners)
+    ?cpPipingStraightStrips(model.activeSew.runs,pipingCordRuns,sa,pipingCord,vinylThick,pipingEaseOff,pipingCorners)
     :[];
   const pipingClosedLoop=pipingAllCornersPass&&pipingCord>1e-9
     ?cpPipingClosedLoop(model.cutPerim,model.activeSew.total,sa,pipingCord,vinylThick)
     :null;
 
   const pipOpts=pipingOn&&pipingCord>1e-9&&ready&&model.valid&&pipingCorners
-    ?{on:true,cord:pipingCord,vinyl:vinylThick,corners:pipingCorners,allCornersPass:pipingAllCornersPass,easeOff:pipingEaseOff}
+    ?{on:true,cord:pipingCord,vinyl:vinylThick,stripWidth:pipingStripWidth?.recommended,corners:pipingCorners,allCornersPass:pipingAllCornersPass,easeOff:pipingEaseOff}
     :null;
 
   // Dynamic title
@@ -1215,7 +1471,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                     <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
                       <svg width="20" height="10" viewBox="0 0 20 10" style={{display:"block"}}>
                         <rect x="0" y="0" width="20" height="10" fill={C_PIPING} fillOpacity="0.16"/>
-                        <line x1="0" y1="5" x2="20" y2="5" stroke={C_PIPING} strokeWidth={W_PIPING} strokeDasharray="5 4"/>
+                        <line x1="0" y1="5" x2="20" y2="5" stroke={C_CORD} strokeWidth={W_PIPING} strokeLinecap="round" strokeOpacity="0.5"/>
                       </svg>
                       piping
                     </span>
@@ -1514,14 +1770,17 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                       ghost={!pipingOn} decMode={decMode}/>
                     {pipingStripWidth&&(
                       <div style={{margin:"6px 0 10px"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <span className="cp-stage-input-label">Cord diameter</span>
+                          <span style={{fontWeight:900,fontSize:15,color:CP.ink,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingCord)}</span>
+                          <span style={{color:CP.muted}}>·</span>
                           <span className="cp-stage-input-label">Recommended cut strip width</span>
                           <span style={{fontWeight:900,fontSize:15,color:CP.ink,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingStripWidth.recommended)}</span>
                         </div>
                         <div style={{fontSize:11.5,color:CP.muted,marginTop:2,fontFamily:"Nunito,sans-serif"}}>
                           {isMetric()
-                            ?`Calculated minimum: ${(pipingStripWidth.raw*25.4).toFixed(1)} mm`
-                            :`Calculated minimum: ${pipingStripWidth.raw.toFixed(3)}"`}
+                            ?`Calculated minimum strip width: ${(pipingStripWidth.raw*25.4).toFixed(1)} mm`
+                            :`Calculated minimum strip width: ${pipingStripWidth.raw.toFixed(3)}"`}
                         </div>
                       </div>
                     )}
@@ -1665,7 +1924,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                     {/* Corner eligibility */}
                     {pipingCorners&&(
                       <div style={{marginTop:12}}>
-                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Corner Easing for Snug Fit</div>
+                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Curve Notching for Snug Fit</div>
                         {pipingCorners.map((c,i)=>(
                           <div key={i} style={{fontSize:13,fontFamily:"Nunito,sans-serif",marginBottom:5,lineHeight:1.35}}>
                             <span style={{fontWeight:800,color:CP.ink,display:"inline-block",minWidth:98}}>{c.name}</span>
@@ -1689,12 +1948,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                             }
                           </div>
                         ))}
-                        {pipingCorners.some(c=>!c.crisp&&!c.openTop&&c.allowed&&(c.minRadius||0)>=2.5)&&(
-                          <label className="cp-check" style={{marginTop:8,fontSize:13}}>
-                            <input type="checkbox" checked={pipingNotchOverride} onChange={e=>setPipingNotchOverride(e.target.checked)}/>
-                            Force notches on wide-radius corners (&gt;{cpFmt(2.5)})
-                          </label>
-                        )}
+                        <p className="cp-stage-hint" style={{marginTop:6}}>Curved piping areas are automatically notched. Straight edges do not need notches.</p>
                       </div>
                     )}
 
@@ -1718,13 +1972,19 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                     )}
                     {!pipingClosedLoop&&pipingStraightStrips.length>0&&(
                       <div style={{marginTop:12}}>
-                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Strip cut sizes</div>
-                        {pipingStraightStrips.map((s,i)=>(
-                          <div key={i} style={{fontSize:13,fontFamily:"Nunito,sans-serif",marginBottom:3}}>
-                            <span style={{fontWeight:800,color:CP.ink,display:"inline-block",marginRight:8}}>{s.side}</span>
-                            <span style={{color:CP.muted}}>{cpFmt(s.cutLength)} × {cpFmt(s.cutWidth)}</span>
-                          </div>
-                        ))}
+                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Cut sizes</div>
+                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:"4px 10px",fontSize:13,alignItems:"baseline"}}>
+                          <div/>
+                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Strip</div>
+                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Cord</div>
+                          {pipingStraightStrips.map((s,i)=>(
+                            <React.Fragment key={i}>
+                              <div style={{fontWeight:800,color:CP.ink,fontFamily:"Nunito,sans-serif"}}>{s.side}</div>
+                              <div style={{color:CP.muted,fontFamily:"DM Mono,monospace",fontWeight:800}}>{cpFmt(s.cutLength)} × {cpFmt(s.cutWidth)}</div>
+                              <div style={{color:CP.muted,fontFamily:"DM Mono,monospace",fontWeight:800}}>{cpFmt(s.cordLength)}</div>
+                            </React.Fragment>
+                          ))}
+                        </div>
                       </div>
                     )}
 

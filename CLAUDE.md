@@ -123,6 +123,7 @@ unless specifically asked.
 ### Stale Files (do not edit)
 
 - src/App(backup).jsx -- pre-refactor snapshot, not imported anywhere
+- src/tabs/CurvedPanel-ClaudeBackup.jsx -- session backup, superseded; safe to delete
 - BottlePocketPage.jsx (repo root) -- early draft, superseded
 
 ---
@@ -444,6 +445,8 @@ These rules govern every SVG diagram in this project — screen and print, every
 **Tier check first.** Before writing any diagram code, determine which tier it belongs to:
 - **Tier 1 — pattern piece diagrams** (panels, strips, gussets, bottoms): the full standard below applies in total — every layer, every mark, every spec.
 - **Tier 2 — instructional/construction diagrams** (accordion pocket steps, zipper diagrams, assembly illustrations): ONLY category colors, fonts, and fill tints apply. Do NOT apply the mark layer system, geometry pipeline, or legend token set to Tier 2 diagrams. Never route a Tier 2 diagram through `cpPanelDiagramSVG()` or `cpMiniStrip()` — those functions are Tier 1 only and must stay that way.
+
+**Piping overlay (CurvedPanel Phase 2) is NOT Tier 2.** It is a supplementary marks/geometry layer rendered inside `cpPanelDiagramSVG()` as a 9th layer, gated on `pipOpts?.on`. It uses `C_PIPING = "#1AA3A3"` from diagramTokens.js. It renders after the cut stroke and before any text labels. It is not a standalone diagram — do not extract it or route it through any separate function.
 
 If you write a Tier 1 diagram that skips a mark layer, omits the legend, or uses a color outside this spec, that is a bug — fix it before considering the pass complete.
 
