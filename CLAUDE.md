@@ -656,19 +656,22 @@ Key points and variable names:
 - **B / Fo** — raw edge bend point; ray-intersection of exit ray (offset outward by
   tailFoldWidth) with the cut edge path
 - **A2** — arc start = Fi = F_inner; where fold edge begins curving away from normal run
-- **A1** — arc end = C = cord endpoint; foot of perpendicular from B onto fold exit ray
+- **A1** — arc end; where the fold edge rejoins a straight exit direction; on the fold
+  edge exit line. A1 is NOT the same as C.
+- **C** — cord endpoint only; located on line A2→B where it intersects the cord
+  centerline. C is distinct from A1.
 - **Tr** — raw edge tail tip = B + nIn × tailFoldWidth (90° inward turn at B)
 - **Se** — short end line; Tr → Tf, closed implicitly by polygon Z
 
-Fold edge path: normal run → A2 (= Fi) → 55° arc → A1 (= C) → straight exit segment → Tf
+Fold edge path: normal run → A2 (= Fi) → 55° arc → A1 → straight exit segment → Tf
 
-Arc: true circular arc, SVG `A` command. Radius = chord(Fi, C) / (2 × sin(27.5°)).
+Arc: true circular arc, SVG `A` command. Radius = chord(Fi, A1) / (2 × sin(27.5°)).
 Sweep direction derived from cross product of cutTanTowardCorner × nOut in model space.
 
 Polygon walk (startFail): M Tr → L B → L outer[0] → [run] → [inner reversed] →
-Arc(Fi→C) → L Tf → Z (Se closes Tf→Tr).
+Arc(Fi→A1) → L Tf → Z (Se closes Tf→Tr).
 
-C is the cord endpoint only — cord terminates at A1=C, does not continue to Tf.
+C is the cord endpoint only — cord terminates at C (on line A2→B), does not continue to Tf.
 easeOff default = 0; base exit offset = 1.5×SA. tailFoldWidth = stripCutWidth / 2.
 
 ---
