@@ -126,6 +126,14 @@ unless specifically asked.
 - src/tabs/CurvedPanel-ClaudeBackup.jsx -- session backup, superseded; safe to delete
 - BottlePocketPage.jsx (repo root) -- early draft, superseded
 
+### Archived Files
+
+- archive/CurvedExpansionBagCalculator.jsx -- early prototype for a Curved
+  Expansion Bag calculator; never wired into the app. Preserved as future
+  feature reference.
+- archive/preview.html + archive/preview.jsx -- standalone dev preview harness
+  that mounted the above prototype; not part of the React/Vite build.
+
 ---
 
 ## Navigation Structure
@@ -636,6 +644,33 @@ If any box fails, the pass is not done — fix before reporting back.
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
+### Piping Exit Tail Geometry (CurvedPanel) — implemented, do not re-derive
+
+The exit tail geometry for failing piping corners is fully specced and implemented
+in `cpPanelDiagramSVG()` inside `src/tabs/CurvedPanel.jsx`. Do not re-derive or
+simplify this geometry without explicit instruction.
+
+Key points and variable names:
+- **Fi** — fold edge crossing point at 1.5×SA from corner (= inner trim point)
+- **Tf** — fold edge tail tip (EXIT_OVERSHOOT past Fi along t_exit)
+- **B / Fo** — raw edge bend point; ray-intersection of exit ray (offset outward by
+  tailFoldWidth) with the cut edge path
+- **A2** — arc start = Fi = F_inner; where fold edge begins curving away from normal run
+- **A1** — arc end = C = cord endpoint; foot of perpendicular from B onto fold exit ray
+- **Tr** — raw edge tail tip = B + nIn × tailFoldWidth (90° inward turn at B)
+- **Se** — short end line; Tr → Tf, closed implicitly by polygon Z
+
+Fold edge path: normal run → A2 (= Fi) → 55° arc → A1 (= C) → straight exit segment → Tf
+
+Arc: true circular arc, SVG `A` command. Radius = chord(Fi, C) / (2 × sin(27.5°)).
+Sweep direction derived from cross product of cutTanTowardCorner × nOut in model space.
+
+Polygon walk (startFail): M Tr → L B → L outer[0] → [run] → [inner reversed] →
+Arc(Fi→C) → L Tf → Z (Se closes Tf→Tr).
+
+C is the cord endpoint only — cord terminates at A1=C, does not continue to Tf.
+easeOff default = 0; base exit offset = 1.5×SA. tailFoldWidth = stripCutWidth / 2.
+
 ---
 
 ## Working Rules
@@ -720,3 +755,9 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
   geometrically derived but untested on physical builds with thick materials
   (foam-backed vinyl, heavy neoprene, etc.). Recommend a test-wrap with a
   known thick material before relying on it for a final build.
+
+- pipingCore.js extraction -- when piping becomes a shared module, these
+  functions are the natural candidates to extract from CurvedPanel.jsx:
+  rayPathIntersect, computeExitTail (geometry helpers nested in
+  cpPanelDiagramSVG), and cpPipingStripWidth, cpPipingCornerRules,
+  cpPipingStraightStrips, cpPipingClosedLoop (module-level calc functions).
