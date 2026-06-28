@@ -203,6 +203,17 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     let pipingPieceSerial=0;
     const pipingClipMarkPoints=[];
 
+    // ── Exit-tail geometry constants ─────────────────────────────────────────
+    const EXIT_OVERSHOOT_IN = 0.25;  // strip extension past fold-exit point (imperial, inches)
+    const EXIT_OVERSHOOT_MM = 5;     // same, metric mm — converted to inches below
+    const EXIT_ANGLE_DEG    = 55;    // fold-edge exit angle from cut-edge tangent (degrees)
+    const EXIT_ANGLE_RAD    = EXIT_ANGLE_DEG * Math.PI / 180;
+    // All model geometry is stored in inches; convert mm at use-time so the math stays consistent.
+    const EXIT_OVERSHOOT    = isMetric() ? EXIT_OVERSHOOT_MM / 25.4 : EXIT_OVERSHOOT_IN;
+    // tailFoldWidth: half the flat cut-strip width, NO cord or vinyl correction.
+    // Correct for exit-tail geometry where the cord has already ended before point F.
+    const tailFoldWidth = stripCutWidth / 2;
+
     function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
     function pathSegModel(path,dS=0,dE=null){
       if(!path||path.length<2)return[];
@@ -413,6 +424,85 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
       svg+=`<path class="cp-piping-cord" data-piece="${pieceId}" d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
+    function rayPathIntersect(origin,dir,path){
+      // Returns the point where the ray (origin + t*dir, t > 0) first intersects the polyline,
+      // or null if no positive-t intersection exists.
+      let best=null,bestT=Infinity;
+      for(let i=0;i<path.length-1;i++){
+        const a=path[i],b=path[i+1];
+        const ex=b.x-a.x,ey=b.y-a.y;
+        const denom=dir.x*ey-dir.y*ex;
+        if(Math.abs(denom)<1e-10)continue; // parallel
+        const fx=origin.x-a.x,fy=origin.y-a.y;
+        const t=(fx*ey-fy*ex)/denom;
+        const s=(fx*dir.y-fy*dir.x)/denom;
+        if(t>1e-6&&s>=-1e-6&&s<=1+1e-6&&t<bestT){bestT=t;best={x:a.x+s*ex,y:a.y+s*ey};}
+      }
+      return best;
+    }
+    function computeExitTail(F_outer,cutTanTowardCorner,nIn,owningCutPath){
+      // Computes all geometry for a failing-corner exit tail. All coords in inches.
+      //
+      // F_outer            = fold-edge-crosses-cut-edge point = trim point at 1.5×SA from corner
+      // cutTanTowardCorner = unit tangent along cut edge pointing toward the corner
+      // nIn                = inward normal at F_outer (toward panel center)
+      // owningCutPath      = full (un-trimmed) model.cutSides[side]
+      //
+      // Returns: { F_inner, t_exit, n_exitOut, B, C, tail_fold, tail_raw, R_arc, sweep_natural }
+      //   F_inner       — fold edge crossing point (A2): arc start; inset from F_outer by tailFoldWidth
+      //   t_exit        — unit direction of fold-edge exit segment (EXIT_ANGLE_DEG toward nOut)
+      //   n_exitOut     — unit outward perpendicular to t_exit (from fold → raw edge direction)
+      //   B  (= Fo)     — raw-edge bend point: offset fold-exit ray ∩ cut-edge path
+      //   C  (= A1)     — cord end / arc end: foot of perpendicular from B onto fold-exit ray
+      //   tail_fold     — fold-edge tail tip (Tf): EXIT_OVERSHOOT past F_inner along t_exit
+      //   tail_raw      — raw-edge tail tip (Tr): B offset inward by tailFoldWidth (90° turn at B)
+      //   R_arc         — radius of the 55° fillet arc F_inner→C (chord = |F_inner–C|)
+      //   sweep_natural — SVG sweep-flag for arc F_inner→C (reversed = 1-this)
+
+      const nOut=mul(nIn,-1);
+
+      // F_inner: uses tailFoldWidth (half cut-strip width), NOT stripVisibleWidth.
+      // The cord has already ended before F, so the fold is just two layers of flat fabric.
+      const F_inner=add(F_outer,mul(nIn,tailFoldWidth));
+
+      // t_exit: rotate cutTanTowardCorner toward nOut by EXIT_ANGLE_DEG.
+      const cosA=Math.cos(EXIT_ANGLE_RAD),sinA=Math.sin(EXIT_ANGLE_RAD);
+      const t_exit=unitV({x:cutTanTowardCorner.x*cosA+nOut.x*sinA,y:cutTanTowardCorner.y*cosA+nOut.y*sinA});
+
+      // n_exitOut: outward perpendicular to t_exit.
+      // "Outward" = toward the raw/cut edge = same side as nOut.
+      // The panel-center dot test misfires on non-axis-aligned exit vectors, so test
+      // against nOut directly: pick the perpendicular whose dot with nOut is positive.
+      let n_exitOut=unitV(perp(t_exit));
+      if(dot(n_exitOut,nOut)<0)n_exitOut=mul(n_exitOut,-1);
+
+      // Point B: fold-exit ray offset outward by tailFoldWidth, intersected with cut-edge path.
+      const rawExitBase=add(F_inner,mul(n_exitOut,tailFoldWidth));
+      const B_found=rayPathIntersect(rawExitBase,t_exit,owningCutPath);
+      const B=B_found!==null?B_found:add(rawExitBase,mul(t_exit,EXIT_OVERSHOOT));
+
+      // Point C: foot of perpendicular from B onto the fold-exit ray at F_inner.
+      const r_C=Math.max(0,dot(sub(B,F_inner),t_exit));
+      const C=add(F_inner,mul(t_exit,r_C));
+
+      // tail_fold: fold-edge tail tip, EXIT_OVERSHOOT past F_inner along t_exit.
+      const tail_fold=add(F_inner,mul(t_exit,EXIT_OVERSHOOT));
+
+      // tail_raw (Tr): 90° turn inward at B (Fo). The raw edge makes a right-angle bend at
+      // Fo from the cut-edge direction inward to Tr, at tailFoldWidth (strip width at exit).
+      const tail_raw=add(B,mul(nIn,tailFoldWidth));
+
+      // Arc geometry: true 55° fillet from F_inner (A2) to C (A1).
+      // After the arc the fold edge runs straight in t_exit direction to tail_fold (Tf).
+      // Radius from chord F_inner→C and half-angle: R = chord / (2·sin(angle/2)).
+      const chord_arc=cpDist(F_inner,C);
+      const R_arc=chord_arc>1e-9?chord_arc/(2*Math.sin(EXIT_ANGLE_RAD/2)):tailFoldWidth*0.5;
+      // Sweep flag in SVG screen space (Y-down). Cross product in model space (Y-up) between
+      // cutTanTowardCorner and nOut: positive → CW in screen (Y inverted) → sweep-flag 1.
+      const sweep_natural=(cutTanTowardCorner.x*nOut.y-cutTanTowardCorner.y*nOut.x)>0?1:0;
+
+      return{F_inner,t_exit,n_exitOut,B,C,tail_fold,tail_raw,R_arc,sweep_natural};
+    }
     function drawStripRun(sides,startFail,endFail){
       const pieceId=++pipingPieceSerial;
       const exitOffset=1.5*SA+easeOff;
@@ -422,54 +512,84 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       const inner=runPath(innerSides,sides,trimStart,trimEnd);
       const cord=runPath(cordSides,sides,trimStart,trimEnd);
       if(outer.length<2||inner.length<2)return;
+
       const startTan=tangentAt(outer,true),endTan=tangentAt(outer,false);
+      const startSide=sides[0],endSide=sides[sides.length-1];
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       const inwardNormal=(tangent,point)=>{
         let n=unitV(perp(tangent));
         if(dot(n,sub(center,point))<0)n=mul(n,-1);
         return n;
       };
-      // Fix trim drift: arc-length walk is shorter on the inner path (smaller radius on curves),
-      // so independently-trimmed Q lands further around the corner than P. Override both
-      // inner endpoints to the exact perpendicular offset of their outer counterparts — same
-      // angular station, chord strictly perpendicular to cut edge at P.
-      let nStart,nEnd;
+
+      // Compute exit-tail geometry for each failing end.
+      // cutTanTowardCorner: at start, startTan points INTO the run (away from corner),
+      // so the toward-corner direction is -startTan. At end, endTan already points toward corner.
+      let tailS=null,tailE=null;
       if(startFail){
-        nStart=inwardNormal(startTan,outer[0]);
-        inner[0]=add(outer[0],mul(nStart,stripVisibleWidth));
+        const nIn=inwardNormal(startTan,outer[0]);
+        tailS=computeExitTail(outer[0],mul(startTan,-1),nIn,model.cutSides[startSide]);
+        inner[0]=tailS.F_inner; // pin inner start to exact perpendicular of F_outer
       }
       if(endFail){
-        nEnd=inwardNormal(endTan,outer[outer.length-1]);
-        inner[inner.length-1]=add(outer[outer.length-1],mul(nEnd,stripVisibleWidth));
+        const nIn=inwardNormal(endTan,outer[outer.length-1]);
+        tailE=computeExitTail(outer[outer.length-1],endTan,nIn,model.cutSides[endSide]);
+        inner[inner.length-1]=tailE.F_inner;
       }
+
       const cpt=p=>pt(sc(p));
-      const C=(c1,c2,end)=>` C ${cpt(c1)} ${cpt(c2)} ${cpt(end)}`;
-      const L=p=>` L ${cpt(p)}`;
-      let d=`M ${cpt(outer[0])}`;
-      for(let i=1;i<outer.length;i++)d+=L(outer[i]);
-      if(endFail){
-        // Both handles use nEnd (perpendicular inward), symmetric with start cap.
-        // c2 = Q - nEnd·h keeps all four control points on the perpendicular axis P→Q,
-        // producing a straight cap that holds constant band width — no corner-bow.
-        const P=outer[outer.length-1],Q=inner[inner.length-1];
-        const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
-        d+=C(add(P,mul(nEnd,h)),sub(Q,mul(nEnd,h)),Q);
-      }else{
-        d+=L(inner[inner.length-1]);
-      }
-      for(let i=inner.length-2;i>=0;i--)d+=L(inner[i]);
+      const Lp=p=>` L ${cpt(p)}`;
+      // True circular arc in SVG: A rx ry x-rot large-arc sweep-flag x y
+      // large-arc is always 0 for EXIT_ANGLE_DEG=55° (< 180°)
+      const Arc=(R,sf,p)=>` A ${R.toFixed(2)} ${R.toFixed(2)} 0 0 ${sf} ${cpt(p)}`;
+
+      // ── Build polygon ──────────────────────────────────────────────────────
+      // Walk: raw edge (cut edge, with tail extension) → fold edge (reversed, with arc tail)
+      let d='';
+
+      // Raw / cut-edge side: start at Tr if failing, else at F_outer (cut-edge trim)
+      d+=startFail?`M ${cpt(tailS.tail_raw)}`:`M ${cpt(outer[0])}`;
       if(startFail){
-        const P=outer[0],Q=inner[0];
-        const h=Math.max(cpDist(P,Q)*0.40,stripVisibleWidth*0.15);
-        d+=C(sub(Q,mul(nStart,h)),add(P,mul(nStart,h)),P);
+        d+=Lp(tailS.B);      // Tr → Fo: 90° out to raw-edge bend point on cut edge
+        d+=Lp(outer[0]);     // Fo → F_outer (1.5×SA trim): along cut edge into normal run
       }
-      d+=" Z";
+      for(let i=1;i<outer.length;i++)d+=Lp(outer[i]);  // normal run on cut edge
+
+      if(endFail){
+        d+=Lp(tailE.B);                     // cut edge past F_outer to Fo (raw-edge bend)
+        d+=Lp(tailE.tail_raw);              // Fo → Tr: 90° inward
+        d+=Lp(tailE.tail_fold);             // Se: short end from Tr to Tf
+        d+=Lp(tailE.C);                     // exit segment reversed: Tf → C (= A1, arc end)
+        d+=Arc(tailE.R_arc,1-tailE.sweep_natural,tailE.F_inner);  // reversed arc: C → F_inner (A2)
+      }else{
+        d+=Lp(inner[inner.length-1]);       // straight close at non-failing end
+      }
+
+      // Fold-edge side: reversed inner path (from end to start, ending at F_inner = A2)
+      for(let i=inner.length-2;i>=0;i--)d+=Lp(inner[i]);
+
+      if(startFail){
+        // Natural arc: F_inner (A2) → C (A1) — 55° fillet, true circular
+        d+=Arc(tailS.R_arc,tailS.sweep_natural,tailS.C);
+        // Exit segment straight from C (A1) to Tf
+        d+=Lp(tailS.tail_fold);
+        // Z closes short end Se from Tf back to M (Tr)
+      }
+      d+=' Z';
+
       svg+=`<g class="cp-piping-piece" data-piece="${pieceId}"><path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="${stripStroke}" stroke-opacity="0.70" stroke-linejoin="round" stroke-linecap="round"/></g>`;
-      drawCordPath(cord,pieceId);
-      // Notch at the cut-edge exit point P (outer strip endpoint = the primary computed constraint).
-      const startSide=sides[0],endSide=sides[sides.length-1];
-      if(startFail)drawPipingEaseAwayNotch(outer[0],model.cutSides[startSide]);
-      if(endFail)drawPipingEaseAwayNotch(outer[outer.length-1],model.cutSides[endSide]);
+
+      // Cord path: terminate at C (cord end), not at exitOffset trim point.
+      // Replace inner endpoint(s) with the computed C point from tail geometry.
+      const cordPts=[...cord];
+      if(startFail&&tailS&&cordPts.length>0)cordPts[0]=tailS.C;
+      if(endFail&&tailE&&cordPts.length>0)cordPts[cordPts.length-1]=tailE.C;
+      drawCordPath(cordPts,pieceId);
+
+      // Ease-away notch triangle at B (Fo — raw-edge bend point on cut edge)
+      if(startFail)drawPipingEaseAwayNotch(tailS.B,model.cutSides[startSide]);
+      if(endFail)drawPipingEaseAwayNotch(tailE.B,model.cutSides[endSide]);
+
     }
 
     if(active.closed&&pipOpts.allCornersPass){
@@ -1227,7 +1347,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   // Piping computed values
   const pipingCord=pipingCordW+(pipingCordD>0?pipingCordN/pipingCordD:0);
   const vinylThick=vinylThickW+vinylThickF;
-  const pipingEaseOff=(pipingEaseW+pipingEaseF)>1e-9?(pipingEaseW+pipingEaseF):2*sa;
+  const pipingEaseOff=(pipingEaseW+pipingEaseF)>1e-9?(pipingEaseW+pipingEaseF):0;
   const pipingStripWidth=pipingOn&&pipingCord>1e-9?cpPipingStripWidth(pipingCord,vinylThick,sa):null;
   const pipingCorners=ready&&model.valid&&pipingOn
     ?cpPipingCornerRules(model.cutPts,model.softness.ts,model.softness.bs,topMode)
