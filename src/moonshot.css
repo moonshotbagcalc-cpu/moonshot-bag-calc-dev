@@ -2207,6 +2207,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-title-bar {
   background: #2d1a6e;
   padding: 20px 28px 22px;
+  border-radius: 10px 10px 0 0;
 }
 .cp-title-bar h2 {
   margin: 0 0 7px;

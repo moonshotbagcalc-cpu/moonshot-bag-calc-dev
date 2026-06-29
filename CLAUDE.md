@@ -673,6 +673,25 @@ If any box fails, the pass is not done — fix before reporting back.
 
 ## Active Work
 
+### Dual Independent Column Scrolling — WIP (unresolved as of June 28 2026)
+
+CurvedPanel uses a sticky-wrap + dual-column layout intended to let the left
+(inputs) and right (stages/diagram) columns scroll independently. The structure
+is in place: `.cp-wrap.cp-redesign` is `position:sticky; height:calc(100vh-130px);
+overflow:hidden`, `.cp-body` is `display:flex; flex:1; min-height:0;
+overflow:hidden`, and both columns have `overflow-y:auto`.
+
+Root cause identified: the old CSS block (line ~651) set `min-height:100vh` on
+`.cp-wrap.cp-redesign`. Because CSS does not reset properties across blocks, that
+`min-height` was never overridden by the new authoritative block, making the wrap
+`100vh` tall instead of `calc(100vh-130px)`. A `min-height:0` reset was added to
+the new block, and `min-height:0` was also added to both columns.
+
+Despite this fix, independent scrolling was still not confirmed working in Edge
+before closing the session. Next session: verify in browser, then diagnose further
+if column scroll still routes to the page. Also: `.cp-title-bar` border-radius was
+lost in the layout rearchitecture and has been restored to `10px 10px 0 0`.
+
 ### Purse Feet — Phase 1 Complete (June 28 2026)
 
 CurvedPanel Stage 7 (Purse Feet) is implemented and building clean.
