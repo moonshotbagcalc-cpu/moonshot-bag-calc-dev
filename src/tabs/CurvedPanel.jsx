@@ -1120,7 +1120,7 @@ function CordDiameterInput({whole,onWhole,num,onNum,den,onDen,ghost,decMode}){
     <div className={"cp-field"+(ghost?" ghost":"")}>
       <label>Cord diameter</label>
       <div className="cp-fi">
-        <select value={isCustom?"custom":String(CORD_PRESETS[matchIdx][1])}
+        <select value={isCustom?"custom":String(CORD_PRESETS[matchIdx][1])} style={{width:'auto'}}
           onChange={e=>{
             if(e.target.value==="custom"){setCustomMode(true);}
             else{setCustomMode(false);setFromInches(parseFloat(e.target.value));}
@@ -1799,7 +1799,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                       ):(
                         <>
                           <div className="cp-fi">
-                            <select value={vinylPreset}
+                            <select value={vinylPreset} style={{width:'auto'}}
                               onChange={e=>{
                                 const v=e.target.value;
                                 setVinylPreset(v);
