@@ -179,9 +179,9 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       SA+D+2*CORD_STAY_AWAY,
       pipOpts.stripWidth || cpPipingStripWidth(D,pipOpts.vinyl||0,SA).recommended
     );
-    // The on-panel folded-edge offset is the visible half-width of the folded strip.
-    // For failed-corner ease tails, this must match the arc radius: 1/2 flat cut-strip width.
-    const stripVisibleWidth=stripCutWidth/2;
+    // The on-panel folded-edge offset is the installed/visible folded-strip width.
+    // This accounts for cord wrap/bulk and keeps the diagram visually realistic.
+    const stripVisibleWidth=cpPipingInstalledFoldWidth(stripCutWidth,D,pipOpts.vinyl||0,SA);
 
     const innerSides=offsetSidePaths(model.cutSides,stripVisibleWidth); // folded/inner edge, installed to-scale from cut edge
     const cordSides=offsetSidePaths(model.sewSides,cordOffset);         // cord centerline, from sewline
@@ -212,9 +212,12 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     const EXIT_ANGLE_RAD    = EXIT_ANGLE_DEG * Math.PI / 180;
     // All model geometry is stored in inches; convert mm at use-time so the math stays consistent.
     const EXIT_OVERSHOOT    = isMetric() ? EXIT_OVERSHOOT_MM / 25.4 : EXIT_OVERSHOOT_IN;
-    // tailFoldWidth: half the flat cut-strip width. This is also the visible folded-edge
-    // offset used for the screen strip and the failed-corner ease-tail radius.
-    const tailFoldWidth = stripVisibleWidth;
+    // easeArcRadius: installed/visible folded-strip width, used for the normal on-panel
+    // folded-edge offset and the 55° failed-corner easing radius.
+    const easeArcRadius = stripVisibleWidth;
+    // tailFoldWidth: physical half of the flat cut strip, used only after the 55°
+    // transition for the short easing tail/end-cap width.
+    const tailFoldWidth = stripCutWidth / 2;
 
     function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
     function pathSegModel(path,dS=0,dE=null){
@@ -517,14 +520,15 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       //   B is the notch/bend point ON the cut edge.
       //   A2 is the start of the folded-edge easing arc.
       //   A1 is the end of that folded-edge easing arc.
-      //   B→A2 and B→A1 are both exactly half the flat piping-strip width.
+      //   B→A2 and B→A1 are both exactly the installed/visible folded-strip width.
       //   The folded-edge arc A2→A1 is exactly 55°, centered at B.
+      //   After that transition, the short tail/end cap uses tailFoldWidth = 1/2 cut strip width.
       //   C is the cord endpoint on the B→A2 construction line, but C stays on the cord centerline.
       //   C is NOT on the folded-edge arc and must never pull the cord onto the folded-edge path.
       //
       // Returns: { Fi, Tf, B, A2, A1, Tr, C, cordDist, R_arc, sweep_natural }
 
-      const R=tailFoldWidth; // halfStripWidth = stripCutWidth / 2
+      const R=easeArcRadius; // installed/visible folded-strip width; radius for B→A2 and B→A1
       const tangentAway=mul(cutTanTowardCorner,-1); // along the cut edge, back into the normal run
       const sin55=Math.sin(EXIT_ANGLE_RAD);
       const cos55=Math.cos(EXIT_ANGLE_RAD);
@@ -551,11 +555,11 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       const Tf=add(Fi,mul(exitDir,EXIT_OVERSHOOT));
 
       // Se / end cap styling rule:
-      // The short trim edge Tr→Tf is the strip-width edge. It should be perpendicular
-      // to the exiting long strip edges and parallel to the B→A1 radius line.
-      // Anchor Tf on the folded-edge overshoot, then place Tr exactly one
-      // half-strip-width away along -B→A1.
-      const Tr=add(Tf,mul(dirA1,-R));
+      // The short trim edge Tr→Tf is the physical half-cut-strip-width edge. It should be
+      // perpendicular to the exiting long strip edges and parallel to the B→A1 radius line.
+      // Anchor Tf on the folded-edge overshoot, then place Tr exactly tailFoldWidth away
+      // along -B→A1. The 55° transition uses R=easeArcRadius; the tail uses tailFoldWidth.
+      const Tr=add(Tf,mul(dirA1,-tailFoldWidth));
 
       // C: cord endpoint. It is inline with the B→A2 construction/radius line,
       // which is perpendicular to the local panel cut edge at B. This matches the

@@ -653,9 +653,12 @@ explicit instruction.
 
 #### Variable glossary
 
-- **`R` / `tailFoldWidth`** — radius for ALL exit-tail geometry; set to `stripVisibleWidth`
-  (the installed folded-edge offset). Same value used for the arc radius and the strip-width
-  edge length Tr→Tf. Do not use `stripCutWidth / 2` here.
+- **`easeArcRadius`** — set to `stripVisibleWidth` (installed folded-edge offset, accounting
+  for cord wrap). Used for: the on-panel folded-edge offset (`innerSides`), the B→A2 radius,
+  the B→A1 radius, the 55° arc radius, and the `stripStroke` visual width. This is `R` inside
+  `computeExitTail`. Do NOT revert to `stripCutWidth / 2` for these.
+- **`tailFoldWidth`** — set to `stripCutWidth / 2`. Used ONLY for the physical end-cap edge
+  Se (Tr→Tf). Do not use this for the arc geometry or the visible strip width.
 - **`Fi`** — folded-edge exit point, ON the panel cut edge, at exactly `1.5×SA + easeOff`
   arc-distance from the failed corner. This is the anchor for all other points.
 - **`B`** — notch / bend point, ON the panel cut edge, placed `notchBack = R / sin(55°)`
@@ -666,19 +669,23 @@ explicit instruction.
   A2 toward the failed corner. `turnSign` is derived from `cross(dirA2, cutTanTowardCorner)`.
 - **`exitDir`** — `unitV(Fi − A1)`; the folded-edge exit direction from the arc into the tail.
 - **`Tf`** — folded-edge tail tip; `Fi + exitDir × EXIT_OVERSHOOT` (past the cut edge).
-- **`Tr`** — raw-edge tail tip; `Tf + (−dirA1) × R`. Tr→Tf is parallel to B→A1 and
-  exactly one `R` long. This is the short end cap Se of the strip.
+- **`Tr`** — raw-edge tail tip; `Tf + (−dirA1) × tailFoldWidth`. Tr→Tf is parallel to B→A1
+  and exactly `tailFoldWidth` (`stripCutWidth / 2`) long. This is the short end cap Se.
 - **`C`** — cord endpoint only; found by `linePathIntersectInfo(B, dirA2, cordPath)` —
   a ray from B in the B→A2 direction (= nIn) intersected with the cord centerline path.
   Fallback: `closestPathPointToLineInfo`. C is NOT on the folded-edge arc and must
   never be placed on the folded-edge path.
-- **`Se`** — short end cap edge: Tr → Tf. Parallel to B→A1. Exactly R in length.
+- **`Se`** — short end cap edge: Tr → Tf. Parallel to B→A1. Exactly `tailFoldWidth` long.
 
 #### Geometry rules (binding — do not change without instruction)
 
-1. **R basis** — `tailFoldWidth = stripVisibleWidth`. The folded-edge offset and the
-   failed-corner arc radius use the same value, which eliminates the bump/mismatch
-   that appeared when they differed.
+1. **Width split** — two named values govern different parts of the geometry:
+   - `easeArcRadius = stripVisibleWidth` — visible piping strip offset, 55° arc radius, B→A2,
+     B→A1. Uses the installed/folded-edge width so the on-panel strip reflects the real
+     installed appearance and the arc geometry is consistent with it.
+   - `tailFoldWidth = stripCutWidth / 2` — physical half-width of the flat cut strip, used
+     ONLY for the Se end cap: `Tr = Tf + (−dirA1) × tailFoldWidth`.
+   Do NOT revert `easeArcRadius` or `stripStroke` to `stripCutWidth / 2`.
 2. **B placement** — `notchBack = R / sin(55°)`, not just R. This ensures A1 lands
    on a tangent line that passes cleanly through Fi.
 3. **Arc** — true circular arc A2 → A1, center B, radius R. SVG `A` command with
@@ -687,8 +694,8 @@ explicit instruction.
 4. **Arc direction** — 55° TOWARD the failed corner (`turnSign` from `dirA2 × cutTanTowardCorner`).
 5. **Tf and Tr** — both use `exitDir = unitV(Fi − A1)`, not `nOut`. The tail follows
    the actual A1→Fi exit angle, not a perpendicular outward direction.
-6. **Se (Tr→Tf)** — parallel to B→A1, length R. Se is the strip's short end edge and
-   must always be visible in the SVG.
+6. **Se (Tr→Tf)** — parallel to B→A1, length `tailFoldWidth` (`stripCutWidth / 2`). Se is
+   the strip's short end edge and must always be visible in the SVG.
 7. **Cord** — the cord stays on its own cord centerline path. C is found by intersecting
    the B→A2 construction line with `cordSides[side]`. C is the cord endpoint only;
    the cord never routes through A1, A2, Tf, or any point on the folded-edge arc.
