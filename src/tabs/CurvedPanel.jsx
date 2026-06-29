@@ -2,14 +2,13 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   buildCurvedPanelModel,
-  fmtIn as cpFmtIn, fmtDec as cpFmtDec, ptsToPath as cpPtsToPath,
+  fmtIn as cpFmtIn, ptsToPath as cpPtsToPath,
   markDetails as cpMarkDetails,
 } from "../curved-panel-core.js";
 import { isMetric, fmtCm, setCurrentUnit } from "../utils/formatting.js";
 import { DEFAULT_SA } from "../utils/constants.js";
 import {
-  CP_TILE_W, CP_TILE_H,
-  cpTilePlan, cpTileLabel, cpRowLabel, cpTestSquareSVG, cpRegistrationMarks,
+  cpTilePlan, cpTileLabel,
 } from "../utils/print-utils.js";
 import PrintButton from "../components/PrintButton.jsx";
 import FracInput, { VINYL_FRACS } from "../components/FracInput.jsx";
@@ -20,22 +19,20 @@ import {
   W_EASING_CLIP, W_EASING_NOTCH,
   DASH_SEW, DASH_STAB, DASH_CENTER,
   MIDPOINT_R, TRIANGLE_BASE, TRIANGLE_HEIGHT,
-  GHOST_OPACITY, GHOST_WEIGHT, GHOST_OFFSET,
-  FILL_OPACITY_SCREEN, STRIP_PAD,
+  GHOST_OPACITY, GHOST_WEIGHT,
+  FILL_OPACITY_SCREEN,
 } from "../diagramTokens.js";
 import { offsetSidePaths, joinAllSides } from "../geometryOffset.js";
 import {
-  cpStabilizerPoints, cpOffsetInwardMiter, cpInsetClosedPoints,
-  cpHasSelfCross, cpPtsBB, stabSVGElement,
+  cpStabilizerPoints, cpPtsBB, stabSVGElement,
 } from "../stabilizer.js";
 import {
-  cpSquareMark, cpDiamondMark, cpTriangleMark, cpPerpTick,
-  cpTriangleH, cpTriangleV, drawPurseFeetMarks,
+  drawPurseFeetMarks,
 } from "../diagramMarks.js";
 import { calcPurseFeet } from "../purseFeet.js";
 import {
   cpPrintDoc, cpPrintPanel, cpPrintStabilizer, cpPrintSides, cpPrintGusset,
-  cpDrawStrip, cpDrawTaperedStrip, cpPiecePrintWidth,
+  cpPiecePrintWidth,
 } from "../printRenderers.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -55,7 +52,6 @@ const CP = {
 // Unit-aware display formatting: cm in metric mode, fractional inches otherwise.
 // (Pattern tiles are 1:1 physical drawings and unaffected; only labels change.)
 function cpFmt(v){ return isMetric() ? fmtCm(v) : cpFmtIn(v); }
-function cpFmtD(v){ return isMetric() ? fmtCm(v) : cpFmtDec(v); }
 
 /* 1/16" precision formatter — used only in the perimeter block.
    Curves/tapers are the only context where sub-1/8" differences matter,
@@ -104,7 +100,6 @@ function cpLineIntersect(a1,a2,b1,b2){
 }
 function cpDist(a,b){return Math.hypot((b?.x||0)-(a?.x||0),(b?.y||0)-(a?.y||0));}
 function cpPathLen(pts){let l=0;for(let i=1;i<(pts?.length||0);i++)l+=cpDist(pts[i-1],pts[i]);return l;}
-function cpUnit(x,y){const l=Math.hypot(x,y)||1e-9;return {x:x/l,y:y/l};}
 function cpLineDirIntersect(p1,d1,p2,d2){
   const den=d1.x*d2.y-d1.y*d2.x;
   if(Math.abs(den)<1e-9)return null;
@@ -441,22 +436,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       let cd=`M ${pt(cordPts[0])}`;
       for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
       svg+=`<path class="cp-piping-cord" data-piece="${pieceId}" d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-    }
-    function rayPathIntersect(origin,dir,path){
-      // Returns the point where the ray (origin + t*dir, t > 0) first intersects the polyline,
-      // or null if no positive-t intersection exists.
-      let best=null,bestT=Infinity;
-      for(let i=0;i<path.length-1;i++){
-        const a=path[i],b=path[i+1];
-        const ex=b.x-a.x,ey=b.y-a.y;
-        const denom=dir.x*ey-dir.y*ex;
-        if(Math.abs(denom)<1e-10)continue; // parallel
-        const fx=origin.x-a.x,fy=origin.y-a.y;
-        const t=(fx*ey-fy*ex)/denom;
-        const s=(fx*dir.y-fy*dir.x)/denom;
-        if(t>1e-6&&s>=-1e-6&&s<=1+1e-6&&t<bestT){bestT=t;best={x:a.x+s*ex,y:a.y+s*ey};}
-      }
-      return best;
     }
     function linePathIntersectInfo(origin,dir,path,maxT=null){
       // Same intersection idea as rayPathIntersect(), but returns a point that is
@@ -1204,20 +1183,6 @@ function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOf
   return strips;
 }
 
-/* Display formatter for small fractions (vinyl/cord thickness).
-   Shows in mm in metric mode since 1/32" = 0.8 mm is clearer than 0.08 cm.
-   Imperial: lookup table for common 64th-fraction values, fallback to N/64". */
-const _FM64={[0]:"0",[1/64]:"1/64",[1/32]:"1/32",[3/64]:"3/64",
-  [1/16]:"1/16",[3/32]:"3/32",[1/8]:"1/8",[3/16]:"3/16",[1/4]:"1/4"};
-function cpFmtVinyl(v){
-  if(isMetric()){const mm=Math.round(v*25.4*10)/10;return `${mm} mm`;}
-  if(!v||v<=0)return `0"`;
-  for(const[n,s]of Object.entries(_FM64)){if(Math.abs(v-Number(n))<5e-4)return `${s}"`;}
-  const r=Math.round(v*64),whole=Math.floor(r/64),rem=r%64;
-  if(whole===0)return `${rem}/64"`;
-  if(rem===0)return `${whole}"`;
-  return `${whole}-${rem}/64"`;
-}
 
 /* Closed-loop piping — activated when all four corners pass the radius check.
    Two calculation methods: geometric (sewline-based) and snug-fit (empirical).
