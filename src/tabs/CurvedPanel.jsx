@@ -30,8 +30,9 @@ import {
 } from "../stabilizer.js";
 import {
   cpSquareMark, cpDiamondMark, cpTriangleMark, cpPerpTick,
-  cpTriangleH, cpTriangleV,
+  cpTriangleH, cpTriangleV, drawPurseFeetMarks,
 } from "../diagramMarks.js";
+import { calcPurseFeet } from "../purseFeet.js";
 import {
   cpPrintDoc, cpPrintPanel, cpPrintStabilizer, cpPrintSides, cpPrintGusset,
   cpDrawStrip, cpDrawTaperedStrip, cpPiecePrintWidth,
@@ -820,6 +821,9 @@ function cpMiniStrip(cutL, cutW, label, dims, opts){
       s+=stabSVGElement('rect',`x="${stabX.toFixed(1)}" y="${stabY.toFixed(1)}" width="${stabW.toFixed(1)}" height="${stabH.toFixed(1)}"`);
     }
   }
+  if(o.purseFeet&&o.purseFeet.length){
+    s+=drawPurseFeetMarks({x0,y0:yTop,xIsW:true},o.purseFeet,{value:scale,mode:'screen'});
+  }
   if(o.topLabel){
     const ty=o.flushStart?yTop+14:yBottom-4;
     s+=`<text x="${midX.toFixed(1)}" y="${ty.toFixed(1)}" font-size="11" font-weight="800" font-family="Nunito,sans-serif" fill="${C_SEW}" text-anchor="middle">TOP</text>`;
@@ -947,7 +951,7 @@ function cpPiecePreviewDims(pc){
 }
 
 /* Sides minis + tables */
-function cpSidesHTML(m,p){
+function cpSidesHTML(m,p,pfFeet){
   const pieces=[...(m.displaySidePieces||[])].sort((a,b)=>cpPiecePreviewOrder(a)-cpPiecePreviewOrder(b));
   if(!pieces.length)return {minis:"",tables:""};
   const maxW=Math.max(...pieces.map(x=>x.cutWidthTop!==undefined?Math.max(x.cutWidthTop,x.cutWidthBottom):x.cutWidth));
@@ -961,7 +965,7 @@ function cpSidesHTML(m,p){
     const isTaper=pc.cutWidthTop!==undefined&&Math.abs(pc.cutWidthTop-pc.cutWidthBottom)>1e-9;
     const svg=isTaper
       ?cpMiniTrapezoid(pc,{ghost:pc.quantity===2,sa:p.sa,stabInset,fitScale,flushStart:pc.flushStart,flushEnd:pc.flushEnd})
-      :cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset});
+      :cpMiniStrip(pc.cutLength,pc.cutWidth,pc.label,"",{ghost:pc.quantity===2,sa:p.sa,plan:pc.plan,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,topLabel:pc.flushStart||pc.flushEnd,fitScale,stabInset,purseFeet:pc.side==="bottom"?pfFeet:null});
     cards.push({title:cpPiecePreviewTitle(pc),dims:cpPiecePreviewDims(pc),svg,cut2:pc.quantity===2});
     if(isTaper){
       const widthRow=cpProw("Width — cut",`${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} btm`,`${cpFmt(pc.finishedWidthTop)} / ${cpFmt(pc.finishedWidthBottom)}`);
@@ -1395,6 +1399,11 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const [vinylThickW,setVinylThickW]=useState(0),[vinylThickF,setVinylThickF]=useState(1/32);
   const [vinylPreset,setVinylPreset]=useState("2"); // "2" = Standard vinyl / faux leather (1/32")
   const [vinylInfoOpen,setVinylInfoOpen]=useState(false);
+  // Purse feet
+  const [pfOn,setPfOn]=useState(false);
+  const [pfCount,setPfCount]=useState(4);
+  const [pfCenter,setPfCenter]=useState(false);
+  const [pfNudge,setPfNudge]=useState(0);
   // Close vinyl info popover on click outside
   useEffect(()=>{
     if(!vinylInfoOpen)return;
@@ -1403,7 +1412,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
     return()=>document.removeEventListener("mousedown",close);
   },[vinylInfoOpen]);
   // UI state
-  const [stageOpen,setStageOpen]=useState([true,true,true,true,false,false]);
+  const [stageOpen,setStageOpen]=useState([true,true,true,true,false,false,false]);
   const [checkedRows,setCheckedRows]=useState({});
   const [showEdges,setShowEdges]=useState(false);
 
@@ -1432,7 +1441,16 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const model=buildCurvedPanelModel(params);
   const hasDepth=sideTaper?(depthTop>0&&depthBottom>0):sideDepth>0;
   const hasGusset=pieceStyle==="gusset"&&sideDepth>0;
-  const sides=cpSidesHTML(model,params),gusset=cpGussetHTML(model,params);
+  const hasPfBottom=pieceStyle==="sides"&&ready&&model.valid&&hasDepth
+    &&!!(model.displaySidePieces||[]).find(pc=>pc.side==="bottom");
+  const pfBottomPc=hasPfBottom
+    ?(model.displaySidePieces||[]).find(pc=>pc.side==="bottom")
+    :null;
+  const pfResult=pfBottomPc&&pfOn
+    ?calcPurseFeet(pfBottomPc.cutLength,pfBottomPc.cutWidth,sa,pfCount,pfCenter,pfNudge)
+    :null;
+  const pfFeet=pfResult&&!pfResult.error?pfResult.feet:[];
+  const sides=cpSidesHTML(model,params,pfOn?pfFeet:null),gusset=cpGussetHTML(model,params);
   const active=model.activeSew;
   // Panel shape has curves/softness → pattern required to cut accurately
   const hasPanelCurves=ready&&model.valid&&(
@@ -2114,6 +2132,54 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
               )}
             </div>
 
+            {/* Stage 7: Purse Feet (optional — only when sides mode has a bottom strip) */}
+            {hasPfBottom&&(
+              <div className="cp-stage">
+                <StageHeader num={7} title="Purse Feet" summary={pfOn?`${pfCount} feet${pfCenter?" + center":""}`:"Off"} open={stageOpen[6]} onToggle={()=>toggleStage(6)} optional={!pfOn}/>
+                {stageOpen[6]&&(
+                  <div className="cp-stage-body">
+                    <label className="cp-check" style={{marginBottom:10}}>
+                      <input type="checkbox" checked={pfOn} onChange={e=>setPfOn(e.target.checked)}/>
+                      Add purse feet
+                    </label>
+                    <div style={{opacity:pfOn?1:0.35,pointerEvents:pfOn?"auto":"none"}}>
+                      <div className="cp-stage-input-group">
+                        <div className="cp-stage-input-label">Foot count</div>
+                        <div className="cp-fi">
+                          <select value={pfCount} onChange={e=>setPfCount(Number(e.target.value))}>
+                            {[2,4,6,8].map(n=><option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <label className="cp-check">
+                        <input type="checkbox" checked={pfCenter} onChange={e=>setPfCenter(e.target.checked)}/>
+                        Center foot
+                      </label>
+                      <div className="cp-stage-input-group">
+                        <div className="cp-stage-input-label">Move feet inward</div>
+                        <div className="cp-fi">
+                          <select value={pfNudge} onChange={e=>setPfNudge(Number(e.target.value))}>
+                            {Array.from({length:9},(_,i)=>i/8).map(v=>(
+                              <option key={v} value={v}>{v===0?"0":cpFmt(v)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {pfResult&&pfResult.error&&(
+                        <p className="cp-stage-hint" style={{color:"#b00020",fontWeight:700}}>{pfResult.error}</p>
+                      )}
+                      {pfFeet.length>0&&pfFeet.map((f,i)=>(
+                        <p key={i} className="cp-stage-hint">{`Foot ${i+1}: ${cpFmt(f.x)} from left · ${cpFmt(f.y)} from top`}</p>
+                      ))}
+                    </div>
+                    {pfOn&&(
+                      <p className="cp-stage-hint" style={{fontStyle:"italic",marginTop:10}}>When adding purse feet, it is recommended to add Decovil Light/Heavy or foam between the feet and the wrong side of the exterior fabric. After installation, cover the back of each foot with interfacing or a small piece of duct tape.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Scroll spacer — keeps sticky diagram visible when bottom
                 stages are open. Always keep this as the last element. */}
             <div style={{ height: 600, flexShrink: 0, background: "#ffffff" }} aria-hidden="true" />
@@ -2302,7 +2368,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
               <div className="cp-print-card-new">
                 <div className="cp-print-card-title">Sides &amp; bottom</div>
                 <div className="cp-print-card-meta">{sidePlan?cpTileLabel(sidePlan):"Add finished side depth"}</div>
-                <PrintButton tone="cp" small label="Print sides & bottom" meta={sidePlan?cpTileLabel(sidePlan):"—"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params)}/>
+                <PrintButton tone="cp" small label="Print sides & bottom" meta={sidePlan?cpTileLabel(sidePlan):"—"} disabled={!model.valid||!hasDepth||!sidePlan} onClick={()=>cpPrintSides(model,params,pfFeet)}/>
               </div>
             )}
             {pieceStyle==="gusset"&&(

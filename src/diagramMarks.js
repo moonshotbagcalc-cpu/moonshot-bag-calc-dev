@@ -8,7 +8,8 @@
    systems and would require new wrappers (beyond pure relocation).
    Flagged for a future pass.
    ===================================================================== */
-import { C_SEW, C_MIDPOINT } from './diagramTokens.js';
+import { C_SEW, C_MIDPOINT, W_SEW } from './diagramTokens.js';
+import { FOOT_RADIUS_IN } from './purseFeet.js';
 
 /* C_BORDER_MARK is the print-doc tile border; cpSquareMark uses it (pre-existing
    deviation from diagram standard — should be catColor but not changed here). */
@@ -63,4 +64,38 @@ export function cpTriangleV(px, py, inward, catColor = "#5a2da0"){
   const bT = py - base/2, bB = py + base/2;
   const apex = px + inward * ht;
   return `<polygon points="${px.toFixed(4)},${bT.toFixed(4)} ${px.toFixed(4)},${bB.toFixed(4)} ${apex.toFixed(4)},${py.toFixed(4)}" fill="${catColor}" stroke="none"/>`;
+}
+
+/**
+ * SVG fragment for purse-feet marks overlaid on a panel diagram.
+ * Returns a bare SVG string — concatenate into the parent SVG before </svg>.
+ *
+ * ctx:
+ *   x0    — SVG x of the panel's top-left cut corner
+ *   y0    — SVG y of the panel's top-left cut corner
+ *   xIsW  — when true, panel W maps to SVG x and L maps to SVG y
+ *            (use for cpMiniStrip, which renders strips vertically)
+ *            default false: L→x, W→y (for horizontal print strips)
+ *
+ * feet  — [{x, y}] in panel inches, origin at cut-edge top-left
+ *
+ * scale:
+ *   value — coordinate multiplier (px/in for screen, 1.0 for print)
+ *   mode  — 'screen' | 'print' — selects stroke weight
+ */
+export function drawPurseFeetMarks(ctx, feet, scale) {
+  if (!feet || !feet.length) return '';
+  const { x0 = 0, y0 = 0, xIsW = false } = ctx;
+  const { value: sv, mode } = scale;
+  const r  = FOOT_RADIUS_IN * sv;
+  const sw = mode === 'print' ? 0.022 : W_SEW;
+  let s = '';
+  for (const f of feet) {
+    const cx = x0 + (xIsW ? f.y : f.x) * sv;
+    const cy = y0 + (xIsW ? f.x : f.y) * sv;
+    s += `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="none" stroke="${C_SEW}" stroke-width="${sw}"/>`;
+    s += `<line x1="${(cx - r*1.25).toFixed(2)}" y1="${cy.toFixed(2)}" x2="${(cx + r*1.25).toFixed(2)}" y2="${cy.toFixed(2)}" stroke="${C_SEW}" stroke-width="${sw}"/>`;
+    s += `<line x1="${cx.toFixed(2)}" y1="${(cy - r*1.25).toFixed(2)}" x2="${cx.toFixed(2)}" y2="${(cy + r*1.25).toFixed(2)}" stroke="${C_SEW}" stroke-width="${sw}"/>`;
+  }
+  return s;
 }

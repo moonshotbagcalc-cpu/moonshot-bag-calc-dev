@@ -10,7 +10,7 @@ import {
 import { C_SEW, C_CENTER, C_STAB, C_EASING, C_MIDPOINT, CAT_BAG_STRUCTURES, FILL_OPACITY_PRINT } from './diagramTokens.js';
 import {
   cpSquareMark, cpDiamondMark, cpMidpointMark, cpTriangleMark, cpPerpTick,
-  cpTriangleH, cpTriangleV,
+  cpTriangleH, cpTriangleV, drawPurseFeetMarks,
 } from './diagramMarks.js';
 import { cpStabilizerPoints, cpPtsBB } from './stabilizer.js';
 import {
@@ -249,7 +249,7 @@ export function cpPrintStabilizer(m,p){
 }
 
 /* ---- PRINT: SIDE PANELS ---- */
-export function cpPrintSides(m,p){
+export function cpPrintSides(m,p,pfFeet=[]){
   if(!m.valid||!m.displaySidePieces?.length)return;
   const PADIN=.4,GAP=.55;
   const pieces=m.displaySidePieces;
@@ -267,6 +267,9 @@ export function cpPrintSides(m,p){
       detailRows.push([pc.label,`cut ${cpFmt(pc.cutLength)} × ${cpFmt(pc.cutWidthTop)} top / ${cpFmt(pc.cutWidthBottom)} bottom · sewline run ${cpFmt(pc.runLength)}`]);
     }else{
       geom+=cpDrawStrip({x0:PADIN,y0:y,cutL:pc.cutLength,w:pieceW,sa:p.sa,flushStart:pc.flushStart,flushEnd:pc.flushEnd,runLen:pc.runLength,plan:pc.plan,landmarks:pc.landmarks,label:pc.label});
+      if(pfFeet&&pfFeet.length&&pc.side==="bottom"){
+        geom+=drawPurseFeetMarks({x0:PADIN,y0:y,xIsW:false},pfFeet,{value:1,mode:'print'});
+      }
       detailRows.push([pc.label,`cut ${cpFmt(pc.cutLength)} × ${cpFmt(pieceW)} · sewline run ${cpFmt(pc.runLength)}`]);
     }
     maxL=Math.max(maxL,pc.cutLength);y+=pieceW+GAP;
