@@ -644,35 +644,77 @@ If any box fails, the pass is not done — fix before reporting back.
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
-### Piping Exit Tail Geometry (CurvedPanel) — implemented, do not re-derive
+### Piping Exit Tail Geometry (CurvedPanel) — approved, do not re-derive
 
-The exit tail geometry for failing piping corners is fully specced and implemented
-in `cpPanelDiagramSVG()` inside `src/tabs/CurvedPanel.jsx`. Do not re-derive or
-simplify this geometry without explicit instruction.
+The exit tail geometry for failing piping corners is implemented in `computeExitTail()`
+and `drawStripRun()` inside `cpPanelDiagramSVG()` in `src/tabs/CurvedPanel.jsx`.
+This geometry is approved. Do not redesign, re-derive, or simplify it without
+explicit instruction.
 
-Key points and variable names:
-- **Fi** — fold edge crossing point at 1.5×SA from corner (= inner trim point)
-- **Tf** — fold edge tail tip (EXIT_OVERSHOOT past Fi along t_exit)
-- **B / Fo** — raw edge bend point; ray-intersection of exit ray (offset outward by
-  tailFoldWidth) with the cut edge path
-- **A2** — arc start = Fi = F_inner; where fold edge begins curving away from normal run
-- **A1** — arc end; where the fold edge rejoins a straight exit direction; on the fold
-  edge exit line. A1 is NOT the same as C.
-- **C** — cord endpoint only; located on line A2→B where it intersects the cord
-  centerline. C is distinct from A1.
-- **Tr** — raw edge tail tip = B + nIn × tailFoldWidth (90° inward turn at B)
-- **Se** — short end line; Tr → Tf, closed implicitly by polygon Z
+#### Variable glossary
 
-Fold edge path: normal run → A2 (= Fi) → 55° arc → A1 → straight exit segment → Tf
+- **`R` / `tailFoldWidth`** — radius for ALL exit-tail geometry; set to `stripVisibleWidth`
+  (the installed folded-edge offset). Same value used for the arc radius and the strip-width
+  edge length Tr→Tf. Do not use `stripCutWidth / 2` here.
+- **`Fi`** — folded-edge exit point, ON the panel cut edge, at exactly `1.5×SA + easeOff`
+  arc-distance from the failed corner. This is the anchor for all other points.
+- **`B`** — notch / bend point, ON the panel cut edge, placed `notchBack = R / sin(55°)`
+  behind Fi toward the normal run. B is the center of the 55° folded-edge ease arc.
+  The physical strip notch marker is placed at or near B.
+- **`A2`** — arc start; `B + nIn × R` (one radius inward from B, on the folded-edge path).
+- **`A1`** — arc end; `B + rotate(nIn, 55° TOWARD corner) × R`. The arc sweeps 55° from
+  A2 toward the failed corner. `turnSign` is derived from `cross(dirA2, cutTanTowardCorner)`.
+- **`exitDir`** — `unitV(Fi − A1)`; the folded-edge exit direction from the arc into the tail.
+- **`Tf`** — folded-edge tail tip; `Fi + exitDir × EXIT_OVERSHOOT` (past the cut edge).
+- **`Tr`** — raw-edge tail tip; `Tf + (−dirA1) × R`. Tr→Tf is parallel to B→A1 and
+  exactly one `R` long. This is the short end cap Se of the strip.
+- **`C`** — cord endpoint only; found by `linePathIntersectInfo(B, dirA2, cordPath)` —
+  a ray from B in the B→A2 direction (= nIn) intersected with the cord centerline path.
+  Fallback: `closestPathPointToLineInfo`. C is NOT on the folded-edge arc and must
+  never be placed on the folded-edge path.
+- **`Se`** — short end cap edge: Tr → Tf. Parallel to B→A1. Exactly R in length.
 
-Arc: true circular arc, SVG `A` command. Radius = chord(Fi, A1) / (2 × sin(27.5°)).
-Sweep direction derived from cross product of cutTanTowardCorner × nOut in model space.
+#### Geometry rules (binding — do not change without instruction)
 
-Polygon walk (startFail): M Tr → L B → L outer[0] → [run] → [inner reversed] →
-Arc(Fi→A1) → L Tf → Z (Se closes Tf→Tr).
+1. **R basis** — `tailFoldWidth = stripVisibleWidth`. The folded-edge offset and the
+   failed-corner arc radius use the same value, which eliminates the bump/mismatch
+   that appeared when they differed.
+2. **B placement** — `notchBack = R / sin(55°)`, not just R. This ensures A1 lands
+   on a tangent line that passes cleanly through Fi.
+3. **Arc** — true circular arc A2 → A1, center B, radius R. SVG `A` command with
+   radius scaled to screen pixels (`R * scale`), not model inches. Arc is always ≤ 90°
+   so large-arc flag is always 0.
+4. **Arc direction** — 55° TOWARD the failed corner (`turnSign` from `dirA2 × cutTanTowardCorner`).
+5. **Tf and Tr** — both use `exitDir = unitV(Fi − A1)`, not `nOut`. The tail follows
+   the actual A1→Fi exit angle, not a perpendicular outward direction.
+6. **Se (Tr→Tf)** — parallel to B→A1, length R. Se is the strip's short end edge and
+   must always be visible in the SVG.
+7. **Cord** — the cord stays on its own cord centerline path. C is found by intersecting
+   the B→A2 construction line with `cordSides[side]`. C is the cord endpoint only;
+   the cord never routes through A1, A2, Tf, or any point on the folded-edge arc.
+8. **Two-pass trim in `drawStripRun`** — first trim to Fi (`exitOffset = 1.5×SA + easeOff`)
+   to locate the fold-exit point; then trim further by `notchBack` to get the B station
+   where the raw and folded edges terminate in the diagram. The cord uses a separate
+   trim distance (`cordDist`) returned by `computeExitTail`.
+9. **`cpPipingStraightStrips` trim** — the displayed cut length subtracts `exitTailBack =
+   (stripWidth/2) / sin(55°)` per failing end (in addition to `1.5×SA + easeOff`) so the
+   diagram cut length and the measurements table agree.
+10. **easeOff default** — 0. Base exit = 1.5×SA. Total exit offset = 1.5×SA + easeOff.
 
-C is the cord endpoint only — cord terminates at C (on line A2→B), does not continue to Tf.
-easeOff default = 0; base exit offset = 1.5×SA. tailFoldWidth = stripCutWidth / 2.
+#### Folded-edge path (per strip run)
+
+```
+normal folded-edge run → A2 → [55° arc centered at B] → A1 → exitDir → Fi → Tf
+```
+
+#### Polygon walk
+
+**startFail:** `M Tr → L B → L outer[0](Fi) → [cut-edge run] → [close/endFail] →
+[reversed inner run] → Arc(A2→A1) → L Fi → L Tf → Z`
+(Z closes Se: Tf → Tr)
+
+**endFail:** `[cut-edge run] → L B → L Tr → L Tf → L Fi → L A1 →
+Arc reversed(A1→A2) → [reversed inner run] → Z`
 
 ---
 

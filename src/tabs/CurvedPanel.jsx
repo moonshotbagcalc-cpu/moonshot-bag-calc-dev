@@ -179,7 +179,9 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       SA+D+2*CORD_STAY_AWAY,
       pipOpts.stripWidth || cpPipingStripWidth(D,pipOpts.vinyl||0,SA).recommended
     );
-    const stripVisibleWidth=cpPipingInstalledFoldWidth(stripCutWidth,D,pipOpts.vinyl||0,SA);
+    // The on-panel folded-edge offset is the visible half-width of the folded strip.
+    // For failed-corner ease tails, this must match the arc radius: 1/2 flat cut-strip width.
+    const stripVisibleWidth=stripCutWidth/2;
 
     const innerSides=offsetSidePaths(model.cutSides,stripVisibleWidth); // folded/inner edge, installed to-scale from cut edge
     const cordSides=offsetSidePaths(model.sewSides,cordOffset);         // cord centerline, from sewline
@@ -210,9 +212,9 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     const EXIT_ANGLE_RAD    = EXIT_ANGLE_DEG * Math.PI / 180;
     // All model geometry is stored in inches; convert mm at use-time so the math stays consistent.
     const EXIT_OVERSHOOT    = isMetric() ? EXIT_OVERSHOOT_MM / 25.4 : EXIT_OVERSHOOT_IN;
-    // tailFoldWidth: half the flat cut-strip width, NO cord or vinyl correction.
-    // Correct for exit-tail geometry where the cord has already ended before point F.
-    const tailFoldWidth = stripCutWidth / 2;
+    // tailFoldWidth: half the flat cut-strip width. This is also the visible folded-edge
+    // offset used for the screen strip and the failed-corner ease-tail radius.
+    const tailFoldWidth = stripVisibleWidth;
 
     function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
     function pathSegModel(path,dS=0,dE=null){
@@ -298,16 +300,28 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       best.inward=unitV(sub(center,best.point));
       return best;
     }
-    function drawPipingEaseAwayNotch(exitPt,owningPath=null){
-      // Ease-away / strip-bend notch: outline triangle rendered AT the cut-edge exit point.
-      // Uses cutFrameOnPath for the tangent direction; position is the exit point on the cut edge.
+    function drawPipingEaseAwayNotch(exitPt,owningPath=null,shiftAwayDir=null){
+      // Ease-away / strip-bend notch: outline triangle rendered at the raw-edge bend B.
+      // When shiftAwayDir is supplied, B becomes the OUTSIDE/base edge of the notch
+      // instead of the triangle center. This keeps the drawn notch from overlapping
+      // the little exit tail and better matches the physical cut: the notch starts at B
+      // and extends back into the normal strip.
       const cordEnd=exitPt; // alias for local vector helpers that still reference cordEnd
       const f=owningPath?cutFrameOnPath(cordEnd,owningPath):nearestCutFrame(cordEnd);
-      const p=sc(cordEnd),t=unitV(f.tangent);
+      let t=unitV(f.tangent);
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       let inward=unitV(perp(t));
       if(dot(inward,sub(center,cordEnd))<0)inward=mul(inward,-1);
       const base=TRIANGLE_BASE*0.85,ht=TRIANGLE_HEIGHT*0.75;
+
+      let markCenter=cordEnd;
+      if(shiftAwayDir){
+        const sd=unitV(shiftAwayDir);
+        if(dot(t,sd)<0)t=mul(t,-1);
+        markCenter=add(cordEnd,mul(sd,(base/2+1.0)/scale));
+      }
+
+      const p=sc(markCenter);
       const b1={x:p.x-t.x*base/2,y:p.y-t.y*base/2};
       const b2={x:p.x+t.x*base/2,y:p.y+t.y*base/2};
       const apex={x:p.x+inward.x*ht,y:p.y+inward.y*ht};
@@ -440,91 +454,141 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       }
       return best;
     }
-    function computeExitTail(Fi,cutTanTowardCorner,nIn,cordPath,dbgLabel){
+    function linePathIntersectInfo(origin,dir,path,maxT=null){
+      // Same intersection idea as rayPathIntersect(), but returns a point that is
+      // guaranteed to lie on the supplied polyline plus its distance along that polyline.
+      // Used for C so the cord keeps following its own centerline instead of bending
+      // toward the folded-edge A1/A2 geometry.
+      if(!path||path.length<2)return null;
+      const u=unitV(dir);
+      let best=null,bestScore=Infinity,walk=0;
+      for(let i=0;i<path.length-1;i++){
+        const a=path[i],b=path[i+1];
+        const ex=b.x-a.x,ey=b.y-a.y,L=Math.hypot(ex,ey);
+        if(L<1e-9){continue;}
+        const denom=u.x*ey-u.y*ex;
+        if(Math.abs(denom)>1e-10){
+          const fx=origin.x-a.x,fy=origin.y-a.y;
+          const t=(fx*ey-fy*ex)/denom;
+          const segS=(fx*u.y-fy*u.x)/denom;
+          if(t>=-1e-6 && (maxT==null||t<=maxT+1e-6) && segS>=-1e-6 && segS<=1+1e-6){
+            const q={x:a.x+segS*ex,y:a.y+segS*ey};
+            const score=Math.abs(t-(maxT==null?t:Math.min(maxT,t)));
+            if(score<bestScore){bestScore=score;best={point:q,dist:walk+segS*L,t};}
+          }
+        }
+        walk+=L;
+      }
+      return best;
+    }
+    function closestPathPointToLineInfo(origin,dir,path){
+      // Fallback only: choose the point on the cord path nearest the B→A1 construction line.
+      // This still keeps C on the cord path, unlike the old fallback that placed C near A2.
+      if(!path||path.length<2)return null;
+      const u=unitV(dir);
+      const n=perp(u);
+      let best=null,bestD=Infinity,walk=0;
+      for(let i=0;i<path.length-1;i++){
+        const a=path[i],b=path[i+1];
+        const ab=sub(b,a),L=len(ab);
+        if(L<1e-9){continue;}
+        // Minimize signed distance to the infinite line origin + t*u over this segment.
+        const da=dot(sub(a,origin),n),db=dot(sub(b,origin),n);
+        let s=0;
+        if(Math.abs(da-db)>1e-10)s=Math.max(0,Math.min(1,da/(da-db)));
+        else s=0;
+        const q=add(a,mul(ab,s));
+        const d=Math.abs(dot(sub(q,origin),n));
+        if(d<bestD){bestD=d;best={point:q,dist:walk+s*L};}
+        walk+=L;
+      }
+      return best;
+    }
+    function computeExitTail(Fi,cutTanTowardCorner,nIn,cordPath){
       // Exit-tail geometry. All coords in inches.
       //
-      // Fi                 = fold-edge exit point, ON the panel cut edge (trim at 1.5×SA+easeOff)
-      // cutTanTowardCorner = unit tangent along cut edge pointing TOWARD the corner
-      // nIn                = inward normal at Fi (toward panel center)
-      // cordPath           = cord centerline path for the owning side (cordSides[side])
-      // dbgLabel           = optional string — when set, logs A1/Fi/exitDir to console
+      // Fi                 = folded-edge exit point ON the panel cut edge
+      //                      (trim point at 1.5×SA + easeOff from the failed corner)
+      // cutTanTowardCorner = unit tangent along the cut edge pointing TOWARD the failed corner
+      // nIn                = inward normal at Fi, toward panel center
+      // cordPath           = owning side's cord centerline path (cordSides[side])
       //
-      // Returns: { Fi, Tf, B, A2, A1, Tr, C, R_arc, sweep_natural }
-      //   Fi        — fold edge exit point, ON cut edge
-      //   B         — notch/bend point: ON cut edge, halfStripWidth from Fi toward normal run
-      //   A2        — arc start: ON fold edge, B + nIn×R
-      //   A1        — arc end: B + rotate(nIn, 55° away from corner)×R
-      //   exitDir   — unit direction A1→Fi (fold edge exits at 55° angle, not straight outward)
-      //   Tf        — fold edge tail tip: Fi + exitDir×EXIT_OVERSHOOT
-      //   Tr        — raw edge tail tip: B + exitDir×EXIT_OVERSHOOT (keeps Se parallel)
-      //   C         — cord endpoint: intersection of A2→B with cord centerline
-      //   R_arc     — arc radius = halfStripWidth
-      //   sweep_natural — SVG sweep-flag for arc A2→A1 (reversed = 1-this)
+      // Critical geometry:
+      //   B is the notch/bend point ON the cut edge.
+      //   A2 is the start of the folded-edge easing arc.
+      //   A1 is the end of that folded-edge easing arc.
+      //   B→A2 and B→A1 are both exactly half the flat piping-strip width.
+      //   The folded-edge arc A2→A1 is exactly 55°, centered at B.
+      //   C is the cord endpoint on the B→A2 construction line, but C stays on the cord centerline.
+      //   C is NOT on the folded-edge arc and must never pull the cord onto the folded-edge path.
+      //
+      // Returns: { Fi, Tf, B, A2, A1, Tr, C, cordDist, R_arc, sweep_natural }
 
-      const nOut=mul(nIn,-1);
-      const R=tailFoldWidth; // halfStripWidth = stripCutWidth/2
-      const tangentAway=mul(cutTanTowardCorner,-1);
+      const R=tailFoldWidth; // halfStripWidth = stripCutWidth / 2
+      const tangentAway=mul(cutTanTowardCorner,-1); // along the cut edge, back into the normal run
+      const sin55=Math.sin(EXIT_ANGLE_RAD);
+      const cos55=Math.cos(EXIT_ANGLE_RAD);
 
-      // B: on cut edge, halfStripWidth from Fi toward normal run.
-      const B=add(Fi,mul(tangentAway,R));
+      // B must be placed so the 55° radius endpoint A1 lands on a tangent line
+      // that continues cleanly through Fi.  Using only R here creates a 90° corner.
+      const notchBack=Math.max(R, R / Math.max(sin55,1e-9));
+      const B=add(Fi,mul(tangentAway,notchBack));
 
-      // A2: fold edge arc-start, inward from B by halfStripWidth.
-      const A2=add(B,mul(nIn,R));
+      // A2: start of folded-edge easing arc, on the half-strip-width radius from B.
+      const dirA2=unitV(nIn);
+      const A2=add(B,mul(dirA2,R));
 
-      // A1: rotate B→A2 direction (= nIn) by 55° away from the failing corner.
-      // "Away from corner" = toward tangentAway. cross(nIn, tangentAway) gives rotation sign.
-      const cross=nIn.x*tangentAway.y-nIn.y*tangentAway.x;
-      const s=cross>=0?1:-1; // +1 CCW in model, -1 CW in model
-      const cos55=Math.cos(EXIT_ANGLE_RAD),sin55=Math.sin(EXIT_ANGLE_RAD);
-      const dirA1={
-        x:nIn.x*cos55-s*nIn.y*sin55,
-        y:s*nIn.x*sin55+nIn.y*cos55,
-      };
+      // A1: end of folded-edge easing arc. Rotate B→A2 by 55° TOWARD the failed corner.
+      const turnSign=(dirA2.x*cutTanTowardCorner.y-dirA2.y*cutTanTowardCorner.x)>=0?1:-1;
+      const dirA1=unitV({
+        x:dirA2.x*cos55-turnSign*dirA2.y*sin55,
+        y:turnSign*dirA2.x*sin55+dirA2.y*cos55,
+      });
       const A1=add(B,mul(dirA1,R));
 
-      // exitDir: the A1→Fi direction — the fold edge exits at the 55° angle, not straight outward.
+      // Folded edge leaves A1 as a straight tangent segment through Fi and then Tf.
       const exitDir=unitV(sub(Fi,A1));
-
-      // Tf and Tr: both extend EXIT_OVERSHOOT along exitDir (keeps Se parallel to A1→Fi line).
       const Tf=add(Fi,mul(exitDir,EXIT_OVERSHOOT));
-      const Tr=add(B,mul(exitDir,EXIT_OVERSHOOT));
 
-      // C: intersection of segment A2→B with cord centerline.
-      // Ray from A2 toward B; must be within segment length R.
-      const dirA2toB=unitV(sub(B,A2));
-      let C=add(A2,mul(dirA2toB,D/2));
+      // Se / end cap styling rule:
+      // The short trim edge Tr→Tf is the strip-width edge. It should be perpendicular
+      // to the exiting long strip edges and parallel to the B→A1 radius line.
+      // Anchor Tf on the folded-edge overshoot, then place Tr exactly one
+      // half-strip-width away along -B→A1.
+      const Tr=add(Tf,mul(dirA1,-R));
+
+      // C: cord endpoint. It is inline with the B→A2 construction/radius line,
+      // which is perpendicular to the local panel cut edge at B. This matches the
+      // notch rule: the outside corner of the strip notch determines the cord end
+      // by projecting inward from B, while the cord itself stays on its own path.
+      // A1 belongs to the folded-strip easing arc; C does not.
+      const dirBtoC=dirA2;
+      let cInfo=null;
       if(cordPath&&cordPath.length>=2){
-        const hit=rayPathIntersect(A2,dirA2toB,cordPath);
-        if(hit!==null&&cpDist(A2,hit)<=R+1e-6)C=hit;
+        cInfo=linePathIntersectInfo(B,dirBtoC,cordPath,R+1e-6);
+        if(!cInfo)cInfo=closestPathPointToLineInfo(B,dirBtoC,cordPath);
       }
+      const C=cInfo?.point || add(B,mul(dirBtoC,Math.max(0,R-D/2)));
+      const cordDist=Number.isFinite(cInfo?.dist)?cInfo.dist:null;
 
-      const R_arc=R;
+      const R_arc=R; // model-space radius; converted to screen units by Arc()
+      const sweep_natural=turnSign>0?1:0;
 
-      // Sweep flag: s>0 (CCW in model) → CW in screen → sweep-flag 1.
-      const sweep_natural=s>0?1:0;
-
-      if(dbgLabel){
-        console.log(`[exitTail ${dbgLabel}]`,
-          `Fi=(${Fi.x.toFixed(3)},${Fi.y.toFixed(3)})`,
-          `A1=(${A1.x.toFixed(3)},${A1.y.toFixed(3)})`,
-          `exitDir=(${exitDir.x.toFixed(3)},${exitDir.y.toFixed(3)})`,
-          `|Fi-A1|=${cpDist(Fi,A1).toFixed(4)}`
-        );
-      }
-
-      return{Fi,Tf,B,A2,A1,Tr,C,R_arc,sweep_natural};
+      return{Fi,Tf,B,A2,A1,Tr,C,cordDist,R_arc,sweep_natural,notchBack,tangentAway,dirA2,dirA1};
     }
+
     function drawStripRun(sides,startFail,endFail){
       const pieceId=++pipingPieceSerial;
       const exitOffset=1.5*SA+easeOff;
       const trimStart=startFail?exitOffset:0;
       const trimEnd=endFail?exitOffset:0;
-      const outer=runPath(model.cutSides,sides,trimStart,trimEnd);
-      const inner=runPath(innerSides,sides,trimStart,trimEnd);
-      const cord=runPath(cordSides,sides,trimStart,trimEnd);
-      if(outer.length<2||inner.length<2)return;
 
-      const startTan=tangentAt(outer,true),endTan=tangentAt(outer,false);
+      // First solve the fold-exit point Fi at the required 1.5×SA+easeOff position.
+      // Fi is not the raw-edge notch point B; B sits farther back into the normal run.
+      const outerAtFi=runPath(model.cutSides,sides,trimStart,trimEnd);
+      if(outerAtFi.length<2)return;
+
+      const startTan=tangentAt(outerAtFi,true),endTan=tangentAt(outerAtFi,false);
       const startSide=sides[0],endSide=sides[sides.length-1];
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       const inwardNormal=(tangent,point)=>{
@@ -533,31 +597,48 @@ function cpPanelDiagramSVG(model,params,pipOpts){
         return n;
       };
 
-      // Compute exit-tail geometry for each failing end.
+      // Compute exit-tail geometry from Fi.
       // At start: cutTanTowardCorner = -startTan (startTan points into the run).
-      // At end:   cutTanTowardCorner = endTan (already toward corner).
-      // JOINT_BEFORE/AFTER corner indices: TL=3, TR=0, BR=1, BL=2
-      const cornerLabelMap={0:'TR',1:'BR',2:'BL',3:'TL'};
+      // At end:   cutTanTowardCorner = endTan (already points toward the failed corner).
       let tailS=null,tailE=null;
       if(startFail){
-        const nIn=inwardNormal(startTan,outer[0]);
-        const cIdx=JOINT_BEFORE[startSide];
-        const lbl=cIdx===3?`TL(start/${startSide})`:undefined;
-        tailS=computeExitTail(outer[0],mul(startTan,-1),nIn,cordSides[startSide],lbl);
-        inner[0]=tailS.A2; // pin fold-edge start to arc-start point
+        const nIn=inwardNormal(startTan,outerAtFi[0]);
+        tailS=computeExitTail(outerAtFi[0],mul(startTan,-1),nIn,cordSides[startSide]);
       }
       if(endFail){
-        const nIn=inwardNormal(endTan,outer[outer.length-1]);
-        const cIdx=JOINT_AFTER[endSide];
-        const lbl=cIdx===3?`TL(end/${endSide})`:undefined;
-        tailE=computeExitTail(outer[outer.length-1],endTan,nIn,cordSides[endSide],lbl);
-        inner[inner.length-1]=tailE.A2;
+        const nIn=inwardNormal(endTan,outerAtFi[outerAtFi.length-1]);
+        tailE=computeExitTail(outerAtFi[outerAtFi.length-1],endTan,nIn,cordSides[endSide]);
       }
+
+      // The visible/raw cut-edge side of the strip stops at B, not at Fi.
+      // The folded edge stops at the B/A2 station. The cord is handled separately below
+      // so it can stop at C while staying on its own centerline.
+      const rawStartTrim=startFail?exitOffset+(tailS?.notchBack||0):0;
+      const rawEndTrim=endFail?exitOffset+(tailE?.notchBack||0):0;
+      const outer=runPath(model.cutSides,sides,rawStartTrim,rawEndTrim);
+      const inner=runPath(innerSides,sides,rawStartTrim,rawEndTrim);
+
+      // Cord stays on its own cord centerline. Its failed endpoint is C, so trim the
+      // cord path to C's distance along the owning cord side instead of trimming it
+      // to the strip notch B. C is on the B→A2/perpendicular construction line, not A1.
+      const startCordTrim=(startFail&&tailS&&tailS.cordDist!=null)?tailS.cordDist:rawStartTrim;
+      const endCordSideLen=endFail?pathLen(cordSides[endSide]||[]):0;
+      const endCordTrim=(endFail&&tailE&&tailE.cordDist!=null)?Math.max(0,endCordSideLen-tailE.cordDist):rawEndTrim;
+      const cord=runPath(cordSides,sides,startCordTrim,endCordTrim);
+      if(outer.length<2||inner.length<2)return;
+
+      if(startFail&&tailS)inner[0]=tailS.A2; // pin folded-edge start to the 55° arc start
+      if(endFail&&tailE)inner[inner.length-1]=tailE.A2;
 
       const cpt=p=>pt(sc(p));
       const Lp=p=>` L ${cpt(p)}`;
-      // SVG arc: A rx ry x-rot large-arc sweep-flag x y  (large-arc=0, arc is always ≤90°)
-      const Arc=(R,sf,p)=>` A ${R.toFixed(2)} ${R.toFixed(2)} 0 0 ${sf} ${cpt(p)}`;
+      // SVG arc uses screen-space coordinates, so the model-space radius must be scaled too.
+      // Without this, the browser rescales the tiny inch-radius to the endpoint chord,
+      // which makes the easing arc look huge and chord-driven instead of 55°/half-strip-width-driven.
+      const Arc=(R,sf,p)=>{
+        const rr=Math.max(0.01,R*scale);
+        return ` A ${rr.toFixed(2)} ${rr.toFixed(2)} 0 0 ${sf} ${cpt(p)}`;
+      };
 
       // ── Build polygon ──────────────────────────────────────────────────────
       // Walk: cut-edge side (with tail extension) → fold-edge side reversed (with arc exit)
@@ -575,7 +656,7 @@ function cpPanelDiagramSVG(model,params,pipOpts){
         // Fi_end → B → Tr → Tf → Fi_end → A1 → arc reversed (A1→A2)
         d+=Lp(tailE.B);                                        // Fi_end → B
         d+=Lp(tailE.Tr);                                       // B → Tr (outward)
-        d+=Lp(tailE.Tf);                                       // Se: Tr → Tf
+        d+=Lp(tailE.Tf);                                       // Se: Tr → Tf, parallel to B→A1
         d+=Lp(tailE.Fi);                                       // Tf → Fi (back to cut edge)
         d+=Lp(tailE.A1);                                       // Fi → A1 (same pt for straight edge)
         d+=Arc(tailE.R_arc,1-tailE.sweep_natural,tailE.A2);   // reversed arc A1→A2
@@ -596,15 +677,18 @@ function cpPanelDiagramSVG(model,params,pipOpts){
 
       svg+=`<g class="cp-piping-piece" data-piece="${pieceId}"><path d="${d}" fill="${C_PIPING}" fill-opacity="0.20" stroke="${C_PIPING}" stroke-width="${stripStroke}" stroke-opacity="0.70" stroke-linejoin="round" stroke-linecap="round"/></g>`;
 
-      // Cord path: terminate at C (on segment A2→B at cord-center offset).
+      // Cord path: terminate at C, but keep every segment on the cord centerline.
+      // C is on the B→A2/perpendicular construction line and also on the cord path.
       const cordPts=[...cord];
       if(startFail&&tailS&&cordPts.length>0)cordPts[0]=tailS.C;
       if(endFail&&tailE&&cordPts.length>0)cordPts[cordPts.length-1]=tailE.C;
       drawCordPath(cordPts,pieceId);
 
-      // Ease-away notch triangle at B (on cut edge, halfStripWidth from Fi)
-      if(startFail)drawPipingEaseAwayNotch(tailS.B,model.cutSides[startSide]);
-      if(endFail)drawPipingEaseAwayNotch(tailE.B,model.cutSides[endSide]);
+      // Ease-away notch triangle at B. Shift the drawn triangle slightly back into
+      // the normal strip so B is the outside/base edge of the simulated notch cut,
+      // not the center of the marker.
+      if(startFail)drawPipingEaseAwayNotch(tailS.B,model.cutSides[startSide],tailS.tangentAway);
+      if(endFail)drawPipingEaseAwayNotch(tailE.B,model.cutSides[endSide],tailE.tangentAway);
 
     }
 
@@ -1075,6 +1159,8 @@ function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOf
   }
 
   const strips=[];
+  const stripWidth=cpPipingStripWidth(cordDia,vinylThick,sa).recommended;
+  const exitTailBack=(stripWidth/2)/Math.sin(55*Math.PI/180); // B is this far behind Fi along the cut edge
   let runSides=[],totalLen=0,totalCordLen=0;
 
   for(let i=0;i<orderedSides.length;i++){
@@ -1088,8 +1174,8 @@ function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOf
 
     if(isLast||exitFails){
       const firstSide=runSides[0],lastSide=runSides[runSides.length-1];
-      const startTrim=fails(cornerResults?.[JOINT_BEFORE[firstSide]])?1.5*sa+easeOff:0;
-      const endTrim  =exitFails?1.5*sa+easeOff:0;
+      const startTrim=fails(cornerResults?.[JOINT_BEFORE[firstSide]])?1.5*sa+easeOff+exitTailBack:0;
+      const endTrim  =exitFails?1.5*sa+easeOff+exitTailBack:0;
       const effective=Math.max(0,totalLen-startTrim-endTrim);
       const cordEffective=Math.max(0,totalCordLen-startTrim-endTrim);
       if(effective>1e-9){
@@ -1100,7 +1186,7 @@ function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOf
           sewRun:totalLen,leftEase:startTrim,rightEase:endTrim,
           effectiveRun:effective,
           cutLength:effective+2*sa,
-          cutWidth:cpPipingStripWidth(cordDia,vinylThick,sa).recommended,
+          cutWidth:stripWidth,
           cordLength:cordEffective,
         });
       }
