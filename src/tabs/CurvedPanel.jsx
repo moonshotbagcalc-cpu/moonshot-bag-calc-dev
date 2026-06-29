@@ -1459,18 +1459,38 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
     ?cpPipingCornerRules(model.cutPts,model.softness.ts,model.softness.bs,topMode)
     :null;
   const pipingAllCornersPass=!!(pipingCorners&&pipingCorners.every(c=>c.allowed)&&topMode==="4side");
+
+  // easeOff clamp: total exit (1.5×SA + easeOff) cannot exceed 40% of the shortest
+  // active side arc length adjacent to any failing corner. Protects against overlap loops.
+  const _PIPING_CORNER_SIDES=[['top','right'],['right','bottom'],['bottom','left'],['left','top']];
+  let _pipingMaxEaseOff=null;
+  if(ready&&model.valid&&pipingCorners&&!pipingAllCornersPass){
+    let _minLimit=Infinity;
+    pipingCorners.forEach((c,idx)=>{
+      if(!c.allowed){
+        _PIPING_CORNER_SIDES[idx].forEach(side=>{
+          const len=(model.activeSew.runs&&model.activeSew.runs[side])||0;
+          if(len>1e-9)_minLimit=Math.min(_minLimit,Math.max(0,len*0.40-1.5*sa));
+        });
+      }
+    });
+    if(_minLimit<Infinity)_pipingMaxEaseOff=_minLimit;
+  }
+  const pipingEaseOffClamped=_pipingMaxEaseOff!==null?Math.min(pipingEaseOff,_pipingMaxEaseOff):pipingEaseOff;
+  const pipingEaseOffWarned=_pipingMaxEaseOff!==null&&pipingEaseOff>_pipingMaxEaseOff;
+
   const pipingCordRuns=ready&&model.valid&&pipingOn&&pipingCord>1e-9
     ?Object.fromEntries(Object.entries(offsetSidePaths(model.sewSides,pipingCord/2+CORD_STAY_AWAY)).map(([side,path])=>[side,cpPathLen(path)]))
     :null;
   const pipingStraightStrips=ready&&model.valid&&pipingOn&&pipingCord>1e-9&&!pipingAllCornersPass
-    ?cpPipingStraightStrips(model.activeSew.runs,pipingCordRuns,sa,pipingCord,vinylThick,pipingEaseOff,pipingCorners)
+    ?cpPipingStraightStrips(model.activeSew.runs,pipingCordRuns,sa,pipingCord,vinylThick,pipingEaseOffClamped,pipingCorners)
     :[];
   const pipingClosedLoop=pipingAllCornersPass&&pipingCord>1e-9
     ?cpPipingClosedLoop(model.cutPerim,model.activeSew.total,sa,pipingCord,vinylThick)
     :null;
 
   const pipOpts=pipingOn&&pipingCord>1e-9&&ready&&model.valid&&pipingCorners
-    ?{on:true,cord:pipingCord,vinyl:vinylThick,stripWidth:pipingStripWidth?.recommended,corners:pipingCorners,allCornersPass:pipingAllCornersPass,easeOff:pipingEaseOff}
+    ?{on:true,cord:pipingCord,vinyl:vinylThick,stripWidth:pipingStripWidth?.recommended,corners:pipingCorners,allCornersPass:pipingAllCornersPass,easeOff:pipingEaseOffClamped}
     :null;
 
   // Dynamic title
@@ -1927,238 +1947,176 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                   </label>
                   <div style={{opacity:pipingOn?1:0.35,pointerEvents:pipingOn?"auto":"none"}}>
 
-                    {/* Cord diameter + strip width result */}
+                    {/* 1. Cord diameter */}
                     <CordDiameterInput whole={pipingCordW} onWhole={setPipingCordW}
                       num={pipingCordN} onNum={setPipingCordN}
                       den={pipingCordD} onDen={setPipingCordD}
                       ghost={!pipingOn} decMode={decMode}/>
-                    {pipingStripWidth&&(
-                      <div style={{margin:"6px 0 10px"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                          <span className="cp-stage-input-label">Cord diameter</span>
-                          <span style={{fontWeight:900,fontSize:15,color:CP.ink,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingCord)}</span>
-                          <span style={{color:CP.muted}}>·</span>
-                          <span className="cp-stage-input-label">Recommended cut strip width</span>
-                          <span style={{fontWeight:900,fontSize:15,color:CP.ink,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingStripWidth.recommended)}</span>
-                        </div>
-                        <div style={{fontSize:11.5,color:CP.muted,marginTop:2,fontFamily:"Nunito,sans-serif"}}>
-                          {isMetric()
-                            ?`Calculated minimum strip width: ${(pipingStripWidth.raw*25.4).toFixed(1)} mm`
-                            :`Calculated minimum strip width: ${pipingStripWidth.raw.toFixed(3)}"`}
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Wrap material thickness + popover info */}
-                    <div style={{position:"relative"}}>
-                      <div className={"cp-field"+((!pipingOn)?" ghost":"")}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-                          <label style={{marginBottom:0}}>Wrap material thickness</label>
-                          <button
-                            onMouseDown={e=>e.stopPropagation()}
-                            onClick={()=>setVinylInfoOpen(v=>!v)}
-                            title="Material wrap thickness guide"
-                            aria-label="Material wrap thickness guide"
-                            style={{
-                              width:20,height:20,borderRadius:"50%",flexShrink:0,
-                              background:vinylInfoOpen?CP.maroon:"#ece5f8",
-                              color:vinylInfoOpen?"#fff":CP.maroon,
-                              border:`1px solid ${CP.maroon}`,
-                              fontSize:11,cursor:"pointer",display:"flex",
-                              alignItems:"center",justifyContent:"center",fontWeight:900,
-                            }}
-                          >ⓘ</button>
-                        </div>
-                        {isMetric()?(
-                          <div className="cp-fi">
-                            <input type="number" className="dec" min="0" step="0.1"
-                              value={Math.round((vinylThickW+vinylThickF)*25.4*10)/10}
-                              onChange={e=>{
-                                const in_=Math.max(0,parseFloat(e.target.value)||0)/25.4;
-                                setVinylThickW(Math.floor(in_));
-                                setVinylThickF(Math.max(0,in_-Math.floor(in_)));
-                                setVinylPreset("custom");
-                              }}
-                              onFocus={e=>e.target.select()}/>
-                            <span className="inch">mm</span>
-                          </div>
-                        ):(
-                          <>
-                            <div className="cp-fi">
-                              <select value={vinylPreset}
-                                onChange={e=>{
-                                  const v=e.target.value;
-                                  setVinylPreset(v);
-                                  if(v!=="custom"){
-                                    setVinylThickW(0);
-                                    setVinylThickF(VINYL_THICKNESS_PRESETS[parseInt(v)].v);
-                                  }
-                                }}>
-                                <optgroup label='1/64"'>
-                                  <option value="0">Plain quilting cotton</option>
-                                  <option value="1">Lightweight lining fabric</option>
-                                </optgroup>
-                                <optgroup label='1/32"'>
-                                  <option value="2">Standard vinyl / faux leather</option>
-                                  <option value="3">Cork, standard backing</option>
-                                </optgroup>
-                                <optgroup label='1/16"'>
-                                  <option value="4">Marine vinyl, standard</option>
-                                  <option value="5">Heavy canvas / duck / denim</option>
-                                </optgroup>
-                                <optgroup label='1/8"'>
-                                  <option value="6">Foam-backed vinyl</option>
-                                  <option value="7">Thick neoprene</option>
-                                </optgroup>
-                                <option value="custom">Custom — enter my own</option>
-                              </select>
-                            </div>
-                            {vinylPreset==="custom"&&(decMode?(
-                              <div className="cp-fi" style={{marginTop:4}}>
-                                <input type="number" className="dec" min="0" step="0.015625"
-                                  value={vinylThickW+vinylThickF}
-                                  onChange={e=>{
-                                    const v=Math.max(0,parseFloat(e.target.value)||0);
-                                    setVinylThickW(Math.floor(v));
-                                    setVinylThickF(Math.max(0,v-Math.floor(v)));
-                                  }}
-                                  onFocus={e=>e.target.select()}/>
-                                <span className="inch">″</span>
-                              </div>
-                            ):(
-                              <div className="cp-fi" style={{marginTop:4}}>
-                                <input type="number" min="0" step="1" value={vinylThickW}
-                                  onChange={e=>setVinylThickW(Math.max(0,parseInt(e.target.value)||0))}
-                                  onFocus={e=>e.target.select()} style={{width:52}}/>
-                                <select
-                                  value={String(Math.max(0,VINYL_FRACS.findIndex(([,v])=>Math.abs(v-vinylThickF)<0.0001)))}
-                                  onChange={e=>setVinylThickF(VINYL_FRACS[parseInt(e.target.value)][1])}>
-                                  {VINYL_FRACS.map(([lbl],i)=><option key={i} value={String(i)}>{lbl}</option>)}
-                                </select>
-                                <span className="inch">″</span>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        <p className="cp-stage-hint" style={{marginTop:5,marginBottom:0}}>These presets estimate the effective bulk added by the folded wrap material. Fabric backing, coating, interfacing, compression, and cord firmness can change the result. Test-wrap before cutting your final strip.</p>
-                      </div>
-                      {vinylInfoOpen&&(
-                        <div
+                    {/* 2. Wrap material thickness */}
+                    <div className={"cp-field"+((!pipingOn)?" ghost":"")} style={{marginTop:8}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                        <label style={{marginBottom:0}}>Wrap material thickness</label>
+                        <button
+                          className="ms-info-btn ms-info-btn--light"
                           onMouseDown={e=>e.stopPropagation()}
-                          style={{
-                            position:"absolute",top:"calc(100% + 4px)",right:0,zIndex:200,
-                            width:320,maxHeight:420,overflowY:"auto",
-                            background:CP.pinkBg,border:`1px solid ${CP.pinkLine}`,borderRadius:8,
-                            padding:"12px 14px",boxShadow:"0 4px 16px rgba(90,45,160,0.14)",
-                            fontSize:12.5,fontFamily:"Nunito,sans-serif",
-                          }}
-                        >
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                            <div style={{fontWeight:700,color:CP.ink,lineHeight:1.4}}>These are starting points — always test-wrap your cord before cutting the full length.</div>
-                            <button onClick={()=>setVinylInfoOpen(false)}
-                              style={{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:CP.muted,fontSize:14,lineHeight:1,padding:"0 2px",flexShrink:0}}
-                              aria-label="Close">✕</button>
+                          onClick={()=>setVinylInfoOpen(v=>!v)}
+                          title="Material wrap thickness guide"
+                          aria-label="Material wrap thickness guide"
+                        >i</button>
+                      </div>
+                      {isMetric()?(
+                        <div className="cp-fi">
+                          <input type="number" className="dec" min="0" step="0.1"
+                            value={Math.round((vinylThickW+vinylThickF)*25.4*10)/10}
+                            onChange={e=>{
+                              const in_=Math.max(0,parseFloat(e.target.value)||0)/25.4;
+                              setVinylThickW(Math.floor(in_));
+                              setVinylThickF(Math.max(0,in_-Math.floor(in_)));
+                              setVinylPreset("custom");
+                            }}
+                            onFocus={e=>e.target.select()}/>
+                          <span className="inch">mm</span>
+                        </div>
+                      ):(
+                        <>
+                          <div className="cp-fi">
+                            <select value={vinylPreset}
+                              onChange={e=>{
+                                const v=e.target.value;
+                                setVinylPreset(v);
+                                if(v!=="custom"){
+                                  setVinylThickW(0);
+                                  setVinylThickF(VINYL_THICKNESS_PRESETS[parseInt(v)].v);
+                                }
+                              }}>
+                              <optgroup label='1/64"'>
+                                <option value="0">Plain quilting cotton</option>
+                                <option value="1">Lightweight lining fabric</option>
+                              </optgroup>
+                              <optgroup label='1/32"'>
+                                <option value="2">Standard vinyl / faux leather</option>
+                                <option value="3">Cork, standard backing</option>
+                              </optgroup>
+                              <optgroup label='1/16"'>
+                                <option value="4">Marine vinyl, standard</option>
+                                <option value="5">Heavy canvas / duck / denim</option>
+                              </optgroup>
+                              <optgroup label='1/8"'>
+                                <option value="6">Foam-backed vinyl</option>
+                                <option value="7">Thick neoprene</option>
+                              </optgroup>
+                              <option value="custom">Custom — enter my own</option>
+                            </select>
                           </div>
-                          {[
-                            {heading:'Very thin / minimal bulk — 1/64"',items:["Lightweight lining fabric","Plain quilting cotton, not interfaced","Lightweight ripstop, about 1.1 oz","Thin nylon, poly, or technical woven"]},
-                            {heading:'Thin / common bag-making bulk — 1/32"',items:["Standard vinyl / faux leather (default)","Standard ripstop, about 1.9–2.2 oz","Quilting cotton, interfaced or laminated","Soft garment leather, lightweight","Cork fabric, thin or standard backing","Light waterproof canvas, waxed canvas, duck, denim, or twill","500D Cordura, packcloth, or coated nylon","Laminated cotton or PUL-style fabric"]},
-                            {heading:'Medium / bulky bag-making material — 1/16"',items:["Slightly thicker garment leather","Cork fabric, heavier backing","Heavy waterproof canvas, waxed canvas, duck, denim, or twill","1000D Cordura, packcloth, or coated nylon","Upholstery vinyl or marine vinyl, standard","Thin neoprene or scuba fabric","Lighter veg-tan or tooling leather"]},
-                            {heading:'Heavy / padded / low-compression material — 1/8"',items:["Foam-backed or padded upholstery/marine vinyl","Thick neoprene","Heavier veg-tan or tooling leather","Very bulky or stiff wrap material"]},
-                          ].map((sec,i)=>(
-                            <div key={i} style={{marginTop:i===0?2:8,borderTop:i===0?"none":`1px solid ${CP.pinkLine}`,paddingTop:i===0?0:8}}>
-                              <div style={{fontWeight:900,color:CP.maroon,fontSize:11,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:3}}>{sec.heading}</div>
-                              <ul style={{margin:0,paddingLeft:14,color:CP.ink,lineHeight:1.5,fontSize:12}}>
-                                {sec.items.map((item,j)=><li key={j}>{item}</li>)}
-                              </ul>
+                          {vinylPreset==="custom"&&(decMode?(
+                            <div className="cp-fi" style={{marginTop:4}}>
+                              <input type="number" className="dec" min="0" step="0.015625"
+                                value={vinylThickW+vinylThickF}
+                                onChange={e=>{
+                                  const v=Math.max(0,parseFloat(e.target.value)||0);
+                                  setVinylThickW(Math.floor(v));
+                                  setVinylThickF(Math.max(0,v-Math.floor(v)));
+                                }}
+                                onFocus={e=>e.target.select()}/>
+                              <span className="inch">″</span>
+                            </div>
+                          ):(
+                            <div className="cp-fi" style={{marginTop:4}}>
+                              <input type="number" min="0" step="1" value={vinylThickW}
+                                onChange={e=>setVinylThickW(Math.max(0,parseInt(e.target.value)||0))}
+                                onFocus={e=>e.target.select()} style={{width:52}}/>
+                              <select
+                                value={String(Math.max(0,VINYL_FRACS.findIndex(([,v])=>Math.abs(v-vinylThickF)<0.0001)))}
+                                onChange={e=>setVinylThickF(VINYL_FRACS[parseInt(e.target.value)][1])}>
+                                {VINYL_FRACS.map(([lbl],i)=><option key={i} value={String(i)}>{lbl}</option>)}
+                              </select>
+                              <span className="inch">″</span>
                             </div>
                           ))}
-                        </div>
+                        </>
                       )}
                     </div>
 
-                    {/* End ease-off — only shown in per-side mode (not closed-loop) */}
+                    {/* 3. End ease-off — only shown in per-side mode (not closed-loop) */}
                     {!pipingAllCornersPass&&(
-                      <div style={{marginTop:8}}>
+                      <div style={{marginTop:8}} title="Additional pullback past the 1.5× SA base exit. Default: 0 (total exit = 1.5× SA + ease-off).">
                         <FracInput variant="cp" label="End ease-off" decMode={decMode} ghost={!pipingOn}
                           whole={pipingEaseW} frac={pipingEaseF} onWhole={setPipingEaseW} onFrac={setPipingEaseF}/>
-                        <p className="cp-stage-hint">Additional pullback past the 1.5× SA base exit. Default: 0 (total exit = 1.5× SA + ease-off)</p>
+                        {pipingEaseOffWarned&&(
+                          <div className="cp-taper-warn">
+                            Ease-off clamped to {cpFmt(pipingEaseOffClamped)} — maximum is 40% of the shortest adjacent side minus the 1.5× SA base exit.
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Corner eligibility */}
-                    {pipingCorners&&(
-                      <div style={{marginTop:12}}>
-                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Curve Notching for Snug Fit</div>
-                        {pipingCorners.map((c,i)=>(
-                          <div key={i} style={{fontSize:13,fontFamily:"Nunito,sans-serif",marginBottom:5,lineHeight:1.35}}>
-                            <span style={{fontWeight:800,color:CP.ink,display:"inline-block",minWidth:98}}>{c.name}</span>
-                            {c.openTop
-                              ?<span style={{color:CP.muted}}>open top — n/a</span>
-                              :c.crisp
-                              ?<><span style={{color:"#a03020"}}>✕ </span><span style={{color:CP.muted}}>sharp corner — cannot ease</span></>
-                              :c.allowed
-                              ?<>
-                                <span style={{color:CP.green}}>✓ </span>
-                                <span style={{color:CP.muted}}>{cpFmt(c.minRadius)} radius</span>
-                                {c.notchSpacing
-                                  ?<span style={{color:CP.muted}}> · notch every {cpFmt(c.notchSpacing)}</span>
-                                  :<span style={{color:CP.muted}}> · no notches</span>
-                                }
-                              </>
-                              :<>
-                                <span style={{color:"#a03020"}}>✕ </span>
-                                <span style={{color:CP.muted}}>{cpFmt(c.minRadius)} radius &lt; {cpFmt(MIN_PIPING_RADIUS)} min</span>
-                              </>
-                            }
-                          </div>
-                        ))}
-                        <p className="cp-stage-hint" style={{marginTop:6}}>Curved piping areas are automatically notched. Straight edges do not need notches.</p>
+                    {/* Recommended cut strip width — bold display after inputs */}
+                    {pipingStripWidth&&(
+                      <div style={{marginTop:14,display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",paddingBottom:2}}>
+                        <span style={{fontWeight:800,fontSize:11,color:CP.muted,letterSpacing:"0.07em",textTransform:"uppercase"}}>Recommended cut strip width</span>
+                        <span style={{fontWeight:900,fontSize:19,color:"#5340b8",fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingStripWidth.recommended)}</span>
                       </div>
                     )}
 
                     {/* Results: closed-loop OR per-side strips */}
                     {pipingClosedLoop&&(
-                      <div style={{marginTop:12}}>
-                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Closed-loop — all corners pass</div>
-                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:"4px 10px",fontSize:13,alignItems:"baseline"}}>
+                      <div style={{marginTop:14}}>
+                        <div style={{fontWeight:800,fontSize:11,color:CP.muted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:10}}>Cut sizes — closed loop</div>
+                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:"6px 12px",alignItems:"baseline"}}>
                           <div/>
-                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Geometric</div>
-                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Snug-fit</div>
-                          <div style={{color:CP.ink,fontWeight:700,fontFamily:"Nunito,sans-serif"}}>Strip</div>
-                          <div style={{color:CP.ink,fontWeight:900,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingClosedLoop.geoStripLen)}</div>
-                          <div style={{color:CP.ink,fontWeight:900,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingClosedLoop.snugStripLen)}</div>
-                          <div style={{color:CP.ink,fontWeight:700,fontFamily:"Nunito,sans-serif"}}>Cord</div>
-                          <div style={{color:CP.ink,fontWeight:900,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingClosedLoop.geoCordLen)}</div>
-                          <div style={{color:CP.ink,fontWeight:900,fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingClosedLoop.snugCordLen)}</div>
+                          <div style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>Geometric</div>
+                          <div style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>Snug-fit</div>
+                          <div style={{color:CP.ink,fontWeight:800,fontFamily:"Nunito,sans-serif",fontSize:13}}>Strip</div>
+                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.geoStripLen)}</div>
+                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.snugStripLen)}</div>
+                          <div style={{color:CP.ink,fontWeight:800,fontFamily:"Nunito,sans-serif",fontSize:13}}>Cord</div>
+                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.geoCordLen)}</div>
+                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.snugCordLen)}</div>
                         </div>
-                        <p className="cp-stage-hint" style={{marginTop:6}}>Geometric values are from sewline perimeter + seam allowances. Snug-fit is empirically calibrated for real-world ease — start there and ease while sewing.</p>
+                        <p className="cp-stage-hint" style={{marginTop:8}}>Geometric values are from sewline perimeter + seam allowances. Snug-fit is empirically calibrated for real-world ease — start there and ease while sewing.</p>
                       </div>
                     )}
                     {!pipingClosedLoop&&pipingStraightStrips.length>0&&(
-                      <div style={{marginTop:12}}>
-                        <div style={{fontWeight:800,fontSize:12,color:CP.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Cut sizes</div>
-                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:"4px 10px",fontSize:13,alignItems:"baseline"}}>
-                          <div/>
-                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Strip</div>
-                          <div style={{color:CP.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em"}}>Cord</div>
-                          {pipingStraightStrips.map((s,i)=>(
-                            <React.Fragment key={i}>
-                              <div style={{fontWeight:800,color:CP.ink,fontFamily:"Nunito,sans-serif"}}>{s.side}</div>
-                              <div style={{color:CP.muted,fontFamily:"DM Mono,monospace",fontWeight:800}}>{cpFmt(s.cutLength)} × {cpFmt(s.cutWidth)}</div>
-                              <div style={{color:CP.muted,fontFamily:"DM Mono,monospace",fontWeight:800}}>{cpFmt(s.cordLength)}</div>
-                            </React.Fragment>
-                          ))}
-                        </div>
+                      <div style={{marginTop:14}}>
+                        <div style={{fontWeight:800,fontSize:11,color:CP.muted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:10}}>Cut sizes</div>
+                        {pipingStraightStrips.map((s,i)=>(
+                          <div key={i} style={{marginTop:i===0?0:12,paddingTop:i===0?0:12,borderTop:i===0?"none":`1px solid ${CP.pinkLine}`}}>
+                            <div style={{fontWeight:800,color:CP.ink,fontFamily:"Nunito,sans-serif",fontSize:13,marginBottom:6}}>{s.side}</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                              <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                                <span style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",minWidth:34}}>Strip</span>
+                                <span style={{color:"#5340b8",fontFamily:"DM Mono,monospace",fontWeight:900,fontSize:17}}>{cpFmt(s.cutLength)} × {cpFmt(s.cutWidth)}</span>
+                              </div>
+                              <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                                <span style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",minWidth:34}}>Cord</span>
+                                <span style={{color:"#5340b8",fontFamily:"DM Mono,monospace",fontWeight:900,fontSize:17}}>{cpFmt(s.cordLength)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 
                     {pipingOn&&!ready&&(
                       <p className="cp-stage-hint" style={{marginTop:8}}>Enter panel dimensions to see corner analysis and strip sizes.</p>
                     )}
+
+                    {/* Notch tip — shown when piping is active */}
+                    {pipingOn&&(
+                      <div className="ms-tip-box">
+                        <span className="ms-tip-pill">Moonshot Tip</span>
+                        For tight curves, notch your piping strip every 3/8″. For larger curves, notch accordingly to ensure a comfortable but snug fit to the bag panel.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Scroll spacer — keeps sticky diagram visible when bottom
+                stages are open. Always keep this as the last element. */}
+            <div style={{ height: 600, flexShrink: 0, background: "#ffffff" }} aria-hidden="true" />
 
           </div>
         </div>{/* end right col */}
@@ -2372,6 +2330,57 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
 
       </div>,
       cuttingListPortalTarget
+    )}
+
+    {/* Wrap material thickness modal */}
+    {vinylInfoOpen&&createPortal(
+      <>
+        <div
+          onClick={()=>setVinylInfoOpen(false)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.40)",zIndex:1000}}
+        />
+        <div
+          onMouseDown={e=>e.stopPropagation()}
+          style={{
+            position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+            width:"min(560px,92vw)",maxHeight:"80vh",overflowY:"auto",
+            background:CP.pinkBg,border:`1px solid ${CP.pinkLine}`,borderRadius:12,
+            padding:"22px 26px",boxShadow:"0 8px 32px rgba(90,45,160,0.22)",
+            fontFamily:"Nunito,sans-serif",zIndex:1001,
+          }}
+        >
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+            <div style={{fontWeight:700,color:CP.ink,lineHeight:1.35,fontSize:18}}>Wrap material thickness guide</div>
+            <button
+              onClick={()=>setVinylInfoOpen(false)}
+              aria-label="Close"
+              style={{
+                minWidth:32,minHeight:32,borderRadius:"50%",flexShrink:0,
+                background:"#ece5f8",border:"none",cursor:"pointer",
+                color:CP.maroon,fontSize:18,fontWeight:900,lineHeight:1,
+                display:"flex",alignItems:"center",justifyContent:"center",marginLeft:14,
+              }}
+            >✕</button>
+          </div>
+          <p style={{margin:"0 0 16px",color:CP.ink,fontSize:16,lineHeight:1.6}}>
+            These presets estimate the effective bulk added by your folded wrap material. Fabric backing, coating, interfacing, compression, and cord firmness all affect the result — and every cord wraps a little differently. Always test-wrap your cord before cutting your full strip length.
+          </p>
+          {[
+            {heading:'Very thin / minimal bulk — 1/64"',items:["Lightweight lining fabric","Plain quilting cotton, not interfaced","Lightweight ripstop, about 1.1 oz","Thin nylon, poly, or technical woven"]},
+            {heading:'Thin / common bag-making bulk — 1/32"',items:["Standard vinyl / faux leather (default)","Standard ripstop, about 1.9–2.2 oz","Quilting cotton, interfaced or laminated","Soft garment leather, lightweight","Cork fabric, thin or standard backing","Light waterproof canvas, waxed canvas, duck, denim, or twill","500D Cordura, packcloth, or coated nylon","Laminated cotton or PUL-style fabric"]},
+            {heading:'Medium / bulky bag-making material — 1/16"',items:["Slightly thicker garment leather","Cork fabric, heavier backing","Heavy waterproof canvas, waxed canvas, duck, denim, or twill","1000D Cordura, packcloth, or coated nylon","Upholstery vinyl or marine vinyl, standard","Thin neoprene or scuba fabric","Lighter veg-tan or tooling leather"]},
+            {heading:'Heavy / padded / low-compression material — 1/8"',items:["Foam-backed or padded upholstery/marine vinyl","Thick neoprene","Heavier veg-tan or tooling leather","Very bulky or stiff wrap material"]},
+          ].map((sec,i)=>(
+            <div key={i} style={{marginTop:i===0?0:14,borderTop:i===0?"none":`1px solid ${CP.pinkLine}`,paddingTop:i===0?0:14}}>
+              <div style={{fontWeight:900,color:CP.maroon,fontSize:12,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:6}}>{sec.heading}</div>
+              <ul style={{margin:0,paddingLeft:18,color:CP.ink,lineHeight:1.65,fontSize:16}}>
+                {sec.items.map((item,j)=><li key={j}>{item}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </>,
+      document.body
     )}
     </>
   );

@@ -9,7 +9,7 @@ import {
 } from './utils/print-utils.js';
 import { C_SEW, C_CENTER, C_STAB, C_EASING, C_MIDPOINT, CAT_BAG_STRUCTURES, FILL_OPACITY_PRINT } from './diagramTokens.js';
 import {
-  cpSquareMark, cpMidpointMark, cpTriangleMark, cpPerpTick,
+  cpSquareMark, cpDiamondMark, cpMidpointMark, cpTriangleMark, cpPerpTick,
   cpTriangleH, cpTriangleV,
 } from './diagramMarks.js';
 import { cpStabilizerPoints, cpPtsBB } from './stabilizer.js';

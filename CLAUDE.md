@@ -114,6 +114,39 @@ cpPrintGusset, cpPrintStabilizer) live in src/printRenderers.js.
 BoxedBottoms print functions (bcPrintDoc, bcPrintPanel, bcPrintStabilizer)
 still live inside src/tabs/BoxedBottoms.jsx.
 
+### UI Component Standards
+
+#### Shared info button
+
+`ms-info-btn` (moonshot.css) — circular 28×28px italic "i" button; designed
+for use on dark backgrounds (white border/text). Defined once, reused everywhere.
+Current uses: NavBar tools row, CurvedPanel Stage 6 wrap-material label.
+`ms-info-btn` = dark backgrounds (nav). `ms-info-btn--light` = light/lavender stage backgrounds.
+
+Usage:
+```jsx
+<button className="ms-info-btn" onClick={...} title="..." aria-label="...">i</button>
+```
+
+#### Moonshot Tip box
+
+`ms-tip-box` + `ms-tip-pill` (moonshot.css, Shared UI Components block) —
+purple-tinted call-out box with a floating pill label. Use for tips, hints,
+and non-blocking guidance across all calculator tabs.
+
+```jsx
+<div className="ms-tip-box">
+  <span className="ms-tip-pill">Moonshot Tip</span>
+  Tip text here.
+</div>
+```
+
+- Box: `rgba(90,45,160,0.09)` background, `var(--sp-muted)` text, 8px radius
+- Pill: `#1e1040` background (nav header purple), white text, fully rounded
+- `margin-top:18px` built-in (pill overhang clearance) — do not add extra margin above
+
+---
+
 ### Static Reference Tools
 
 public/curved-panel.html and public/thread-needle.html are standalone HTML
@@ -790,11 +823,17 @@ Arc reversed(A1→A2) → [reversed inner run] → Z`
 
 - CurvedPanel.jsx.tmp (src/tabs/) -- orphaned file, safe to delete.
 
-- Standardized info-button component -- a reusable ⓘ toggle button + popover
-  for use across all calculator tabs. Currently CurvedPanel Stage 6 (vinyl
-  thickness guide) has a one-off inline implementation. Piping.jsx has a
-  different inline-expanding variant. Both should be replaced when a proper
-  shared component is built.
+- Standardized info-button component -- a reusable ⓘ toggle button + modal
+  for use across all calculator tabs. CurvedPanel Stage 6 (vinyl thickness
+  guide) now uses a one-off inline modal portal. Piping.jsx has a different
+  inline-expanding variant. Both should be replaced when a proper shared
+  component is built.
+
+- Reusable tooltip class + icon component -- a shared CSS class and icon
+  component for hover tooltips across all calculator tabs. Currently tooltip
+  text is applied via native `title` attributes (e.g. End ease-off field) or
+  inline styles. A proper shared component would standardize appearance,
+  positioning, and accessibility.
 
 - Piping.jsx strip-width formula is now outdated relative to CurvedPanel.
   Piping.jsx uses the legacy constant `4×dia + 2×SA`. CurvedPanel uses the
