@@ -1415,6 +1415,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const [stageOpen,setStageOpen]=useState([true,true,true,true,false,false,false]);
   const [checkedRows,setCheckedRows]=useState({});
   const [showEdges,setShowEdges]=useState(false);
+  const [showPfCoords,setShowPfCoords]=useState(false);
 
   // Derived values
   const lf=Math.max(0,lfW+lfF);
@@ -2168,13 +2169,35 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                       {pfResult&&pfResult.error&&(
                         <p className="cp-stage-hint" style={{color:"#b00020",fontWeight:700}}>{pfResult.error}</p>
                       )}
-                      {pfFeet.length>0&&pfFeet.map((f,i)=>(
-                        <p key={i} className="cp-stage-hint">{`Foot ${i+1}: ${cpFmt(f.x)} from left · ${cpFmt(f.y)} from top`}</p>
-                      ))}
+                      {pfFeet.length>0&&(
+                        <div className="cp-perim" style={{marginTop:10}}>
+                          <div className="cp-perim-row cp-perim-row--last">
+                            <span className="cp-perim-label">Foot placement coordinates</span>
+                            <span/>
+                            <button className="cp-perim-expand" onClick={()=>setShowPfCoords(s=>!s)} aria-label={showPfCoords?"Hide coordinates":"Show coordinates"}>
+                              {showPfCoords?"▲":"▼"}
+                            </button>
+                          </div>
+                          {showPfCoords&&(
+                            <div className="cp-perim-edges">
+                              {pfFeet.map((f,i)=>(
+                                <div key={i} style={{display:"flex",alignItems:"baseline",gap:8,padding:"4px 10px",borderBottom:i<pfFeet.length-1?"1px solid rgba(0,0,0,0.03)":"none"}}>
+                                  <span style={{fontFamily:"var(--font-sans)",fontSize:11,fontWeight:700,color:"var(--sp-muted)",minWidth:48,flexShrink:0}}>Foot {i+1}</span>
+                                  <span style={{fontFamily:"var(--font-mono)",fontSize:13,color:"#5340b8"}}>{cpFmt(f.x)}</span>
+                                  <span style={{fontSize:10,color:"var(--sp-muted)"}}>from left</span>
+                                  <span style={{fontFamily:"var(--font-mono)",fontSize:13,color:"#5340b8",marginLeft:4}}>{cpFmt(f.y)}</span>
+                                  <span style={{fontSize:10,color:"var(--sp-muted)"}}>from top</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {pfOn&&(
-                      <p className="cp-stage-hint" style={{fontStyle:"italic",marginTop:10}}>When adding purse feet, it is recommended to add Decovil Light/Heavy or foam between the feet and the wrong side of the exterior fabric. After installation, cover the back of each foot with interfacing or a small piece of duct tape.</p>
-                    )}
+                    <div className="ms-tip-box">
+                      <span className="ms-tip-pill">Moonshot Tip</span>
+                      When adding purse feet, it is recommended to add Decovil Light/Heavy or foam between the feet and the wrong side of the exterior fabric. After installation, cover the back of each foot with interfacing or a small piece of duct tape.
+                    </div>
                   </div>
                 )}
               </div>
@@ -2182,7 +2205,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
 
             {/* Scroll spacer — keeps sticky diagram visible when bottom
                 stages are open. Always keep this as the last element. */}
-            <div style={{ height: 600, flexShrink: 0, background: "#ffffff" }} aria-hidden="true" />
+            <div className="cp-scroll-spacer" aria-hidden="true" />
 
           </div>
         </div>{/* end right col */}
@@ -2362,7 +2385,7 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
             <div className="cp-print-card-new">
               <div className="cp-print-card-title">Main panel</div>
               <div className="cp-print-card-meta">{panelPlan?cpTileLabel(panelPlan):"Add dimensions"}</div>
-              <PrintButton tone="cp" small label="Print main panel" meta={panelPlan?cpTileLabel(panelPlan):"—"} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params)}/>
+              <PrintButton tone="cp" small label="Print main panel" meta={panelPlan?cpTileLabel(panelPlan):"—"} disabled={!model.valid} onClick={()=>cpPrintPanel(model,params,pfOn?pfFeet:[])}/>
             </div>
             {pieceStyle==="sides"&&(
               <div className="cp-print-card-new">

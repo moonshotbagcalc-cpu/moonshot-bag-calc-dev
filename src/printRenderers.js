@@ -176,7 +176,7 @@ export function cpDrawTaperedStrip(pc){
 }
 
 /* ---- PRINT: MAIN PANEL ---- */
-export function cpPrintPanel(m,p){
+export function cpPrintPanel(m,p,pfFeet=[]){
   if(!m.valid)return;
   const PADIN=0.4;
   const originX=m.cutBB.minX-PADIN,originY=m.cutBB.minY-PADIN;
@@ -220,7 +220,11 @@ export function cpPrintPanel(m,p){
     ["Construction",open?"3-sided open top":"4-sided enclosed"],
     ["Sewline side runs",open
       ?("Right "+cpFmt(r.right)+" · Bottom "+cpFmt(r.bottom)+" · Left "+cpFmt(r.left)+" · Top open")
-      :("Top "+cpFmt(r.top)+" · Right "+cpFmt(r.right)+" · Bottom "+cpFmt(r.bottom)+" · Left "+cpFmt(r.left))]
+      :("Top "+cpFmt(r.top)+" · Right "+cpFmt(r.right)+" · Bottom "+cpFmt(r.bottom)+" · Left "+cpFmt(r.left))],
+    ...(pfFeet.length?[
+      ["Purse foot placement",""],
+      ...pfFeet.map((f,i)=>[`Foot ${i+1}`,`${cpFmt(f.x)} from left · ${cpFmt(f.y)} from top`])
+    ]:[])
   ];
   cpPrintDoc("Curved Panel — Main Panel",geom,spanW,spanH,detailRows,
     "Black = cut line · grey dashed = sewline · rust dotted = stabilizer guide · cyan dashed = center fold line · red ▲ = center/fold mark · purple □ = side junction · red ○ = side midpoint.");

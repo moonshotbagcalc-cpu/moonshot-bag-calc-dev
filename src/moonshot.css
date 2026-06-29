@@ -1448,6 +1448,9 @@ body{margin:0;padding:0;background-attachment:fixed;}
   box-shadow:0 2px 18px rgba(0,0,0,0.10);
 }
 
+/* CurvedPanel only — flush with nav, no top gap */
+.ms-page-card:has(.cp-wrap.cp-redesign){ margin-top:0; }
+
 /* ── Primary nav group tabs ── */
 .ms-primary-nav{
   display:flex;
@@ -1949,8 +1952,14 @@ body{margin:0;padding:0;background-attachment:fixed;}
   --cp-ink:#241550;
   --cp-muted:#7a608e;
   width:100%;
-  min-height:100vh;
-  padding:76px 0 56px;
+  position:sticky;
+  top:130px;
+  height:calc(100vh - 130px);
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding:0;
   color:var(--ms-cp-ink);
   font-family:var(--font-sans);
 }
@@ -2161,7 +2170,6 @@ body{margin:0;padding:0;background-attachment:fixed;}
   .cp-construction-grid{grid-template-columns:minmax(0,1fr) minmax(120px,.45fr);}
 }
 @media(max-width:960px){
-  .cp-wrap.cp-redesign{padding-top:48px;}
   .cp-page-shell,.cp-print-section{width:min(calc(100% - 28px),720px);}
   .cp-hero{grid-template-columns:88px minmax(0,1fr);padding:18px 20px;}
   .cp-hero-icon{width:76px;height:66px;}
@@ -2299,23 +2307,29 @@ body{margin:0;padding:0;background-attachment:fixed;}
 
 /* ── Diagram wrap: relative so status overlay can anchor to bottom ── */
 
-/* ── Body two-column grid ── */
+/* ── Body: dual-scroll flex container ── */
 .cp-body {
-  display: grid;
-  grid-template-columns: 52% 48%;
-  align-items: start;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* ── Left column: sticky ── */
+/* ── Left column: independent scroll ── */
 .cp-left-col {
-  position: sticky;
-  top: 130px;
+  width: 52%;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--sp-soft);
   background: #fff;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.cp-left-col::-webkit-scrollbar { display: none; }
 .cp-left-section-label {
   font-size: 10px;
   font-weight: 900;
@@ -2470,7 +2484,15 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-meas-row-stab .cp-meas-cut { font-size: 11px; color: #9d8fd0; }
 
 /* ── Right column: cascade stages ── */
-.cp-right-col { background: #faf7ff; }
+.cp-right-col {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #faf7ff;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.cp-right-col::-webkit-scrollbar { display: none; }
 .cp-stages { display: flex; flex-direction: column; }
 .cp-stage {
   border-bottom: 1px solid var(--sp-soft);
@@ -2871,11 +2893,21 @@ body{margin:0;padding:0;background-attachment:fixed;}
 .cp-print-card-meta { font-size: 11px; color: var(--sp-muted); font-weight: 600; margin-bottom: 4px; }
 .cp-print-card-new button { margin-top: auto !important; }
 
+.cp-scroll-spacer { height: 200px; flex-shrink: 0; background: #ffffff; }
+
 /* ── Mobile overrides for new layout ── */
 @media (max-width: 767px) {
-  .cp-body { grid-template-columns: 1fr; }
-  .cp-left-col {
+  .cp-scroll-spacer { display: none; }
+  .cp-wrap.cp-redesign {
     position: static;
+    height: auto;
+    overflow: visible;
+    padding: 48px 0 0;
+    display: block;
+  }
+  .cp-body { display: grid; grid-template-columns: 1fr; overflow: visible; }
+  .cp-left-col {
+    width: 100%;
     height: auto;
     overflow-y: visible;
     overflow-x: visible;
@@ -2883,7 +2915,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
     border-bottom: 1px solid var(--sp-soft);
     order: 2;
   }
-  .cp-right-col { order: 1; }
+  .cp-right-col { flex: unset; overflow-y: visible; order: 1; }
   .cp-mission-bar { top: 44px; padding: 8px 16px; }
   .cp-mission-sa-label { white-space: normal; }
   .cp-mission-sa-abbr { display: block; }
