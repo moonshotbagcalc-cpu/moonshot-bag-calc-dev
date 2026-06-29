@@ -632,6 +632,15 @@ If any box fails, the pass is not done — fix before reporting back.
 
 ## Active Work
 
+### Purse Feet — Phase 1 Complete (June 28 2026)
+
+CurvedPanel Stage 7 (Purse Feet) is implemented and building clean.
+Files touched: src/purseFeet.js (created), src/diagramMarks.js,
+src/tabs/CurvedPanel.jsx, src/printRenderers.js.
+
+Deferred stabilizer print wiring (cpPrintStabilizer needs pfFeet param) is
+the immediate next step before Phase 2. See SESSION_HANDOFF.md for details.
+
 ### Pass 12 -- Remaining Tabs
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
@@ -720,3 +729,13 @@ Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
   geometrically derived but untested on physical builds with thick materials
   (foam-backed vinyl, heavy neoprene, etc.). Recommend a test-wrap with a
   known thick material before relying on it for a final build.
+
+- Purse feet stabilizer print wiring -- cpPrintStabilizer in printRenderers.js
+  should receive pfFeet and call drawPurseFeetMarks for the bottom stabilizer
+  piece. Same coordinates as cpPrintSides. Not yet implemented; do before Phase 2.
+
+- Purse feet Phase 2 -- asymmetry controls: separate inset nudge per axis
+  (long/short) or individual foot inset overrides. Design TBD.
+
+- Purse feet Phase 3 -- adjustable foot radius (currently fixed 1/4") and
+  adjustable stay-away distance (currently fixed 3/4" + SA).
