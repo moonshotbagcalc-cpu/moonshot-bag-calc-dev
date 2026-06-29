@@ -35,12 +35,12 @@ src/
   nav-config.js            <- data-driven nav; adding a tab = one entry here
   curved-panel-core.js     <- geometry/model for CurvedPanel (pure JS, no React)
   boxed-corner-core.js     <- geometry/model for BoxedCorner (pure JS, no React)
-  geometryOffset.js        <- curve-aware per-side path offset; extracted from curved-panel-core.js in Pass 11
+  geometryOffset.js        <- curve-aware per-side path offset; shared by sewline and stabilizer
   diagramTokens.js         <- centralized color/spec constants for SVG diagram standard
-  stabilizer.js            <- stabilizer geometry + shared draw helper; extracted in Pass 11
-  measurementsTable.js     <- HTML table row/block builders (cpProw, cpPieceBlock); extracted in Pass 11
-  diagramMarks.js          <- shared SVG mark builders for print diagrams; extracted in Pass 11
-  printRenderers.js        <- all print-output functions for CurvedPanel; extracted in Pass 11
+  stabilizer.js            <- stabilizer geometry + shared draw helper
+  measurementsTable.js     <- HTML table row/block builders (cpProw, cpPieceBlock)
+  diagramMarks.js          <- shared SVG mark builders for print diagrams
+  printRenderers.js        <- all print-output functions for CurvedPanel
 
   components/
     NavBar.jsx             <- desktop nav; props: page, setPage, activeGroup, onGroupClick
@@ -89,7 +89,7 @@ own formatting helpers (cpFmt, bcFmt). Do not modify these unless explicitly ask
 
 geometryOffset.js holds the curve-aware per-side path offset function
 (offsetSidePaths, joinAllSides) shared by the sewline and stabilizer paths.
-It was relocated from curved-panel-core.js in Pass 11 and is self-contained.
+It is self-contained; do not inline it back into curved-panel-core.js.
 
 ### Units
 
@@ -373,87 +373,16 @@ pattern string. Applied to document.body; not on input or diagram zones.
 
 ## Page Layout System
 
-This is the standard layout all calculator tabs follow. Established in Pass 8.
+Full spec in docs/PASS_HISTORY.md → "Pass 8 Layout Spec." All calculator tabs follow this system.
 
-### Container
-
-- Max content width: 1400px, centered with auto side margins
-- Breathing room visible on both sides at <=1240px (iPad landscape)
-- No fixed heights on the container -- page scrolls naturally
-
-### Breakpoints
-
-/* Two-column layout */
-@media (min-width: 1024px) { ... }
-
-/* Stacked single column -- tablet portrait, landscape phone */
-@media (max-width: 1023px) and (min-width: 768px) { ... }
-
-/* Tight single column -- mobile */
-@media (max-width: 767px) { ... }
-
-### Page Zones (top to bottom)
-
-  INTRO CARD          (full content width)
-  INPUT COLUMN        DIAGRAM
-  (flex 1)            (flex 1)
-  min 600px           MEASUREMENTS TABLE
-  SIDES / GUSSET SECTION  (full width, optional)
-  PRINT CARDS         (full width)
-  FOOTER
-
-### Intro Card
-
-Every tab gets an intro card. Full content width, rounded corners.
-Background: group family color.
-
-Contents:
-- Left: outline thumbnail SVG -- placeholder box if not yet supplied
-- Right: tab title (large, bold) + 2-4 sentence description
-
-Do not generate thumbnail art -- await designer delivery.
-
-### Two-Column Body
-
-At >=1024px: two equal flex columns side by side.
-At <1024px: columns stack (inputs -> diagram -> measurements).
-
-Input column (left):
-- Minimum height: 600px
-- No interior scrolling ever. Page scrolls; columns do not.
-- Contains: input groups (labeled clusters of FracInput/select fields)
-
-Right column:
-- Minimum height: 600px per zone (diagram + measurements stacked)
-- Diagram zone: SVG preview, full right-column width
-- Measurements zone: results table below diagram
-
-### Measurements Table
-
-Three columns: PANEL / CUT / SEWLINE
-
-Row groups have a sub-header row. Each shows a cut quantity pill (e.g. CUT 2).
-
-Stabilizer rows: when stabilizer active, each piece gets a sub-row.
-- Shows STABILIZER CUT value only (no SEWLINE)
-- Visually lighter -- smaller text, muted color, slight indent
-- Separate row, not a third column
-
-### Sides / Gusset Section
-
-Below two-column body. Full content width. Only renders when construction
-mode includes side panels or gusset.
-
-Side Panels mode: three diagrams in a row + matching measurements table.
-Gusset mode: single draggable gusset diagram + measurements table.
-Neither active: section hidden entirely.
-
-### Print Cards Section
-
-Full width below Sides section.
-Multiple cards: displayed in a row.
-Single card: centered, max-width ~400px.
-Each card: title, description, PrintButton.
+- Container: max-width 1400px, centered, no fixed heights; page scrolls naturally
+- Breakpoints: ≥1024px two-column · 768–1023px stacked · <768px mobile
+- Zones (top → bottom): intro card · input column + right column (diagram + measurements) · sides/gusset section · print cards · footer
+- Intro card: full content width, group color bg, SVG thumbnail placeholder left + title/description right. Do not generate thumbnail art.
+- Input column: no interior scrolling ever (min 600px); right column: diagram zone above, measurements zone below
+- Measurements table: three columns PANEL / CUT / SEWLINE; stabilizer sub-rows indented, muted, cut value only (no sewline), separate row not third column
+- Sides/Gusset section: full width, hidden when neither active; side panels = three diagrams in a row; gusset = single pannable diagram
+- Print cards: full width, multiple in a row, single centered at max ~400px; each card has title + description + PrintButton
 
 ---
 
@@ -673,24 +602,62 @@ If any box fails, the pass is not done — fix before reporting back.
 
 ## Active Work
 
-### Dual Independent Column Scrolling — WIP (unresolved as of June 28 2026)
+### CurvedPanel Scroll Architecture — Resolved
 
-CurvedPanel uses a sticky-wrap + dual-column layout intended to let the left
-(inputs) and right (stages/diagram) columns scroll independently. The structure
-is in place: `.cp-wrap.cp-redesign` is `position:sticky; height:calc(100vh-130px);
-overflow:hidden`, `.cp-body` is `display:flex; flex:1; min-height:0;
-overflow:hidden`, and both columns have `overflow-y:auto`.
+Page-scroll model with a sticky left column and natural-flow right column.
+No internal column scroll.
 
-Root cause identified: the old CSS block (line ~651) set `min-height:100vh` on
-`.cp-wrap.cp-redesign`. Because CSS does not reset properties across blocks, that
-`min-height` was never overridden by the new authoritative block, making the wrap
-`100vh` tall instead of `calc(100vh-130px)`. A `min-height:0` reset was added to
-the new block, and `min-height:0` was also added to both columns.
+- **Page scrolls naturally** — footer reached via browser scroll
+- **`.cp-mission-bar`**: `position: sticky; top: 50px; z-index: 8` — pins under compact nav (50px tall)
+- **`.cp-body`**: `display: flex; align-items: flex-start; overflow: visible` — `align-items: flex-start` lets each column be its own height; `overflow: visible` keeps page scroll active
+- **`.cp-left-col`**: `position: sticky; top: 108px; align-self: flex-start` — sticky at natural height, no fixed height, no internal scroll. Has `overflow-x: hidden`, which per CSS spec implicitly computes `overflow-y: auto`, clipping children to `border-bottom-left-radius: 10px`
+- **`.cp-right-col`**: `flex: 1; overflow: hidden` — flows with the page, NOT sticky. `overflow: hidden` clips children to `border-bottom-right-radius: 10px`
+- **`.ms-page-card`**: `overflow: visible` — required for sticky columns; do NOT change to hidden or clip
+- **`.cp-wrap.cp-redesign`**: plain block container; no height, no overflow, no flex. Has `min-height: 0` to override the stale `min-height: 100vh` in the old CSS block at line ~651
 
-Despite this fix, independent scrolling was still not confirmed working in Edge
-before closing the session. Next session: verify in browser, then diagnose further
-if column scroll still routes to the page. Also: `.cp-title-bar` border-radius was
-lost in the layout rearchitecture and has been restored to `10px 10px 0 0`.
+**Border-radius note:** `.ms-page-card` has `border-radius: 10px` but `overflow: visible`
+disables radius clipping on children. Bottom corners are patched per-column:
+`cp-left-col { border-bottom-left-radius: 10px }` and `cp-right-col { border-bottom-right-radius: 10px }`.
+Each column's own overflow setting clips its children to its radius.
+
+**Small screen (≤1023px):** both columns get `position: static; height: auto; overflow-y: visible`
+and stack vertically via `flex-direction: column` on `.cp-body`.
+
+**Do NOT add:** `overflow: hidden` or fixed heights to `.ms-page-card`, `.cp-wrap.cp-redesign`,
+or `.cp-body`. Do NOT add an `ms-app--cp` class or a viewport-shell `@media` block.
+These approaches were tried and abandoned.
+
+### CurvedPanel Cutting List & Print Bar
+
+Both rendered via React portal into `#cp-cutting-list-root`. That div lives in
+App.jsx as a direct sibling of `.ms-page-card` — outside the card, before the footer.
+Portal target is resolved reactively (useEffect after DOM commit) so it is found on
+first render without user interaction:
+
+```js
+const [portalTarget, setPortalTarget] = useState(null);
+useEffect(() => { setPortalTarget(document.getElementById('cp-cutting-list-root')); }, []);
+```
+
+DOM structure:
+```
+.ms-app
+  nav
+  .ms-page-card
+    .cp-wrap.cp-redesign
+      .cp-title-bar / .cp-mission-bar / .cp-body
+  #cp-cutting-list-root         ← outside .ms-page-card
+    .cp-cutting-card            ← cutting list (own card)
+    .cp-print-bar               ← print patterns (own card, sibling)
+  Footer
+```
+
+Both cards: `max-width: 800px`, centered, `background: #fff`, `border-radius: 10px`,
+`box-shadow: 0 2px 14px rgba(0,0,0,0.07)`. `.cp-print-bar` uses `margin: 16px auto 30px`.
+
+**Print bar:** always visible. When `ready` is false (no valid dimensions), rendered at
+`opacity: 0.45; pointer-events: none` with the hint "Enter dimensions to enable printing".
+Individual PrintButtons carry their own `disabled` prop for piece-level gating.
 
 ### Purse Feet — Phase 1 Complete (June 28 2026)
 
@@ -705,85 +672,6 @@ the immediate next step before Phase 2. See SESSION_HANDOFF.md for details.
 
 Gusset -> BoxedBottoms -> Piping -> AccordionPocket -> stubs
 
-### Piping Exit Tail Geometry (CurvedPanel) — approved, do not re-derive
-
-The exit tail geometry for failing piping corners is implemented in `computeExitTail()`
-and `drawStripRun()` inside `cpPanelDiagramSVG()` in `src/tabs/CurvedPanel.jsx`.
-This geometry is approved. Do not redesign, re-derive, or simplify it without
-explicit instruction.
-
-#### Variable glossary
-
-- **`easeArcRadius`** — set to `stripVisibleWidth` (installed folded-edge offset, accounting
-  for cord wrap). Used for: the on-panel folded-edge offset (`innerSides`), the B→A2 radius,
-  the B→A1 radius, the 55° arc radius, and the `stripStroke` visual width. This is `R` inside
-  `computeExitTail`. Do NOT revert to `stripCutWidth / 2` for these.
-- **`tailFoldWidth`** — set to `stripCutWidth / 2`. Used ONLY for the physical end-cap edge
-  Se (Tr→Tf). Do not use this for the arc geometry or the visible strip width.
-- **`Fi`** — folded-edge exit point, ON the panel cut edge, at exactly `1.5×SA + easeOff`
-  arc-distance from the failed corner. This is the anchor for all other points.
-- **`B`** — notch / bend point, ON the panel cut edge, placed `notchBack = R / sin(55°)`
-  behind Fi toward the normal run. B is the center of the 55° folded-edge ease arc.
-  The physical strip notch marker is placed at or near B.
-- **`A2`** — arc start; `B + nIn × R` (one radius inward from B, on the folded-edge path).
-- **`A1`** — arc end; `B + rotate(nIn, 55° TOWARD corner) × R`. The arc sweeps 55° from
-  A2 toward the failed corner. `turnSign` is derived from `cross(dirA2, cutTanTowardCorner)`.
-- **`exitDir`** — `unitV(Fi − A1)`; the folded-edge exit direction from the arc into the tail.
-- **`Tf`** — folded-edge tail tip; `Fi + exitDir × EXIT_OVERSHOOT` (past the cut edge).
-- **`Tr`** — raw-edge tail tip; `Tf + (−dirA1) × tailFoldWidth`. Tr→Tf is parallel to B→A1
-  and exactly `tailFoldWidth` (`stripCutWidth / 2`) long. This is the short end cap Se.
-- **`C`** — cord endpoint only; found by `linePathIntersectInfo(B, dirA2, cordPath)` —
-  a ray from B in the B→A2 direction (= nIn) intersected with the cord centerline path.
-  Fallback: `closestPathPointToLineInfo`. C is NOT on the folded-edge arc and must
-  never be placed on the folded-edge path.
-- **`Se`** — short end cap edge: Tr → Tf. Parallel to B→A1. Exactly `tailFoldWidth` long.
-
-#### Geometry rules (binding — do not change without instruction)
-
-1. **Width split** — two named values govern different parts of the geometry:
-   - `easeArcRadius = stripVisibleWidth` — visible piping strip offset, 55° arc radius, B→A2,
-     B→A1. Uses the installed/folded-edge width so the on-panel strip reflects the real
-     installed appearance and the arc geometry is consistent with it.
-   - `tailFoldWidth = stripCutWidth / 2` — physical half-width of the flat cut strip, used
-     ONLY for the Se end cap: `Tr = Tf + (−dirA1) × tailFoldWidth`.
-   Do NOT revert `easeArcRadius` or `stripStroke` to `stripCutWidth / 2`.
-2. **B placement** — `notchBack = R / sin(55°)`, not just R. This ensures A1 lands
-   on a tangent line that passes cleanly through Fi.
-3. **Arc** — true circular arc A2 → A1, center B, radius R. SVG `A` command with
-   radius scaled to screen pixels (`R * scale`), not model inches. Arc is always ≤ 90°
-   so large-arc flag is always 0.
-4. **Arc direction** — 55° TOWARD the failed corner (`turnSign` from `dirA2 × cutTanTowardCorner`).
-5. **Tf and Tr** — both use `exitDir = unitV(Fi − A1)`, not `nOut`. The tail follows
-   the actual A1→Fi exit angle, not a perpendicular outward direction.
-6. **Se (Tr→Tf)** — parallel to B→A1, length `tailFoldWidth` (`stripCutWidth / 2`). Se is
-   the strip's short end edge and must always be visible in the SVG.
-7. **Cord** — the cord stays on its own cord centerline path. C is found by intersecting
-   the B→A2 construction line with `cordSides[side]`. C is the cord endpoint only;
-   the cord never routes through A1, A2, Tf, or any point on the folded-edge arc.
-8. **Two-pass trim in `drawStripRun`** — first trim to Fi (`exitOffset = 1.5×SA + easeOff`)
-   to locate the fold-exit point; then trim further by `notchBack` to get the B station
-   where the raw and folded edges terminate in the diagram. The cord uses a separate
-   trim distance (`cordDist`) returned by `computeExitTail`.
-9. **`cpPipingStraightStrips` trim** — the displayed cut length subtracts `exitTailBack =
-   (stripWidth/2) / sin(55°)` per failing end (in addition to `1.5×SA + easeOff`) so the
-   diagram cut length and the measurements table agree.
-10. **easeOff default** — 0. Base exit = 1.5×SA. Total exit offset = 1.5×SA + easeOff.
-
-#### Folded-edge path (per strip run)
-
-```
-normal folded-edge run → A2 → [55° arc centered at B] → A1 → exitDir → Fi → Tf
-```
-
-#### Polygon walk
-
-**startFail:** `M Tr → L B → L outer[0](Fi) → [cut-edge run] → [close/endFail] →
-[reversed inner run] → Arc(A2→A1) → L Fi → L Tf → Z`
-(Z closes Se: Tf → Tr)
-
-**endFail:** `[cut-edge run] → L B → L Tr → L Tf → L Fi → L A1 →
-Arc reversed(A1→A2) → [reversed inner run] → Z`
-
 ---
 
 ## Working Rules
@@ -791,10 +679,8 @@ Arc reversed(A1→A2) → [reversed inner run] → Z`
 - Always confirm npm run build passes after each change before moving on.
 - One pass at a time. Do not begin the next pass until current is confirmed.
 - Do not modify curved-panel-core.js or boxed-corner-core.js unless
-  explicitly authorized for a specific change. (In Pass 11, the shared
-  curve-offset function was relocated to src/geometryOffset.js and the
-  core was updated to import it — that relocation is complete history,
-  not an open permission.)
+  explicitly authorized for a specific change. The shared curve-offset
+  function lives in geometryOffset.js — do not move it back.
 - Do not edit App(backup).jsx or root BottlePocketPage.jsx.
 - Do not add features or make improvements outside current pass scope.
   Flag them as notes for later instead.
@@ -842,6 +728,14 @@ Arc reversed(A1→A2) → [reversed inner run] → Z`
 - Diagram styles audit -- confirm all diagram styles live in appropriate
   stylesheets rather than individual calculator tabs. Flag findings before
   moving anything.
+
+- Dead code pass (moonshot.css, ~lines 650–837): ~130 lines of orphaned
+  prototype CSS from the old Illustrator-layout (.cp-hero, .cp-layout-card,
+  .cp-controls-panel, .cp-decimal-slot, etc.) plus stale overridden blocks
+  (.cp-wrap.cp-redesign at line 651, .cp-page-shell at line 666). Safe to
+  remove but requires targeted surgery — the live rules .cp-check, .cp-field,
+  .cp-fi are interleaved in the same region and must be preserved. Do as a
+  focused dead-code pass in a fresh session; verify input field styling after.
 
 - Dead code cleanup in stabilizer.js and curved-panel-core.js:
   buildOpenSewline (curved-panel-core.js ~line 245) -- exported, never imported.

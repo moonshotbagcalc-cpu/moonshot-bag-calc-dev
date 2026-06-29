@@ -169,7 +169,7 @@ export default function MoonshotBagCalc() {
         })}
       </div>
 
-      {/* Portal target: cp-cutting-list and cp-print-bar render here via CurvedPanel portal */}
+      {/* Cutting list portal target: outside the card so cp-cutting-card styles render against the page */}
       <div id="cp-cutting-list-root" />
 
       {/* Footer: full-width sibling of ms-page-card */}

@@ -1185,7 +1185,6 @@ body{margin:0;padding:0;background-attachment:fixed}
 }
 
 @media(max-width:960px){
-  .cp-wrap.cp-redesign{padding-top:48px;}
   .cp-page-shell,
   .cp-print-section{width:min(calc(100% - 28px),720px);}
   .cp-hero{grid-template-columns:88px minmax(0,1fr);padding:18px 20px;}
@@ -1443,13 +1442,11 @@ body{margin:0;padding:0;background-attachment:fixed;}
   width:calc(100% - 40px);   /* 20px margin on each side below 1440px; above 1440px max-width + auto-centering take over */
   margin:30px auto 15px;
   border-radius:10px;
-  overflow-x:clip;
+  overflow:visible;
   background:#fff;
   box-shadow:0 2px 18px rgba(0,0,0,0.10);
 }
 
-/* CurvedPanel only — flush with nav, no top gap */
-.ms-page-card:has(.cp-wrap.cp-redesign){ margin-top:0; }
 
 /* ── Primary nav group tabs ── */
 .ms-primary-nav{
@@ -1952,13 +1949,7 @@ body{margin:0;padding:0;background-attachment:fixed;}
   --cp-ink:#241550;
   --cp-muted:#7a608e;
   width:100%;
-  position:sticky;
-  top:130px;
-  height:calc(100vh - 130px);
   min-height:0;
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
   padding:0;
   color:var(--ms-cp-ink);
   font-family:var(--font-sans);
@@ -2203,6 +2194,18 @@ body{margin:0;padding:0;background-attachment:fixed;}
    Curved Panel — Page Layout
    ===================================================================== */
 
+/* ── Tablet + mobile: unstick columns, stack vertically ── */
+@media (max-width: 1023px) {
+  .cp-body { flex-direction: column; }
+  .cp-left-col,
+  .cp-right-col {
+    position: static;
+    height: auto;
+    width: 100%;
+    overflow-y: visible;
+  }
+}
+
 /* ── Title bar ── */
 .cp-title-bar {
   background: #2d1a6e;
@@ -2308,27 +2311,26 @@ body{margin:0;padding:0;background-attachment:fixed;}
 
 /* ── Diagram wrap: relative so status overlay can anchor to bottom ── */
 
-/* ── Body: dual-scroll flex container ── */
+/* ── Body: side-by-side, each column its own height ── */
 .cp-body {
   display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  align-items: flex-start;
+  overflow: visible;
 }
 
-/* ── Left column: independent scroll ── */
+/* ── Left column: sticky, natural height, no internal scroll ── */
 .cp-left-col {
   width: 52%;
   flex-shrink: 0;
-  min-height: 0;
-  overflow-y: auto;
+  position: sticky;
+  top: 108px;
+  align-self: flex-start;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--sp-soft);
+  border-bottom-left-radius: 10px;
   background: #fff;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 .cp-left-col::-webkit-scrollbar { display: none; }
 .cp-left-section-label {
@@ -2487,11 +2489,9 @@ body{margin:0;padding:0;background-attachment:fixed;}
 /* ── Right column: cascade stages ── */
 .cp-right-col {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+  border-bottom-right-radius: 10px;
   background: #faf7ff;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 .cp-right-col::-webkit-scrollbar { display: none; }
 .cp-stages { display: flex; flex-direction: column; }
@@ -2864,9 +2864,19 @@ body{margin:0;padding:0;background-attachment:fixed;}
 
 /* ── Print bar ── */
 .cp-print-bar {
-  background: var(--sp-cream);
-  border-top: 2px solid var(--sp-soft);
+  max-width: 800px;
+  margin: 16px auto 30px;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.07);
   padding: 20px 28px;
+}
+.cp-print-bar-hint {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-muted);
 }
 .cp-print-bar-title {
   font-size: 11px;

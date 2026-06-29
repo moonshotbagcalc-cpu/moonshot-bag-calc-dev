@@ -509,6 +509,93 @@ Instructions:
 
 ---
 
+## Pass 8 Layout Spec (reference — implemented)
+
+This is the full page layout spec established in Pass 8. All calculator tabs follow it.
+The compact summary lives in CLAUDE.md → "Page Layout System."
+
+### Container
+
+- Max content width: 1400px, centered with auto side margins
+- Breathing room visible on both sides at <=1240px (iPad landscape)
+- No fixed heights on the container -- page scrolls naturally
+
+### Breakpoints
+
+/* Two-column layout */
+@media (min-width: 1024px) { ... }
+
+/* Stacked single column -- tablet portrait, landscape phone */
+@media (max-width: 1023px) and (min-width: 768px) { ... }
+
+/* Tight single column -- mobile */
+@media (max-width: 767px) { ... }
+
+### Page Zones (top to bottom)
+
+  INTRO CARD          (full content width)
+  INPUT COLUMN        DIAGRAM
+  (flex 1)            (flex 1)
+  min 600px           MEASUREMENTS TABLE
+  SIDES / GUSSET SECTION  (full width, optional)
+  PRINT CARDS         (full width)
+  FOOTER
+
+### Intro Card
+
+Every tab gets an intro card. Full content width, rounded corners.
+Background: group family color.
+
+Contents:
+- Left: outline thumbnail SVG -- placeholder box if not yet supplied
+- Right: tab title (large, bold) + 2-4 sentence description
+
+Do not generate thumbnail art -- await designer delivery.
+
+### Two-Column Body
+
+At >=1024px: two equal flex columns side by side.
+At <1024px: columns stack (inputs -> diagram -> measurements).
+
+Input column (left):
+- Minimum height: 600px
+- No interior scrolling ever. Page scrolls; columns do not.
+- Contains: input groups (labeled clusters of FracInput/select fields)
+
+Right column:
+- Minimum height: 600px per zone (diagram + measurements stacked)
+- Diagram zone: SVG preview, full right-column width
+- Measurements zone: results table below diagram
+
+### Measurements Table
+
+Three columns: PANEL / CUT / SEWLINE
+
+Row groups have a sub-header row. Each shows a cut quantity pill (e.g. CUT 2).
+
+Stabilizer rows: when stabilizer active, each piece gets a sub-row.
+- Shows STABILIZER CUT value only (no SEWLINE)
+- Visually lighter -- smaller text, muted color, slight indent
+- Separate row, not a third column
+
+### Sides / Gusset Section
+
+Below two-column body. Full content width. Only renders when construction
+mode includes side panels or gusset.
+
+Side Panels mode: three diagrams in a row + matching measurements table.
+Gusset mode: single draggable gusset diagram + measurements table.
+Neither active: section hidden entirely.
+
+### Print Cards Section
+
+Full width below Sides section.
+Multiple cards: displayed in a row.
+Single card: centered, max-width ~400px.
+Each card: title, description, PrintButton.
+
+---
+
 ## Active Work — Pass 9 (done)
 
 ### Pass 9 -- Curved Panel First Implementation (done)
@@ -820,4 +907,86 @@ driving sizing from fitScale so diagrams fill available column width.
 - [x] Formatting punch list items confirmed visually
 - [x] `npm run build` passes with no new errors
 - [x] git commit + push to backup before closing the session
+
+---
+
+## Piping Exit Tail Geometry (CurvedPanel) — archived from CLAUDE.md
+
+Geometry is approved and implemented. Moved here to keep CLAUDE.md under 40k.
+Do not redesign, re-derive, or simplify without explicit instruction.
+
+Implemented in `computeExitTail()` and `drawStripRun()` inside `cpPanelDiagramSVG()`
+in `src/tabs/CurvedPanel.jsx`.
+
+### Variable glossary
+
+- **`easeArcRadius`** — set to `stripVisibleWidth` (installed folded-edge offset, accounting
+  for cord wrap). Used for: the on-panel folded-edge offset (`innerSides`), the B→A2 radius,
+  the B→A1 radius, the 55° arc radius, and the `stripStroke` visual width. This is `R` inside
+  `computeExitTail`. Do NOT revert to `stripCutWidth / 2` for these.
+- **`tailFoldWidth`** — set to `stripCutWidth / 2`. Used ONLY for the physical end-cap edge
+  Se (Tr→Tf). Do not use this for the arc geometry or the visible strip width.
+- **`Fi`** — folded-edge exit point, ON the panel cut edge, at exactly `1.5×SA + easeOff`
+  arc-distance from the failed corner. This is the anchor for all other points.
+- **`B`** — notch / bend point, ON the panel cut edge, placed `notchBack = R / sin(55°)`
+  behind Fi toward the normal run. B is the center of the 55° folded-edge ease arc.
+  The physical strip notch marker is placed at or near B.
+- **`A2`** — arc start; `B + nIn × R` (one radius inward from B, on the folded-edge path).
+- **`A1`** — arc end; `B + rotate(nIn, 55° TOWARD corner) × R`. The arc sweeps 55° from
+  A2 toward the failed corner. `turnSign` is derived from `cross(dirA2, cutTanTowardCorner)`.
+- **`exitDir`** — `unitV(Fi − A1)`; the folded-edge exit direction from the arc into the tail.
+- **`Tf`** — folded-edge tail tip; `Fi + exitDir × EXIT_OVERSHOOT` (past the cut edge).
+- **`Tr`** — raw-edge tail tip; `Tf + (−dirA1) × tailFoldWidth`. Tr→Tf is parallel to B→A1
+  and exactly `tailFoldWidth` (`stripCutWidth / 2`) long. This is the short end cap Se.
+- **`C`** — cord endpoint only; found by `linePathIntersectInfo(B, dirA2, cordPath)` —
+  a ray from B in the B→A2 direction (= nIn) intersected with the cord centerline path.
+  Fallback: `closestPathPointToLineInfo`. C is NOT on the folded-edge arc and must
+  never be placed on the folded-edge path.
+- **`Se`** — short end cap edge: Tr → Tf. Parallel to B→A1. Exactly `tailFoldWidth` long.
+
+### Geometry rules (binding — do not change without instruction)
+
+1. **Width split** — two named values govern different parts of the geometry:
+   - `easeArcRadius = stripVisibleWidth` — visible piping strip offset, 55° arc radius, B→A2,
+     B→A1. Uses the installed/folded-edge width so the on-panel strip reflects the real
+     installed appearance and the arc geometry is consistent with it.
+   - `tailFoldWidth = stripCutWidth / 2` — physical half-width of the flat cut strip, used
+     ONLY for the Se end cap: `Tr = Tf + (−dirA1) × tailFoldWidth`.
+   Do NOT revert `easeArcRadius` or `stripStroke` to `stripCutWidth / 2`.
+2. **B placement** — `notchBack = R / sin(55°)`, not just R. This ensures A1 lands
+   on a tangent line that passes cleanly through Fi.
+3. **Arc** — true circular arc A2 → A1, center B, radius R. SVG `A` command with
+   radius scaled to screen pixels (`R * scale`), not model inches. Arc is always ≤ 90°
+   so large-arc flag is always 0.
+4. **Arc direction** — 55° TOWARD the failed corner (`turnSign` from `dirA2 × cutTanTowardCorner`).
+5. **Tf and Tr** — both use `exitDir = unitV(Fi − A1)`, not `nOut`. The tail follows
+   the actual A1→Fi exit angle, not a perpendicular outward direction.
+6. **Se (Tr→Tf)** — parallel to B→A1, length `tailFoldWidth` (`stripCutWidth / 2`). Se is
+   the strip's short end edge and must always be visible in the SVG.
+7. **Cord** — the cord stays on its own cord centerline path. C is found by intersecting
+   the B→A2 construction line with `cordSides[side]`. C is the cord endpoint only;
+   the cord never routes through A1, A2, Tf, or any point on the folded-edge arc.
+8. **Two-pass trim in `drawStripRun`** — first trim to Fi (`exitOffset = 1.5×SA + easeOff`)
+   to locate the fold-exit point; then trim further by `notchBack` to get the B station
+   where the raw and folded edges terminate in the diagram. The cord uses a separate
+   trim distance (`cordDist`) returned by `computeExitTail`.
+9. **`cpPipingStraightStrips` trim** — the displayed cut length subtracts `exitTailBack =
+   (stripWidth/2) / sin(55°)` per failing end (in addition to `1.5×SA + easeOff`) so the
+   diagram cut length and the measurements table agree.
+10. **easeOff default** — 0. Base exit = 1.5×SA. Total exit offset = 1.5×SA + easeOff.
+
+### Folded-edge path (per strip run)
+
+```
+normal folded-edge run → A2 → [55° arc centered at B] → A1 → exitDir → Fi → Tf
+```
+
+### Polygon walk
+
+**startFail:** `M Tr → L B → L outer[0](Fi) → [cut-edge run] → [close/endFail] →
+[reversed inner run] → Arc(A2→A1) → L Fi → L Tf → Z`
+(Z closes Se: Tf → Tr)
+
+**endFail:** `[cut-edge run] → L B → L Tr → L Tf → L Fi → L A1 →
+Arc reversed(A1→A2) → [reversed inner run] → Z`
 - [ ] _removeLocalLoops fix (see Active Work in CLAUDE.md) -- NOT YET DONE

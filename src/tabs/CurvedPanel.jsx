@@ -1545,11 +1545,12 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
     ?`Curved panel · ${cpFmt(params.topW)} × ${cpFmt(params.height)} · SA ${cpFmt(sa)}`
     :"Curved panel";
 
-  const cuttingListPortalTarget = document.getElementById('cp-cutting-list-root');
+  const [portalTarget, setPortalTarget] = useState(null);
+  useEffect(() => { setPortalTarget(document.getElementById('cp-cutting-list-root')); }, []);
 
   return(
     <>
-    <div>
+    <div className="cp-wrap cp-redesign">
 
       {/* Title bar */}
       <div className="cp-title-bar">
@@ -2203,10 +2204,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
               </div>
             )}
 
-            {/* Scroll spacer — keeps sticky diagram visible when bottom
-                stages are open. Always keep this as the last element. */}
-            <div className="cp-scroll-spacer" aria-hidden="true" />
-
           </div>
         </div>{/* end right col */}
 
@@ -2214,8 +2211,9 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
 
     </div>{/* end calculator shell */}
 
-    {/* Cutting list + print bar: portaled below ms-page-card as a sibling card */}
-    {isActive && cuttingListPortalTarget && createPortal(
+    {/* Cutting list + print bar: portaled into #cp-cutting-list-root (sibling of cp-body) */}
+    {isActive && portalTarget && createPortal(
+      <>
       <div className="cp-cutting-card">
       <div className="cp-cutting-list">
         <div className="cp-cutting-header">
@@ -2376,12 +2374,13 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
           </div>
         </div>
       </div>
+      </div>
 
       {/* Print bar */}
-      {ready&&(
-        <div className="cp-print-bar">
-          <div className="cp-print-bar-title">Print patterns</div>
-          <div className="cp-print-grid-new">
+      <div className="cp-print-bar" style={!ready ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
+        <div className="cp-print-bar-title">Print patterns</div>
+        {!ready && <p className="cp-print-bar-hint">Enter dimensions to enable printing</p>}
+        <div className="cp-print-grid-new">
             <div className="cp-print-card-new">
               <div className="cp-print-card-title">Main panel</div>
               <div className="cp-print-card-meta">{panelPlan?cpTileLabel(panelPlan):"Add dimensions"}</div>
@@ -2414,11 +2413,10 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
               <PrintButton tone="cp" small label="Print cutting list" onClick={()=>window.print()}/>
             </div>
           </div>
-        </div>
-      )}
+      </div>
 
-      </div>,
-      cuttingListPortalTarget
+      </>,
+      portalTarget
     )}
 
     {/* Wrap material thickness modal */}
