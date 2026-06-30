@@ -111,8 +111,10 @@ export function computeExitTail(Fi, cutTanTowardCorner, nIn, cordPath, opts) {
 //   center       = panel center {x,y} (from model.cutBB) for inward-normal sign
 //   opts         = { sa, easeOff, R, tailFoldWidth, exitAngleRad, exitOvershoot, D }
 //
-// Returns: { stripLen, cordLen, tailStart, tailEnd, tailS, tailE }
-//   tailStart/tailEnd = the longitudinal tail added at each end (0 if that end passes)
+// Returns: { stripLen, cordLen, measureBackStart, measureBackEnd, tailS, tailE }
+//   measureBackStart/measureBackEnd = folded-path length at each eased end
+//        (straight A1→Tf + the 55° arc A1→A2); feeds the "measure back X from
+//        the short end" tip. 0 at an end with no tail.
 //   tailS/tailE       = the full computeExitTail result at each failed end (for
 //                       diagram reuse / "measure down X from the end" tips)
 export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
@@ -146,6 +148,13 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
   let tailS = null, tailE = null;
   let cordTrimStart = 0, cordTrimEnd = 0;
 
+  // Guards stay on purpose. For every strip that actually gets built, both ends
+  // ease: 4-side runs are rotated to start/end at a failing joint, and open-top
+  // "3side" forces the top corners allowed:false so they bookend the linear run.
+  // The false-branch is only reachable by a degenerate partial-subset run (e.g. a
+  // lone middle side with passing neighbors), where skipping the tail is correct.
+  // Do NOT remove these assuming "two ends always ease" — true for the real
+  // configs, but not structurally enforced at the call site.
   if (startFail) {
     const nIn = inwardNormal(startTan, outerAtFi[0]);
     tailS = computeExitTail(outerAtFi[0], mul(startTan, -1), nIn, cordSides[startSide], exitOpts);
