@@ -1869,31 +1869,48 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                       </div>
                     )}
 
-                    {/* Recommended cut strip width — bold display after inputs */}
-                    {pipingStripWidth&&(
-                      <div style={{marginTop:14,display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",paddingBottom:2}}>
-                        <span style={{fontWeight:800,fontSize:11,color:CP.muted,letterSpacing:"0.07em",textTransform:"uppercase"}}>Recommended cut strip width</span>
-                        <span style={{fontWeight:900,fontSize:19,color:"#5340b8",fontFamily:"DM Mono,monospace"}}>{cpFmt(pipingStripWidth.recommended)}</span>
-                      </div>
-                    )}
-
-                    {/* Results: closed-loop OR per-side strips */}
+                    {/* Results: closed-loop cut sizes */}
                     {pipingClosedLoop&&(
-                      <div style={{marginTop:14}}>
-                        <div style={{fontWeight:800,fontSize:11,color:CP.muted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:10}}>Cut sizes — closed loop</div>
-                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr",gap:"6px 12px",alignItems:"baseline"}}>
-                          <div/>
-                          <div style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>Geometric</div>
-                          <div style={{color:CP.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>Snug-fit</div>
-                          <div style={{color:CP.ink,fontWeight:800,fontFamily:"Nunito,sans-serif",fontSize:13}}>Strip</div>
-                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.geoStripLen)}</div>
-                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.snugStripLen)}</div>
-                          <div style={{color:CP.ink,fontWeight:800,fontFamily:"Nunito,sans-serif",fontSize:13}}>Cord</div>
-                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.geoCordLen)}</div>
-                          <div style={{color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17}}>{cpFmt(pipingClosedLoop.snugCordLen)}</div>
+                    <div style={{marginTop:14}}>
+                    {(() => {
+                      const EPS = 1/64;
+                      const stripVal = pipingClosedLoop.geoStripLen;
+                      const loopWhenSewn = stripVal - 2*sa;
+                      const matchesSewline = Math.abs(loopWhenSewn - model.activeSew.total) < EPS;
+                      const valCell = {color:"#5340b8",fontWeight:900,fontFamily:"DM Mono,monospace",fontSize:17};
+                      const labelCell = {color:CP.ink,fontWeight:800,fontFamily:"Nunito,sans-serif",fontSize:13};
+                      return (
+                        <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"6px 12px",alignItems:"baseline"}}>
+                          {pipingStripWidth&&(<>
+                            <div style={labelCell}>Strip width</div>
+                            <div style={valCell}>{cpFmt(pipingStripWidth.recommended)}</div>
+                          </>)}
+                          <div style={labelCell}>Strip length</div>
+                          <div style={valCell}>{cpFmt(stripVal)}</div>
+                          <div style={labelCell}>Cord</div>
+                          <div style={valCell}>{cpFmt(pipingClosedLoop.geoCordLen)}</div>
+                          <div style={labelCell}>Loop when sewn</div>
+                          <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                            <span style={valCell}>{cpFmt(loopWhenSewn)}</span>
+                            {matchesSewline?(
+                              <span style={{fontSize:10,fontWeight:800,color:"#1a7a3a",background:"#d8f3df",
+                                padding:"2px 8px",borderRadius:999,fontFamily:"Nunito,sans-serif",letterSpacing:"0.03em"}}>
+                                ✓ Matches Sewline</span>
+                            ):(
+                              <span style={{fontSize:10,fontWeight:800,color:"#9a3412",background:"#ffe4d6",
+                                padding:"2px 8px",borderRadius:999,fontFamily:"Nunito,sans-serif",letterSpacing:"0.03em"}}>
+                                ⚠ Check strip math</span>
+                            )}
+                          </div>
                         </div>
-                        <p className="cp-stage-hint" style={{marginTop:8}}>Geometric values are from sewline perimeter + seam allowances. Snug-fit is empirically calibrated for real-world ease — start there and ease while sewing.</p>
-                      </div>
+                      );
+                    })()}
+                    <div style={{marginTop:8,color:CP.muted,fontSize:11,lineHeight:1.5,fontFamily:"Nunito,sans-serif"}}>
+                      Cut sizes derive from the sewline perimeter plus seam allowances. Notch and clip
+                      the strip's raw edge before sewing — heavily on tight curves — to seat the piping
+                      snugly. The loop, once sewn with seams pressed open, restates the sewline.
+                    </div>
+                    </div>
                     )}
                     {!pipingClosedLoop&&pipingStraightStrips.length>0&&(
                       <div style={{marginTop:14}}>
