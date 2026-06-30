@@ -127,8 +127,8 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
   const outerAtFi = runPath(cutSides, sides, trimStart, trimEnd);
   if (outerAtFi.length < 2) {
     // Degenerate run; fall back to the bare sew run + seam allowances.
-    return { stripLen: sewRun + 2 * sa, cordLen: cordRun, tailStart: 0, tailEnd: 0,
-             tailS: null, tailE: null };
+    return { stripLen: sewRun + 2 * sa, cordLen: cordRun,
+             measureBackStart: 0, measureBackEnd: 0, tailS: null, tailE: null };
   }
 
   const startTan = tangentAt(outerAtFi, true);
@@ -144,15 +144,11 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
   const exitOpts = { R, tailFoldWidth, exitAngleRad, exitOvershoot, D };
 
   let tailS = null, tailE = null;
-  let tailStart = 0, tailEnd = 0;
   let cordTrimStart = 0, cordTrimEnd = 0;
 
   if (startFail) {
     const nIn = inwardNormal(startTan, outerAtFi[0]);
     tailS = computeExitTail(outerAtFi[0], mul(startTan, -1), nIn, cordSides[startSide], exitOpts);
-    // Longitudinal tail past the sewline endpoint at the start:
-    // exitOffset (corner→Fi) + notchBack (Fi→B) + exitOvershoot (Fi→Tf past edge).
-    tailStart = exitOffset + tailS.notchBack + exitOvershoot;
     // Cord stops at C: trim the cord run by how far C sits from the run start.
     const startCordSideLen = pathLen(cordSides[startSide] || []);
     cordTrimStart = (tailS.cordDist != null)
@@ -165,7 +161,6 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
   if (endFail) {
     const nIn = inwardNormal(endTan, outerAtFi[outerAtFi.length - 1]);
     tailE = computeExitTail(outerAtFi[outerAtFi.length - 1], endTan, nIn, cordSides[endSide], exitOpts);
-    tailEnd = exitOffset + tailE.notchBack + exitOvershoot;
     const endCordSideLen = pathLen(cordSides[endSide] || []);
     cordTrimEnd = (tailE.cordDist != null)
       ? Math.max(0, endCordSideLen - tailE.cordDist)
@@ -186,9 +181,11 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
     return straight + arc;
   };
   const stripLen = rawCordLen + segLen(tailS) + segLen(tailE);
+  const measureBackStart = segLen(tailS);
+  const measureBackEnd   = segLen(tailE);
 
   // Guard: cordLen can never exceed stripLen (always true since stripLen = rawCord + segs).
   const cordLen = Math.min(rawCordLen, stripLen);
 
-  return { stripLen, cordLen, tailStart, tailEnd, tailS, tailE };
+  return { stripLen, cordLen, measureBackStart, measureBackEnd, tailS, tailE };
 }

@@ -1834,46 +1834,38 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                         {(() => {
                           const baste = cpFmt(Math.max(1/8, sa - 1/8));
                           const saStr = cpFmt(sa);
+                          const ulStyle = {margin:"4px 0 0", paddingLeft:18, lineHeight:1.6};
+                          const liStyle = {marginBottom:6};
                           if (pipingClosedLoop) {
                             return (
-                              <span>
-                                <strong>Sewn as a closed loop.</strong> Mark the center of the strip.
-                                With right sides together, sew the strip into a loop using a {saStr} seam
-                                allowance. Open the seam, finger-press it flat, and stitch it open.
-                                {" "}Apply double-sided tape down the center line and along one long edge.
-                                Lay the piping cord on the center tape, then fold the strip over the cord
-                                so the long raw edges align. Work all the way around, keeping the cord out
-                                of the open seam-allowance area at the join (trim the cord if needed).
-                                {" "}Mark the center of the cord, opposite the strip's stitch line. Align
-                                that center mark to the center mark on the bag panel, clip in place, and
-                                begin notching along the curves — staying clear of where your sew line will
-                                fall. Notch and clip as you go, adding more wherever it's needed. The piping
-                                and cord should feel snug; that's good. Notch heavily at sharp corners,
-                                working the strip to align with the panel edge.
-                                {" "}Baste at {baste} from the raw edge.
-                              </span>
+                              <>
+                                <strong>Sewn as a closed loop.</strong>
+                                <ul style={ulStyle}>
+                                  <li style={liStyle}>Mark the center of the strip.</li>
+                                  <li style={liStyle}>Bring the two <strong>short ends</strong> together, <strong>right sides facing</strong>, and sew them with a {saStr} seam allowance to form a loop. Open that seam, finger-press it flat, and stitch it open.</li>
+                                  <li style={liStyle}>Apply double-sided tape down the center line and along one long edge. Lay the cord on the center tape, then fold the strip over it so the long raw edges align.</li>
+                                  <li style={liStyle}>Work all the way around, keeping the cord out of the open seam-allowance area at the join (trim the cord if needed).</li>
+                                  <li style={liStyle}>Mark the center of the cord, opposite the strip's stitch line. Align it to the panel's center mark and clip in place.</li>
+                                  <li style={liStyle}>Notch along the curves as you go — staying clear of your sew line — adding more wherever needed. The piping should feel snug; that's good. Notch heavily at sharp corners.</li>
+                                  <li style={liStyle}>Baste at {baste} from the raw edge.</li>
+                                </ul>
+                              </>
                             );
                           }
-                          const tailBack = (pipingStraightStrips && pipingStraightStrips[0])
-                            ? cpFmt(pipingStraightStrips[0].exitTailBack) : null;
+                          const s0 = pipingStraightStrips && pipingStraightStrips[0];
+                          const tailBack = (s0 && Number.isFinite(s0.measureBackStart)) ? cpFmt(s0.measureBackStart) : null;
                           return (
-                            <span>
-                              <strong>Sewn with open tails.</strong> From each short end of the strip,
-                              measure back {tailBack ? tailBack : "about 1½ strip-widths"} and mark; do
-                              the same at the opposite end. Draw a center line between the two marks.
-                              Apply double-sided tape down that center line, and again along one entire
-                              long edge. Lay the piping cord on the center tape, then fold the strip over
-                              the cord so the long raw edges align.
-                              {" "}Mark the center of each strip. Align the folded strip's raw edges to
-                              the panel — matching strip center to panel center and to the marks on the
-                              pattern — clip in place, and notch along the curves, staying clear of where
-                              your sew line will fall. The piping and cord should feel snug; that's good.
-                              Notch heavily at sharp corners, working the strip to align with the panel edge.
-                              {" "}Where the empty strip eases away from the cord, add a notch — it lets
-                              the strip fold away cleanly (the diagram marks this point). To keep the cord
-                              out of the seam allowance, you may need to trim it.
-                              {" "}Baste at {baste} from the raw edge, then trim any excess strip material.
-                            </span>
+                            <>
+                              <strong>Sewn with open tails.</strong>
+                              <ul style={ulStyle}>
+                                <li style={liStyle}>From each short end, measure back {tailBack ? tailBack : "about 1½ strip-widths"} and mark; draw a center line between the two marks.</li>
+                                <li style={liStyle}>Apply double-sided tape down that center line and along one long edge. Lay the cord on the center tape, then fold the strip over it so the long raw edges align.</li>
+                                <li style={liStyle}>Mark the center of each strip. Align the folded raw edges to the panel — strip center to panel center, and to the pattern marks — then clip in place.</li>
+                                <li style={liStyle}>Notch along the curves, staying clear of your sew line. The piping should feel snug; that's good. Notch heavily at sharp corners.</li>
+                                <li style={liStyle}>Where the empty strip eases away from the cord, add a notch so it folds away cleanly (the diagram marks this point). Trim the cord if needed to keep it out of the seam allowance.</li>
+                                <li style={liStyle}>Baste at {baste} from the raw edge, then trim any excess strip material.</li>
+                              </ul>
+                            </>
                           );
                         })()}
                       </div>

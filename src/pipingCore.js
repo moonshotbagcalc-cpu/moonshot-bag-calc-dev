@@ -199,8 +199,8 @@ export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick
           cutLength:stripLen,
           cutWidth:stripWidth,
           cordLength:cordLen,
-          tailStart:m?m.tailStart:0,
-          tailEnd:m?m.tailEnd:0,
+          measureBackStart:m?m.measureBackStart:0,
+          measureBackEnd:m?m.measureBackEnd:0,
           tailS:m?m.tailS:null,
           tailE:m?m.tailE:null,
         });
