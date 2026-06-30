@@ -41,12 +41,12 @@ export function pathSegModel(path,dS=0,dE=null){
   const out=[];
   for(let i=0;i<ann.length-1;i++){
     const a=ann[i],b=ann[i+1],seg=b.dist-a.dist||1e-9;
-    if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:a.side});}
-    if(a.dist>=dS&&a.dist<=dE)out.push({x:a.x,y:a.y,side:a.side});
-    if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:b.side});}
+    if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:a.side,corner:a.corner});}
+    if(a.dist>=dS&&a.dist<=dE)out.push({x:a.x,y:a.y,side:a.side,corner:a.corner});
+    if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:b.side,corner:b.corner});}
   }
   const last=ann[ann.length-1];
-  if(last.dist>=dS&&last.dist<=dE)out.push({x:last.x,y:last.y,side:last.side});
+  if(last.dist>=dS&&last.dist<=dE)out.push({x:last.x,y:last.y,side:last.side,corner:last.corner});
   return cpDedupePath(out,false);
 }
 
