@@ -41,6 +41,11 @@ import {
   cpPipingNotchSpacing, cpPipingStripWidth, cpPipingInstalledFoldWidth,
   cpPipingCornerRules, cpPipingStraightStrips, cpPipingClosedLoop,
 } from "../pipingCore.js";
+import {
+  add, sub, mul, dot, perp, len, unitV,
+  cpDist, cpDedupePath, pathLen, pathSegModel, concatSegs,
+  runPath, tangentAt, linePathIntersectInfo, closestPathPointToLineInfo,
+} from "../pathGeometry.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── CURVED PANEL — fair-curve calculator (replaces the old Advanced tab) ──────
@@ -105,7 +110,6 @@ function cpLineIntersect(a1,a2,b1,b2){
   if(!Number.isFinite(px)||!Number.isFinite(py))return null;
   return {x:px,y:py};
 }
-function cpDist(a,b){return Math.hypot((b?.x||0)-(a?.x||0),(b?.y||0)-(a?.y||0));}
 function cpPathLen(pts){let l=0;for(let i=1;i<(pts?.length||0);i++)l+=cpDist(pts[i-1],pts[i]);return l;}
 function cpLineDirIntersect(p1,d1,p2,d2){
   const den=d1.x*d2.y-d1.y*d2.x;
@@ -113,16 +117,6 @@ function cpLineDirIntersect(p1,d1,p2,d2){
   const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/den;
   return {x:p1.x+d1.x*t,y:p1.y+d1.y*t};
 }
-function cpDedupePath(pts,closed=false){
-  const out=[];
-  for(const p of pts||[]){
-    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
-    if(!out.length||cpDist(out[out.length-1],p)>1e-7)out.push({...p});
-  }
-  if(closed&&out.length>2&&cpDist(out[0],out[out.length-1])<1e-7)out.pop();
-  return out;
-}
-
 /* =====================================================================
    ON-SCREEN DIAGRAM + PIECE RENDERERS (ported from prototype render())
    ===================================================================== */
@@ -196,13 +190,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     const cornerFails=idx=>!!pipOpts.corners?.[idx]&&!pipOpts.corners[idx].allowed;
     const sc=p=>({x:X(p.x),y:Y(p.y)});
     const pt=q=>`${q.x.toFixed(1)},${q.y.toFixed(1)}`;
-    const add=(a,b)=>({x:a.x+b.x,y:a.y+b.y});
-    const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y});
-    const mul=(a,k)=>({x:a.x*k,y:a.y*k});
-    const dot=(a,b)=>a.x*b.x+a.y*b.y;
-    const perp=v=>({x:-v.y,y:v.x});
-    const len=v=>Math.hypot(v.x,v.y);
-    const unitV=v=>{const l=len(v)||1e-9;return{x:v.x/l,y:v.y/l};};
     const cordW=Math.max(1.0,D*scale).toFixed(2);
     const stripStroke=Math.max(1.0,Math.min(2.2,stripVisibleWidth*scale*0.055)).toFixed(2);
     let pipingPieceSerial=0;
@@ -222,54 +209,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     // transition for the short easing tail/end-cap width.
     const tailFoldWidth = stripCutWidth / 2;
 
-    function pathLen(path){let l=0;for(let i=1;i<path.length;i++)l+=cpDist(path[i-1],path[i]);return l;}
-    function pathSegModel(path,dS=0,dE=null){
-      if(!path||path.length<2)return[];
-      const total=pathLen(path);
-      dS=Math.max(0,Math.min(dS,total));
-      dE=dE==null?total:Math.max(0,Math.min(dE,total));
-      if(dE<=dS+1e-7)return[];
-      const ann=[{dist:0,...path[0]}];
-      for(let i=1;i<path.length;i++)ann.push({dist:ann[i-1].dist+cpDist(path[i-1],path[i]),...path[i]});
-      const out=[];
-      for(let i=0;i<ann.length-1;i++){
-        const a=ann[i],b=ann[i+1],seg=b.dist-a.dist||1e-9;
-        if(a.dist<dS&&b.dist>dS){const t=(dS-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:a.side});}
-        if(a.dist>=dS&&a.dist<=dE)out.push({x:a.x,y:a.y,side:a.side});
-        if(a.dist<dE&&b.dist>dE){const t=(dE-a.dist)/seg;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,side:b.side});}
-      }
-      const last=ann[ann.length-1];
-      if(last.dist>=dS&&last.dist<=dE)out.push({x:last.x,y:last.y,side:last.side});
-      return cpDedupePath(out,false);
-    }
-    function concatSegs(segments){
-      const out=[];
-      for(const seg of segments){
-        for(let i=0;i<seg.length;i++){
-          const p=seg[i];
-          if(out.length&&i===0&&cpDist(out[out.length-1],p)<1e-7)continue;
-          out.push({...p});
-        }
-      }
-      return cpDedupePath(out,false);
-    }
-    function runPath(sidePaths,sides,startTrim,endTrim){
-      const segs=[];
-      for(let i=0;i<sides.length;i++){
-        const side=sides[i],path=sidePaths[side]||[],L=pathLen(path);
-        const dS=i===0?Math.min(startTrim,L*0.45):0;
-        const dE=i===sides.length-1?Math.max(0,L-Math.min(endTrim,L*0.45)):L;
-        const seg=pathSegModel(path,dS,dE);
-        if(seg.length)segs.push(seg);
-      }
-      return concatSegs(segs);
-    }
-    function tangentAt(pts,atStart){
-      if(!pts||pts.length<2)return {x:1,y:0};
-      const a=atStart?pts[0]:pts[pts.length-2];
-      const b=atStart?pts[1]:pts[pts.length-1];
-      return unitV(sub(b,a));
-    }
     function nearestCutFrame(point){
       const pts=model.cutPts||[];
       if(pts.length<2){
@@ -443,56 +382,6 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       let cd=`M ${pt(cordPts[0])}`;
       for(let i=1;i<cordPts.length;i++)cd+=` L ${pt(cordPts[i])}`;
       svg+=`<path class="cp-piping-cord" data-piece="${pieceId}" d="${cd}" fill="none" stroke="${C_CORD}" stroke-width="${cordW}" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-    }
-    function linePathIntersectInfo(origin,dir,path,maxT=null){
-      // Same intersection idea as rayPathIntersect(), but returns a point that is
-      // guaranteed to lie on the supplied polyline plus its distance along that polyline.
-      // Used for C so the cord keeps following its own centerline instead of bending
-      // toward the folded-edge A1/A2 geometry.
-      if(!path||path.length<2)return null;
-      const u=unitV(dir);
-      let best=null,bestScore=Infinity,walk=0;
-      for(let i=0;i<path.length-1;i++){
-        const a=path[i],b=path[i+1];
-        const ex=b.x-a.x,ey=b.y-a.y,L=Math.hypot(ex,ey);
-        if(L<1e-9){continue;}
-        const denom=u.x*ey-u.y*ex;
-        if(Math.abs(denom)>1e-10){
-          const fx=origin.x-a.x,fy=origin.y-a.y;
-          const t=(fx*ey-fy*ex)/denom;
-          const segS=(fx*u.y-fy*u.x)/denom;
-          if(t>=-1e-6 && (maxT==null||t<=maxT+1e-6) && segS>=-1e-6 && segS<=1+1e-6){
-            const q={x:a.x+segS*ex,y:a.y+segS*ey};
-            const score=Math.abs(t-(maxT==null?t:Math.min(maxT,t)));
-            if(score<bestScore){bestScore=score;best={point:q,dist:walk+segS*L,t};}
-          }
-        }
-        walk+=L;
-      }
-      return best;
-    }
-    function closestPathPointToLineInfo(origin,dir,path){
-      // Fallback only: choose the point on the cord path nearest the B→A1 construction line.
-      // This still keeps C on the cord path, unlike the old fallback that placed C near A2.
-      if(!path||path.length<2)return null;
-      const u=unitV(dir);
-      const n=perp(u);
-      let best=null,bestD=Infinity,walk=0;
-      for(let i=0;i<path.length-1;i++){
-        const a=path[i],b=path[i+1];
-        const ab=sub(b,a),L=len(ab);
-        if(L<1e-9){continue;}
-        // Minimize signed distance to the infinite line origin + t*u over this segment.
-        const da=dot(sub(a,origin),n),db=dot(sub(b,origin),n);
-        let s=0;
-        if(Math.abs(da-db)>1e-10)s=Math.max(0,Math.min(1,da/(da-db)));
-        else s=0;
-        const q=add(a,mul(ab,s));
-        const d=Math.abs(dot(sub(q,origin),n));
-        if(d<bestD){bestD=d;best={point:q,dist:walk+s*L};}
-        walk+=L;
-      }
-      return best;
     }
     function computeExitTail(Fi,cutTanTowardCorner,nIn,cordPath){
       // Exit-tail geometry. All coords in inches.
@@ -1958,10 +1847,25 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                               </span>
                             );
                           }
+                          const tailBack = (pipingStraightStrips && pipingStraightStrips[0])
+                            ? cpFmt(pipingStraightStrips[0].exitTailBack) : null;
                           return (
                             <span>
-                              For tight curves, notch your piping strip every 3/8″. For larger curves,
-                              notch accordingly to ensure a comfortable but snug fit to the bag panel.
+                              <strong>Sewn with open tails.</strong> From each short end of the strip,
+                              measure back {tailBack ? tailBack : "about 1½ strip-widths"} and mark; do
+                              the same at the opposite end. Draw a center line between the two marks.
+                              Apply double-sided tape down that center line, and again along one entire
+                              long edge. Lay the piping cord on the center tape, then fold the strip over
+                              the cord so the long raw edges align.
+                              {" "}Mark the center of each strip. Align the folded strip's raw edges to
+                              the panel — matching strip center to panel center and to the marks on the
+                              pattern — clip in place, and notch along the curves, staying clear of where
+                              your sew line will fall. The piping and cord should feel snug; that's good.
+                              Notch heavily at sharp corners, working the strip to align with the panel edge.
+                              {" "}Where the empty strip eases away from the cord, add a notch — it lets
+                              the strip fold away cleanly (the diagram marks this point). To keep the cord
+                              out of the seam allowance, you may need to trim it.
+                              {" "}Baste at {baste} from the raw edge, then trim any excess strip material.
                             </span>
                           );
                         })()}
