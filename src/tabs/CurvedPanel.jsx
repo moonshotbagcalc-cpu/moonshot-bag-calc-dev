@@ -1905,11 +1905,6 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                         </div>
                       );
                     })()}
-                    <div style={{marginTop:8,color:CP.muted,fontSize:11,lineHeight:1.5,fontFamily:"Nunito,sans-serif"}}>
-                      Cut sizes derive from the sewline perimeter plus seam allowances. Notch and clip
-                      the strip's raw edge before sewing — heavily on tight curves — to seat the piping
-                      snugly. The loop, once sewn with seams pressed open, restates the sewline.
-                    </div>
                     </div>
                     )}
                     {!pipingClosedLoop&&pipingStraightStrips.length>0&&(
@@ -1937,11 +1932,39 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
                       <p className="cp-stage-hint" style={{marginTop:8}}>Enter panel dimensions to see corner analysis and strip sizes.</p>
                     )}
 
-                    {/* Notch tip — shown when piping is active */}
                     {pipingOn&&(
                       <div className="ms-tip-box">
                         <span className="ms-tip-pill">Moonshot Tip</span>
-                        For tight curves, notch your piping strip every 3/8″. For larger curves, notch accordingly to ensure a comfortable but snug fit to the bag panel.
+                        {(() => {
+                          const baste = cpFmt(Math.max(1/8, sa - 1/8));
+                          const saStr = cpFmt(sa);
+                          if (pipingClosedLoop) {
+                            return (
+                              <span>
+                                <strong>Sewn as a closed loop.</strong> Mark the center of the strip.
+                                With right sides together, sew the strip into a loop using a {saStr} seam
+                                allowance. Open the seam, finger-press it flat, and stitch it open.
+                                {" "}Apply double-sided tape down the center line and along one long edge.
+                                Lay the piping cord on the center tape, then fold the strip over the cord
+                                so the long raw edges align. Work all the way around, keeping the cord out
+                                of the open seam-allowance area at the join (trim the cord if needed).
+                                {" "}Mark the center of the cord, opposite the strip's stitch line. Align
+                                that center mark to the center mark on the bag panel, clip in place, and
+                                begin notching along the curves — staying clear of where your sew line will
+                                fall. Notch and clip as you go, adding more wherever it's needed. The piping
+                                and cord should feel snug; that's good. Notch heavily at sharp corners,
+                                working the strip to align with the panel edge.
+                                {" "}Baste at {baste} from the raw edge.
+                              </span>
+                            );
+                          }
+                          return (
+                            <span>
+                              For tight curves, notch your piping strip every 3/8″. For larger curves,
+                              notch accordingly to ensure a comfortable but snug fit to the bag panel.
+                            </span>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
