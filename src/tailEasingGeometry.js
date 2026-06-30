@@ -172,13 +172,23 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
       : exitOffset;
   }
 
-  // Strip: full sew run, plus seam allowances at both short ends, plus the tail at
-  // each FAILED end (passing ends contribute 0 tail).
-  const stripLen = sewRun + 2 * sa + tailStart + tailEnd;
+  // Cord: trimmed at each failed end to where C lands on its own centerline path.
+  const rawCordLen = Math.max(0, cordRun - cordTrimStart - cordTrimEnd);
 
-  // Cord: the cord run trimmed at each failed end to where C lands. Guard so it
-  // can never exceed the strip or go negative.
-  const cordLen = Math.max(0, Math.min(cordRun - cordTrimStart - cordTrimEnd, stripLen));
+  // Strip = cord (middle) + at each end the straight exit segment A1→Tf plus the
+  // 55° easing arc A1→A2. Both ends always ease (a strip only terminates at failed
+  // corners). Measures the actual folded path — not sewRun + tails, which wrongly
+  // counts the fold-back geometry as additive longitudinal length.
+  const segLen = (t) => {
+    if (!t) return 0;
+    const arc = t.R_arc * exitAngleRad;       // arc length A1→A2 = R × 55°
+    const straight = len(sub(t.Tf, t.A1));     // straight exit segment A1→Tf
+    return straight + arc;
+  };
+  const stripLen = rawCordLen + segLen(tailS) + segLen(tailE);
+
+  // Guard: cordLen can never exceed stripLen (always true since stripLen = rawCord + segs).
+  const cordLen = Math.min(rawCordLen, stripLen);
 
   return { stripLen, cordLen, tailStart, tailEnd, tailS, tailE };
 }

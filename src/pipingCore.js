@@ -1,4 +1,5 @@
 // src/pipingCore.js — pure piping math; no React, no formatting imports.
+import { measureStripRun } from "./tailEasingGeometry.js";
 
 /*
  * ─────────────────────────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ export const CORD_STAY_AWAY       = 1/64;
 export const CLOSED_LOOP_STRIP_PCT = 0.950;
 export const CLOSED_LOOP_CORD_PCT  = 0.915;
 export const EXIT_ANGLE_DEG        = 55;
+export const EXIT_OVERSHOOT_IN     = 0.25; // strip tail extension past Fi, imperial (inches)
+export const EXIT_OVERSHOOT_MM     = 5;    // same, metric (mm) — caller converts to inches
 
 /* Discrete curvature at a corner junction: same circumradius technique as
    notchPlan() in curved-panel-core.js.  Examines a window of cut-path points
@@ -133,7 +136,7 @@ export function cpPipingCornerRules(cutPts,softTs,softBs,topMode){
      [0]=Top-right  [1]=Bottom-right  [2]=Bottom-left  [3]=Top-left
    Corner BEFORE each side:  top→3, right→0, bottom→1, left→2
    Corner AFTER  each side:  top→0, right→1, bottom→2, left→3            */
-export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOff,cornerResults){
+export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick,easeOff,cornerResults,cutSides,cordSides,center,exitOvershoot){
   const JOINT_BEFORE={top:3,right:0,bottom:1,left:2};
   const JOINT_AFTER ={top:0,right:1,bottom:2,left:3};
   const ALL_SIDES   =['top','right','bottom','left'];
@@ -157,7 +160,14 @@ export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick
 
   const strips=[];
   const stripWidth=cpPipingStripWidth(cordDia,vinylThick,sa).recommended;
-  const exitTailBack=(stripWidth/2)/Math.sin(EXIT_ANGLE_DEG*Math.PI/180);
+  const measureOpts={
+    sa, easeOff,
+    R:stripWidth/2,                      // authoritative cut basis = stripWidth/2 (§9)
+    tailFoldWidth:stripWidth/2,
+    exitAngleRad:EXIT_ANGLE_DEG*Math.PI/180,
+    exitOvershoot:exitOvershoot||0,      // ¼"/5mm, passed unit-aware from the caller
+    D:cordDia,
+  };
   let runSides=[],totalLen=0,totalCordLen=0;
 
   for(let i=0;i<orderedSides.length;i++){
@@ -170,22 +180,29 @@ export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick
     const exitFails=fails(cornerResults?.[JOINT_AFTER[side]]);
 
     if(isLast||exitFails){
-      const firstSide=runSides[0],lastSide=runSides[runSides.length-1];
-      const startTrim=fails(cornerResults?.[JOINT_BEFORE[firstSide]])?1.5*sa+easeOff+exitTailBack:0;
-      const endTrim  =exitFails?1.5*sa+easeOff+exitTailBack:0;
-      const effective=Math.max(0,totalLen-startTrim-endTrim);
-      const cordEffective=Math.max(0,totalCordLen-startTrim-endTrim);
-      if(effective>1e-9){
-        // Human-readable label: "Right + Bottom + Left" for a 3-side merge
+      const firstSide=runSides[0];
+      const startFail=fails(cornerResults?.[JOINT_BEFORE[firstSide]]);
+      const endFail=exitFails;
+      const m=(cutSides&&cordSides&&center)
+        ? measureStripRun([...runSides],cutSides,cordSides,totalLen,totalCordLen,startFail,endFail,center,measureOpts)
+        : null;
+      const stripLen=m?m.stripLen:totalLen+2*sa;
+      const cordLen=m?m.cordLen:totalCordLen;
+      const effective=Math.max(0,stripLen-2*sa);
+      if(stripLen>1e-9){
         const label=runSides.map(s=>s[0].toUpperCase()+s.slice(1)).join(' + ');
         strips.push({
           sides:[...runSides],side:label,
-          sewRun:totalLen,leftEase:startTrim,rightEase:endTrim,
+          sewRun:totalLen,
+          startFail,endFail,
           effectiveRun:effective,
-          cutLength:effective+2*sa,
+          cutLength:stripLen,
           cutWidth:stripWidth,
-          cordLength:cordEffective,
-          exitTailBack:exitTailBack,
+          cordLength:cordLen,
+          tailStart:m?m.tailStart:0,
+          tailEnd:m?m.tailEnd:0,
+          tailS:m?m.tailS:null,
+          tailE:m?m.tailE:null,
         });
       }
       runSides=[];totalLen=0;totalCordLen=0;

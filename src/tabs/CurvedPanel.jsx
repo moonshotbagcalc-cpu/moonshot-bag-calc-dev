@@ -37,7 +37,7 @@ import {
 import {
   MIN_PIPING_RADIUS, CORD_STAY_AWAY,
   CLOSED_LOOP_STRIP_PCT, CLOSED_LOOP_CORD_PCT,
-  EXIT_ANGLE_DEG,
+  EXIT_ANGLE_DEG, EXIT_OVERSHOOT_IN, EXIT_OVERSHOOT_MM,
   cpPipingNotchSpacing, cpPipingStripWidth, cpPipingInstalledFoldWidth,
   cpPipingCornerRules, cpPipingStraightStrips, cpPipingClosedLoop,
 } from "../pipingCore.js";
@@ -1188,8 +1188,15 @@ export default function CurvedPanelPage({unitMode="imperial",setUnitMode=()=>{},
   const pipingCordRuns=ready&&model.valid&&pipingOn&&pipingCord>1e-9
     ?Object.fromEntries(Object.entries(offsetSidePaths(model.sewSides,pipingCord/2+CORD_STAY_AWAY)).map(([side,path])=>[side,cpPathLen(path)]))
     :null;
+  const pipingCordSides=ready&&model.valid&&pipingOn&&pipingCord>1e-9
+    ?offsetSidePaths(model.sewSides,pipingCord/2+CORD_STAY_AWAY)
+    :null;
+  const pipingPanelCenter=model.cutBB
+    ?{x:(model.cutBB.minX+model.cutBB.maxX)/2,y:(model.cutBB.minY+model.cutBB.maxY)/2}
+    :null;
+  const pipingExitOvershoot=isMetric()?(EXIT_OVERSHOOT_MM/25.4):EXIT_OVERSHOOT_IN;
   const pipingStraightStrips=ready&&model.valid&&pipingOn&&pipingCord>1e-9&&!pipingAllCornersPass
-    ?cpPipingStraightStrips(model.activeSew.runs,pipingCordRuns,sa,pipingCord,vinylThick,pipingEaseOffClamped,pipingCorners)
+    ?cpPipingStraightStrips(model.activeSew.runs,pipingCordRuns,sa,pipingCord,vinylThick,pipingEaseOffClamped,pipingCorners,model.cutSides,pipingCordSides,pipingPanelCenter,pipingExitOvershoot)
     :[];
   const pipingClosedLoop=pipingAllCornersPass&&pipingCord>1e-9
     ?cpPipingClosedLoop(model.cutPerim,model.activeSew.total,sa,pipingCord,vinylThick)
