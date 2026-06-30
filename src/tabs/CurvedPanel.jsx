@@ -196,9 +196,7 @@ function cpPanelDiagramSVG(model,params,pipOpts){
     const pipingClipMarkPoints=[];
 
     // ── Exit-tail geometry constants ─────────────────────────────────────────
-    const EXIT_OVERSHOOT_IN = 0.25;  // strip extension past fold-exit point (imperial, inches)
-    const EXIT_OVERSHOOT_MM = 5;     // same, metric mm — converted to inches below
-    // EXIT_ANGLE_DEG imported from ../pipingCore.js (shared with cut-list calc)
+    // EXIT_ANGLE_DEG, EXIT_OVERSHOOT_IN, EXIT_OVERSHOOT_MM imported from ../pipingCore.js
     const EXIT_ANGLE_RAD    = EXIT_ANGLE_DEG * Math.PI / 180;
     // All model geometry is stored in inches; convert mm at use-time so the math stays consistent.
     const EXIT_OVERSHOOT    = isMetric() ? EXIT_OVERSHOOT_MM / 25.4 : EXIT_OVERSHOOT_IN;
