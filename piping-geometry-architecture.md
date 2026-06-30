@@ -4,7 +4,8 @@
 > Captures *why* the piping lines are derived the way they are, so future
 > work (human or Claude Code) doesn't "helpfully" unify them and reintroduce
 > solved bugs.
-> Last updated: failed-corner strip-length fix + shared-geometry extraction session.
+> Last updated: piping cleanup session — guard-keep decision (§6.2) + open-top
+> resolved in code (§6.4).
 
 ---
 
@@ -243,18 +244,28 @@ identical at the swap step was the trust proof.
    `computeExitTail`/`drawStripRun`. Delete the diagram's copy and have it
    import from `tailEasingGeometry.js` (passing visible-width R for drawing).
    One source of truth. Verify the diagram stays pixel-identical.
-2. **`measureStripRun` conditional cleanup.** Now that a failed corner ALWAYS
-   yields a strip with two easing ends (§4b rule), the `startFail`/`endFail`
-   conditionals in `measureStripRun` (and possibly the now-unused
-   `tailStart`/`tailEnd` longitudinal calcs) are redundant for any strip that
-   gets built. Simplify — but FIRST confirm no degenerate single-side/open-edge
-   run relies on the guard. Its own commit (refactor, not behavior).
+2. **`measureStripRun` conditional cleanup — RESOLVED: KEEP the guards.** The
+   `startFail`/`endFail` conditionals are NOT redundant; they stay. For every
+   strip that actually gets built both ends do ease (4-side runs are rotated to
+   start/end at a failing joint; open-top "3side" forces the two top corners
+   `allowed:false` so they bookend the linear run — see §6.4). But that is NOT
+   structurally enforced at the call site (`cpPipingStraightStrips`): the only
+   reachable false-branch is a degenerate partial-subset run (a lone middle side
+   whose neighbour corners both pass), where skipping the tail is correct. A
+   keep-comment above the `if (startFail)` block now records this. The stale
+   `tailStart`/`tailEnd` JSDoc was the only real debt and is fixed.
+   (commit da1e5ad — comments/JSDoc only.)
 3. **Redundant EXIT_OVERSHOOT consts in the diagram.** `EXIT_OVERSHOOT_IN/MM`
    are now exported from `pipingCore.js` and imported; the diagram's old local
    consts still shadow them (harmless, identical values). Remove the locals in
    the Phase 2 / style sweep.
-4. **Confirm the open-top edge run** (sewline runs UP an open top rather than
-   closing across it). Still a verification, not a code change.
+4. **Open-top edge run — RESOLVED in code (visual confirm optional).** Open-top
+   is not a special edge anywhere: in `3side` mode `cpPipingCornerRules` sets the
+   two top corners `allowed:false` (before any radius check), and `fails()` treats
+   that identically to a geometric fail. So an open-top run is bookended by
+   "failing" corners and both ends ease — which is why the §6.2 guards always see
+   true in real configs. A visual confirm that the sewline runs UP the open top
+   (rather than closing across it) is still nice-to-have but no longer blocking.
 5. **Diagram fold-edge length** should consume the cut-list strip number;
    diagram is the design-aid tier, cut list is authoritative. Lower priority.
 6. **"Measure down X from the short end" tip.** Now that the real exit-tail
@@ -311,8 +322,11 @@ Re-confirm exact lines with a read-only pass before any edit.
 
 ## 9. Decisions & nuances log (don't lose these)
 
-- **A failed corner ALWAYS yields a strip with two easing ends.** §4b. This is
-  the rule that simplifies the open-strip math and enables the §6.2 cleanup.
+- **A failed corner ALWAYS yields a strip with two easing ends — in real
+  configs.** §4b. Holds because runs are bookended by failing joints (4-side
+  rotation) or by open-top corners forced `allowed:false` (§6.4). It is NOT
+  structurally enforced at the call site, so the `startFail`/`endFail` guards
+  STAY — a degenerate partial-subset run is the one legit false-branch. See §6.2.
 - **Strip = measured folded path, never sewline ± offsets.** The bug was
   treating 2D fold geometry as 1D length (first subtractively → too short, then
   additively → too long). Measure between the real returned points. §4b.
