@@ -185,6 +185,7 @@ export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick
           cutLength:effective+2*sa,
           cutWidth:stripWidth,
           cordLength:cordEffective,
+          exitTailBack:exitTailBack,
         });
       }
       runSides=[];totalLen=0;totalCordLen=0;
