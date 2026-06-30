@@ -14,7 +14,7 @@
 
 import {
   add, sub, mul, dot, perp, len, unitV,
-  pathLen, runPath, tangentAt,
+  pathLen, runPath, tangentAt, straightTangentAt,
   linePathIntersectInfo, closestPathPointToLineInfo,
 } from "./pathGeometry.js";
 
@@ -133,8 +133,8 @@ export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
              measureBackStart: 0, measureBackEnd: 0, tailS: null, tailE: null };
   }
 
-  const startTan = tangentAt(outerAtFi, true);
-  const endTan   = tangentAt(outerAtFi, false);
+  const startTan = straightTangentAt(outerAtFi, true);
+  const endTan   = straightTangentAt(outerAtFi, false);
   const startSide = sides[0], endSide = sides[sides.length - 1];
 
   const inwardNormal = (tangent, point) => {

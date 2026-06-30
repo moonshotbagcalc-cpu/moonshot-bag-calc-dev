@@ -131,3 +131,22 @@ export function closestPathPointToLineInfo(origin,dir,path){
   }
   return best;
 }
+
+// Tangent at a run end, skipping corner-blend points so the direction comes from
+// the STRAIGHT edge, not a folded-in fillet arc. Falls back to the raw end
+// tangent if the run is entirely corner points (degenerate). At a crisp corner
+// there are no corner points, so this returns exactly tangentAt's result.
+export function straightTangentAt(pts,atStart){
+  if(!pts||pts.length<2)return tangentAt(pts,atStart);
+  if(atStart){
+    let i=0;
+    while(i<pts.length&&pts[i].corner)i++;          // skip leading corner pts
+    if(i>=pts.length-1)return tangentAt(pts,true);   // all corner — fall back
+    return unitV(sub(pts[i+1],pts[i]));
+  }else{
+    let j=pts.length-1;
+    while(j>=0&&pts[j].corner)j--;                    // skip trailing corner pts
+    if(j<1)return tangentAt(pts,false);              // all corner — fall back
+    return unitV(sub(pts[j],pts[j-1]));
+  }
+}

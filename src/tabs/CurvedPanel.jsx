@@ -44,7 +44,7 @@ import {
 import {
   add, sub, mul, dot, perp, len, unitV,
   cpDist, cpDedupePath, pathLen, pathSegModel, concatSegs,
-  runPath, tangentAt, linePathIntersectInfo, closestPathPointToLineInfo,
+  runPath, tangentAt, straightTangentAt, linePathIntersectInfo, closestPathPointToLineInfo,
 } from "../pathGeometry.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -466,7 +466,7 @@ function cpPanelDiagramSVG(model,params,pipOpts){
       const outerAtFi=runPath(model.cutSides,sides,trimStart,trimEnd);
       if(outerAtFi.length<2)return;
 
-      const startTan=tangentAt(outerAtFi,true),endTan=tangentAt(outerAtFi,false);
+      const startTan=straightTangentAt(outerAtFi,true),endTan=straightTangentAt(outerAtFi,false);
       const startSide=sides[0],endSide=sides[sides.length-1];
       const center={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
       const inwardNormal=(tangent,point)=>{
