@@ -1,5 +1,39 @@
 // src/pipingCore.js — pure piping math; no React, no formatting imports.
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * PIPING LENGTH MODEL — why the strip = sewline, and the cord is its own length
+ * (A note to future us, in Abby's own words, for when we forget this again.)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * "The strip length MUST be calculated exactly at the sewline because we can't
+ *  ease past that to make it fit. The material compresses around the corners
+ *  with the cord inside, so the actual length of the strip MUST work with the
+ *  sewline."
+ *
+ * The principle: you can take up slack, but you can't add length you don't have.
+ *   - The strip can't be shorter than the sewline (it wouldn't reach), and it
+ *     rides at the seam so it isn't longer. Therefore:  STRIP = sewline + 2*SA
+ *     (the 2*SA is the two join allowances to close the strip into a loop.)
+ *   - Bag-makers take up the slack by NOTCHING/CLIPPING the strip's raw edge
+ *     BEFORE sewing (not easing while sewing, as garment-makers do). Tight
+ *     curves need heavy notching to seat snugly.
+ *
+ * "The cord is its own length because it DOES live inside the sewline and
+ *  cannot be eased."
+ *   - Therefore:  CORD = sewline inset by ~one cord radius (it sits just inside
+ *     the seam). The wrap/vinyl thickness moves the FOLD, not the cord center,
+ *     so it is NOT part of the cord offset.
+ *
+ * SELF-CHECK INVARIANT: a sewn closed loop = strip - 2*SA = the sewline
+ * perimeter, always. If a displayed "loop when sewn" value ever differs from the
+ * sewline, the strip math has drifted — surface it, don't ship it.
+ *
+ * DO NOT derive strip or cord cut-length from the inner fold-crease POSITION.
+ * That inner path is ~1" shorter and exists for DRAWING the diagram only.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
 export const MIN_PIPING_RADIUS    = 1;
 export const CORD_STAY_AWAY       = 1/64;
 export const CLOSED_LOOP_STRIP_PCT = 0.950;
@@ -164,7 +198,9 @@ export function cpPipingStraightStrips(activeRuns,cordRuns,sa,cordDia,vinylThick
    Snug-fit percentages derived from Piping.jsx anchor calibration data. */
 export function cpPipingClosedLoop(cutPerim, sewPerim, sa, cordDia, vinylThick){
   const geoStripLen  = sewPerim + 2*sa;
-  const geoCordLen   = Math.max(0, sewPerim - 2*Math.PI*(cordDia/2 + vinylThick));
+  // Cord centerline rides one cord-radius inside the sewline. vinylThick is
+  // deliberately excluded here: wrap thickness moves the FOLD, not the cord center.
+  const geoCordLen   = Math.max(0, sewPerim - 2*Math.PI*(cordDia/2));
   const snugStripLen = cutPerim * CLOSED_LOOP_STRIP_PCT;
   const snugCordLen  = cutPerim * CLOSED_LOOP_CORD_PCT;
   return {geoStripLen, geoCordLen, snugStripLen, snugCordLen};
