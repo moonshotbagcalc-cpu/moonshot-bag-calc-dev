@@ -563,7 +563,8 @@ function sampleCornerBlend(P, tP, Q, tQ, sideA, sideB){
     pts.push({
       x:m*m*m*P.x + 3*m*m*t*c1.x + 3*m*t*t*c2.x + t*t*t*Q.x,
       y:m*m*m*P.y + 3*m*m*t*c1.y + 3*m*t*t*c2.y + t*t*t*Q.y,
-      side:t <= 0.5 ? sideA : sideB
+      side:t <= 0.5 ? sideA : sideB,
+      corner:true
     });
   }
   const mid = CORNER_SAMPLES/2;
@@ -578,7 +579,7 @@ function joinPathParts(parts, side){
   let out = [];
   for (const part of parts){
     for (const p of part){
-      const q = {x:p.x,y:p.y,side};
+      const q = p.corner ? {x:p.x,y:p.y,side,corner:true} : {x:p.x,y:p.y,side};
       if (!out.length || dist(out[out.length-1],q) > 1e-7) out.push(q);
     }
   }
