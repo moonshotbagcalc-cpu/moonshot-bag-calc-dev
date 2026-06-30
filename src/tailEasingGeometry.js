@@ -13,7 +13,8 @@
 // caller decides the basis — this is the §9 cut-vs-visible-width harmonization.
 
 import {
-  add, sub, mul, dot, unitV,
+  add, sub, mul, dot, perp, len, unitV,
+  pathLen, runPath, tangentAt,
   linePathIntersectInfo, closestPathPointToLineInfo,
 } from "./pathGeometry.js";
 
@@ -81,4 +82,103 @@ export function computeExitTail(Fi, cutTanTowardCorner, nIn, cordPath, opts) {
 
   return { Fi, Tf, B, A2, A1, Tr, C, cordDist, R_arc, sweep_natural,
            notchBack, tangentAway, dirA2, dirA1 };
+}
+
+// ── Cut-list length measurement ─────────────────────────────────────────────
+// Computes per-side STRIP and CORD cut lengths for the failed-corner (open-tail)
+// case, by measuring the real exit-tail geometry instead of guessing offsets.
+//
+// This mirrors how drawStripRun sets up computeExitTail (same runPath trim, same
+// tangent/inward-normal derivation), then MEASURES the result into scalars:
+//
+//   strip length = side sew run + at each FAILED end a longitudinal tail of
+//                  (notchBack + exitOvershoot) past the sewline endpoint.
+//                  notchBack = R/sin(55°) is the B→Fi distance; Tf overshoots Fi
+//                  by exitOvershoot. Together they are how much LONGER the strip
+//                  runs at a failed end so it can fold away and be trimmed.
+//   cord length  = side cord run, trimmed at each FAILED end to where C lands
+//                  (cordDist = arc-length along the cord path to C). The cord stops
+//                  at C on its own centerline; it does NOT tail past like the strip.
+//
+// Inputs:
+//   sides        = array of side keys for this run, e.g. ['top'] or ['left','top']
+//   cutSides     = {top,right,bottom,left} cut-edge polylines (inch space)
+//   cordSides    = {top,right,bottom,left} cord-centerline polylines (inch space)
+//   sewRun       = scalar sewline length for this run (sum of activeRuns over sides)
+//   cordRun      = scalar cord length for this run (sum of cordRuns over sides)
+//   startFail    = boolean, does the corner BEFORE this run fail?
+//   endFail      = boolean, does the corner AFTER this run fail?
+//   center       = panel center {x,y} (from model.cutBB) for inward-normal sign
+//   opts         = { sa, easeOff, R, tailFoldWidth, exitAngleRad, exitOvershoot, D }
+//
+// Returns: { stripLen, cordLen, tailStart, tailEnd, tailS, tailE }
+//   tailStart/tailEnd = the longitudinal tail added at each end (0 if that end passes)
+//   tailS/tailE       = the full computeExitTail result at each failed end (for
+//                       diagram reuse / "measure down X from the end" tips)
+export function measureStripRun(sides, cutSides, cordSides, sewRun, cordRun,
+                                startFail, endFail, center, opts) {
+  const { sa, easeOff, R, tailFoldWidth, exitAngleRad, exitOvershoot, D } = opts;
+  const exitOffset = 1.5 * sa + easeOff;
+
+  // Walk the cut edge for this run, trimmed by exitOffset at each FAILED end, to
+  // land Fi exactly where drawStripRun does.
+  const trimStart = startFail ? exitOffset : 0;
+  const trimEnd   = endFail   ? exitOffset : 0;
+  const outerAtFi = runPath(cutSides, sides, trimStart, trimEnd);
+  if (outerAtFi.length < 2) {
+    // Degenerate run; fall back to the bare sew run + seam allowances.
+    return { stripLen: sewRun + 2 * sa, cordLen: cordRun, tailStart: 0, tailEnd: 0,
+             tailS: null, tailE: null };
+  }
+
+  const startTan = tangentAt(outerAtFi, true);
+  const endTan   = tangentAt(outerAtFi, false);
+  const startSide = sides[0], endSide = sides[sides.length - 1];
+
+  const inwardNormal = (tangent, point) => {
+    let n = unitV(perp(tangent));
+    if (dot(n, sub(center, point)) < 0) n = mul(n, -1);
+    return n;
+  };
+
+  const exitOpts = { R, tailFoldWidth, exitAngleRad, exitOvershoot, D };
+
+  let tailS = null, tailE = null;
+  let tailStart = 0, tailEnd = 0;
+  let cordTrimStart = 0, cordTrimEnd = 0;
+
+  if (startFail) {
+    const nIn = inwardNormal(startTan, outerAtFi[0]);
+    tailS = computeExitTail(outerAtFi[0], mul(startTan, -1), nIn, cordSides[startSide], exitOpts);
+    // Longitudinal tail past the sewline endpoint at the start:
+    // exitOffset (corner→Fi) + notchBack (Fi→B) + exitOvershoot (Fi→Tf past edge).
+    tailStart = exitOffset + tailS.notchBack + exitOvershoot;
+    // Cord stops at C: trim the cord run by how far C sits from the run start.
+    const startCordSideLen = pathLen(cordSides[startSide] || []);
+    cordTrimStart = (tailS.cordDist != null)
+      ? Math.max(0, tailS.cordDist)
+      : exitOffset;
+    // (cordDist is measured from the start of cordSides[startSide]; for the start
+    //  end that is the distance to trim off the front.)
+  }
+
+  if (endFail) {
+    const nIn = inwardNormal(endTan, outerAtFi[outerAtFi.length - 1]);
+    tailE = computeExitTail(outerAtFi[outerAtFi.length - 1], endTan, nIn, cordSides[endSide], exitOpts);
+    tailEnd = exitOffset + tailE.notchBack + exitOvershoot;
+    const endCordSideLen = pathLen(cordSides[endSide] || []);
+    cordTrimEnd = (tailE.cordDist != null)
+      ? Math.max(0, endCordSideLen - tailE.cordDist)
+      : exitOffset;
+  }
+
+  // Strip: full sew run, plus seam allowances at both short ends, plus the tail at
+  // each FAILED end (passing ends contribute 0 tail).
+  const stripLen = sewRun + 2 * sa + tailStart + tailEnd;
+
+  // Cord: the cord run trimmed at each failed end to where C lands. Guard so it
+  // can never exceed the strip or go negative.
+  const cordLen = Math.max(0, Math.min(cordRun - cordTrimStart - cordTrimEnd, stripLen));
+
+  return { stripLen, cordLen, tailStart, tailEnd, tailS, tailE };
 }
